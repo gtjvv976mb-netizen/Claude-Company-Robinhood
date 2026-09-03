@@ -2,14 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "claude-co",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "src/index.js",
-        "office",
-        "8788"
-      ],
-      "port": 8788
+      "name": "rh-viewer",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5199", "--directory",
+        "/Users/michaelkennethbrillantes/Downloads/claude-co-robinhood/viewer"],
+      "port": 5199
     }
   ]
 }

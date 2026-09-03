@@ -49,14 +49,14 @@
   /* the evening (hero) — fixed in both schemes: it is a picture of dusk */
   --dusk-ink:#f8f0dc;
   --dusk-soft:#e9dcbd;
-  --dusk-amber:#eec27a;
-  --dusk-bar:rgba(18,15,34,.94);
+  --dusk-amber:#5cf07a;
+  --dusk-bar:rgba(7,14,16,.94);
   --hero-sky:linear-gradient(180deg,
-    #0f0c22 0%, #171233 17%, #241a44 33%, #37255a 47%,
-    #55306a 59%, #7c4071 69%, #a85672 77%, #cf7469 83%,
-    #ec9d6b 88%, #f7bf80 93%, #f3b978 100%);
-  --hero-horizon:linear-gradient(180deg,#251a2d 0%,#181120 38%,#0d0913 100%);
-  --hero-horizon-line:rgba(244,196,120,.28);
+    #05090c 0%, #071016 17%, #0a1a1e 33%, #0d2529 47%,
+    #103330 59%, #124338 69%, #14563d 77%, #156a41 83%,
+    #17864a 88%, #1aa155 93%, #1bab59 100%);
+  --hero-horizon:linear-gradient(180deg,#0b1a17 0%, #08120f 38%, #04090a 100%);
+  --hero-horizon-line:rgba(0,200,5,.32);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -66,7 +66,7 @@
     --accent:#e0ad3d; --accent-ink:#e8bb5c;
     --hot:#e0ad3d; --hot-ink:#231a12;
     --kind-model:#73c9d2;
-    --dusk-ink:#f8f0dc; --dusk-soft:#e9dcbd; --dusk-amber:#eec27a;
+    --dusk-ink:#f8f0dc; --dusk-soft:#e9dcbd; --dusk-amber:#5cf07a;
     --dusk-bar:rgba(14,12,28,.94);
   }
 }
@@ -74,23 +74,24 @@
    The dusk stays the default and the night; flipping the switch relights the
    hero, re-inks its type, and lets the broadsheet below run in daylight. */
 :root[data-theme="light"]{
-  --dusk-ink:#233036; --dusk-soft:#48575a; --dusk-amber:#8a651c;
+  --dusk-ink:#233036; --dusk-soft:#48575a; --dusk-amber:#0f7a33;
   --dusk-bar:rgba(240,236,222,.95);
   --hero-sky:linear-gradient(180deg,
-    #79aBd3 0%, #8db8d9 22%, #a9c9e0 44%, #c6dbe4 64%,
-    #e3e4d2 80%, #eee7cf 90%, #ecdfc0 100%);
-  --hero-horizon:linear-gradient(180deg,#d9d6c3 0%,#c6c4b0 55%,#b7b5a1 100%);
-  --hero-horizon-line:rgba(90,84,60,.28);
+    #6f9fb8 0%, #86b2c4 22%, #a4c8d2 44%, #c2dcde 64%,
+    #dbe7dc 80%, #e7eee2 90%, #e2ecdf 100%);
+  --hero-horizon:linear-gradient(180deg,#c9d4cd 0%,#b6c2bb 55%,#a7b4ac 100%);
+  --hero-horizon-line:rgba(0,140,20,.26);
 }
 :root[data-theme="light"] .shade{display:none}
-/* the tower itself changes shift: stars out, lamps off, dusk masonry lifted
-   to daylight, the reflections calmed. The crest stays coral — the sign is
-   the sign at any hour. */
+/* the tower changes shift: stars out, lamps down, night glass lifted to
+   daylight, the reflections calmed. The crest stays coral at any hour — the
+   desk is Claude's whatever chain it trades on. */
 :root[data-theme="light"] .hero-art #stars{display:none}
 :root[data-theme="light"] .hero-art #wins{opacity:.3}
 :root[data-theme="light"] .hero-art #refl{opacity:.4}
-:root[data-theme="light"] .hero-art #trees{fill:#42583a}
-:root[data-theme="light"] .hero-art #tower{filter:brightness(1.62) saturate(.62) hue-rotate(-14deg)}
+:root[data-theme="light"] .hero-art #trees{fill:#3f4f52}
+:root[data-theme="light"] .hero-art #plazalight{opacity:.35}
+:root[data-theme="light"] .hero-art #tower{filter:brightness(1.5) saturate(.7)}
 :root[data-theme="light"] .hero::before{content:"";position:absolute;top:9%;right:15%;
   width:78px;height:78px;border-radius:50%;z-index:1;
   background:radial-gradient(circle,#fffdf2 0 36%,#f7dd94 58%,rgba(247,221,148,0) 72%)}
@@ -190,7 +191,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent-ink);outline
   height:min(88%,880px);aspect-ratio:720/1060}
 .hero-art svg{display:block;width:100%;height:100%}
 .shade{position:absolute;inset:0;z-index:3;pointer-events:none;background:
-  linear-gradient(66deg, rgba(10,7,19,.78) 0%, rgba(10,7,19,.4) 30%, rgba(10,7,19,0) 58%),
+  linear-gradient(66deg, rgba(4,10,12,.80) 0%, rgba(4,10,12,.42) 30%, rgba(4,10,12,0) 58%),
   linear-gradient(0deg, rgba(8,6,16,.74) 0%, rgba(8,6,16,.26) 26%, rgba(8,6,16,0) 54%)}
 .hero-copy{position:absolute;left:0;right:0;bottom:0;z-index:4;
   padding:0 clamp(18px,4.5vw,56px) clamp(30px,6vh,72px)}
@@ -421,7 +422,7 @@ footer a:hover{color:var(--ink);border-bottom-color:var(--accent)}
 /* ── 14 · print ─────────────────────────────────────────────────────── */
 @media print{
   .topnav,.tokenlinks,.cacopy,.skip,.shade{display:none}
-  .hero{height:auto;min-height:0;background:#181228}
+  .hero{height:auto;min-height:0;background:#071016}
   body{background:#fff;color:#000;font-size:11pt}
   .sheet{padding:18pt 0;break-inside:avoid}
   a{text-decoration:none}
@@ -471,73 +472,80 @@ footer a:hover{color:var(--ink);border-bottom-color:var(--accent)}
   });
 })();
 </script>
-<section class="hero" id="top" aria-label="Claude Tower at dusk">
+<section class="hero" id="top" aria-label="Claude Tower on Robinhood Chain at night">
   <div class="hero-art" aria-hidden="false">
     <svg id="towersvg" viewBox="0 0 720 1060" preserveAspectRatio="xMidYMax meet" role="img" focusable="false"
-      aria-label="Claude Tower at dusk: a fifty-floor slab with scattered lit amber windows, the crown floor glowing brightest, a spark mark above the roof, low trees at the base, and the lit windows reflected in dark glossy ground.">
+      aria-label="Claude Tower on Robinhood Chain at night: a fifty-floor dark-glass slab with scattered lit green windows, the crown floor glowing brightest, a coral spark mark above the roof, a lit plaza at the base, and the green windows reflected in wet dark ground.">
       <defs>
         <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9"/></filter>
         <filter id="soft2" x="-140%" y="-140%" width="380%" height="380%"><feGaussianBlur stdDeviation="15"/></filter>
         <linearGradient id="fwash" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#4a3a62" stop-opacity=".26"/>
-          <stop offset=".45" stop-color="#4a3a62" stop-opacity="0"/>
-          <stop offset=".72" stop-color="#f0a86a" stop-opacity="0"/>
-          <stop offset="1" stop-color="#f0a86a" stop-opacity=".2"/>
+          <stop offset="0" stop-color="#0d2b23" stop-opacity=".34"/>
+          <stop offset=".45" stop-color="#0d2b23" stop-opacity="0"/>
+          <stop offset=".72" stop-color="#00c805" stop-opacity="0"/>
+          <stop offset="1" stop-color="#00c805" stop-opacity=".17"/>
         </linearGradient>
       </defs>
       <g id="stars"></g>
-      <g id="trees" fill="#140e1f">
-        <rect x="94" y="858" width="9" height="44"/><rect x="70" y="812" width="56" height="50"/><rect x="82" y="794" width="32" height="22"/>
-        <rect x="150" y="868" width="8" height="34"/><rect x="132" y="830" width="44" height="42"/><rect x="141" y="814" width="26" height="20"/>
-        <rect x="36" y="872" width="7" height="30"/><rect x="20" y="840" width="38" height="36"/>
-        <rect x="588" y="860" width="9" height="42"/><rect x="566" y="816" width="54" height="48"/><rect x="578" y="798" width="30" height="22"/>
-        <rect x="650" y="872" width="8" height="30"/><rect x="632" y="836" width="44" height="40"/>
-        <rect x="692" y="878" width="7" height="24"/><rect x="676" y="850" width="38" height="32"/>
+      <g id="trees" fill="#0c1614">
+        <!-- a plaza, not a wood: slim lit pylons and low planters along the frontage -->
+        <rect x="96" y="806" width="5" height="96"/><rect x="88" y="800" width="21" height="7"/>
+        <rect x="152" y="822" width="5" height="80"/><rect x="144" y="816" width="21" height="7"/>
+        <rect x="596" y="806" width="5" height="96"/><rect x="588" y="800" width="21" height="7"/>
+        <rect x="652" y="822" width="5" height="80"/><rect x="644" y="816" width="21" height="7"/>
+        <rect x="24" y="874" width="76" height="28"/><rect x="618" y="874" width="86" height="28"/>
+        <rect x="126" y="884" width="54" height="18"/><rect x="546" y="884" width="54" height="18"/>
+      </g>
+      <g id="plazalight" fill="#00c805">
+        <rect x="88" y="800" width="21" height="3" opacity=".85"/><rect x="144" y="816" width="21" height="3" opacity=".8"/>
+        <rect x="588" y="800" width="21" height="3" opacity=".85"/><rect x="644" y="816" width="21" height="3" opacity=".8"/>
+        <rect x="24" y="872" width="76" height="2" opacity=".5"/><rect x="618" y="872" width="86" height="2" opacity=".5"/>
       </g>
       <g id="tower">
         <!-- four bands, stepping back at floors 16, 29 and 41 — the built tower's profile -->
-        <rect x="496" y="656" width="26" height="224" fill="#1b1529"/>
-        <rect x="488" y="474" width="24" height="182" fill="#1b1529"/>
-        <rect x="472" y="306" width="22" height="168" fill="#1b1529"/>
-        <rect x="460" y="180" width="20" height="126" fill="#1b1529"/>
-        <rect x="210" y="656" width="302" height="224" fill="#332b47"/>
-        <rect x="218" y="474" width="286" height="182" fill="#372e4c"/>
-        <rect x="228" y="306" width="266" height="168" fill="#3b3152"/>
-        <rect x="240" y="180" width="242" height="126" fill="#403558"/>
+        <rect x="496" y="656" width="26" height="224" fill="#0b1114"/>
+        <rect x="488" y="474" width="24" height="182" fill="#0b1114"/>
+        <rect x="472" y="306" width="22" height="168" fill="#0b1114"/>
+        <rect x="460" y="180" width="20" height="126" fill="#0b1114"/>
+        <rect x="210" y="656" width="302" height="224" fill="#151d21"/>
+        <rect x="218" y="474" width="286" height="182" fill="#182126"/>
+        <rect x="228" y="306" width="266" height="168" fill="#1b262b"/>
+        <rect x="240" y="180" width="242" height="126" fill="#1e2b30"/>
         <rect x="210" y="180" width="302" height="700" fill="url(#fwash)"/>
-        <rect x="210" y="656" width="4" height="224" fill="#dcc99c" opacity=".45"/>
-        <rect x="218" y="474" width="4" height="182" fill="#dcc99c" opacity=".4"/>
-        <rect x="228" y="306" width="4" height="168" fill="#dcc99c" opacity=".35"/>
+        <rect x="210" y="656" width="4" height="224" fill="#00c805" opacity=".5"/>
+        <rect x="218" y="474" width="4" height="182" fill="#00c805" opacity=".44"/>
+        <rect x="228" y="306" width="4" height="168" fill="#00c805" opacity=".38"/>
         <!-- terraces at each setback: a stone lip and planters, as built -->
-        <g fill="#cfc0a0" opacity=".8">
+        <g fill="#5d6f74" opacity=".85">
           <rect x="206" y="652" width="310" height="5"/>
           <rect x="214" y="470" width="294" height="5"/>
           <rect x="224" y="302" width="274" height="5"/>
         </g>
-        <g fill="#5d8f4a">
-          <rect x="214" y="644" width="12" height="9"/><rect x="496" y="644" width="12" height="9"/>
-          <rect x="222" y="462" width="11" height="9"/><rect x="486" y="462" width="11" height="9"/>
-          <rect x="232" y="294" width="10" height="9"/><rect x="472" y="294" width="10" height="9"/>
+        <!-- edge-light along each setback, the way a glass tower marks its terraces -->
+        <g fill="#00c805" opacity=".62">
+          <rect x="206" y="650" width="310" height="2"/>
+          <rect x="214" y="468" width="294" height="2"/>
+          <rect x="224" y="300" width="274" height="2"/>
         </g>
-        <rect x="238" y="177" width="246" height="22" fill="#ffd987" opacity=".8" filter="url(#soft)"/>
+        <rect x="238" y="177" width="246" height="22" fill="#5cf07a" opacity=".8" filter="url(#soft)"/>
         <g id="wins"></g>
-        <rect x="204" y="876" width="348" height="26" fill="#1e1830"/>
-        <rect x="308" y="866" width="106" height="7" fill="#e9b158" opacity=".9"/>
-        <rect x="312" y="873" width="5" height="29" fill="#8a6540"/>
-        <rect x="404" y="873" width="5" height="29" fill="#8a6540"/>
-        <rect x="298" y="900" width="126" height="4" fill="#3a3050"/>
-        <rect x="306" y="904" width="110" height="4" fill="#332a47"/>
-        <rect x="338" y="880" width="44" height="22" fill="#f2bd63"/>
-        <rect x="326" y="884" width="6" height="18" fill="#e9b158" opacity=".8"/>
-        <rect x="388" y="884" width="6" height="18" fill="#e9b158" opacity=".8"/>
-        <rect x="232" y="161" width="258" height="4" fill="#d9c69c" opacity=".8"/>
-        <rect x="232" y="164" width="258" height="16" fill="#2a2138"/>
+        <rect x="204" y="876" width="348" height="26" fill="#0d1518"/>
+        <rect x="308" y="866" width="106" height="7" fill="#00c805" opacity=".9"/>
+        <rect x="312" y="873" width="5" height="29" fill="#44565b"/>
+        <rect x="404" y="873" width="5" height="29" fill="#44565b"/>
+        <rect x="298" y="900" width="126" height="4" fill="#162024"/>
+        <rect x="306" y="904" width="110" height="4" fill="#121a1e"/>
+        <rect x="338" y="880" width="44" height="22" fill="#3ee063"/>
+        <rect x="326" y="884" width="6" height="18" fill="#00c805" opacity=".75"/>
+        <rect x="388" y="884" width="6" height="18" fill="#00c805" opacity=".75"/>
+        <rect x="232" y="161" width="258" height="4" fill="#6b7d82" opacity=".85"/>
+        <rect x="232" y="164" width="258" height="16" fill="#121b1f"/>
       </g>
       <circle cx="361" cy="116" r="30" fill="#d97757" opacity=".18" filter="url(#soft2)"/>
       <g id="herospark" transform="translate(361,116) scale(1.9)" fill="#d97757" color="#d97757"><circle r="2.6" fill="currentColor"/></g>
       <g id="refl">
-        <rect x="214" y="902" width="300" height="44" fill="#d8c49c" opacity=".05"/>
-        <rect x="338" y="904" width="44" height="26" fill="#eeb964" opacity=".2"/>
+        <rect x="214" y="902" width="300" height="44" fill="#6fe08a" opacity=".05"/>
+        <rect x="338" y="904" width="44" height="26" fill="#3ee063" opacity=".2"/>
       </g>
     </svg>
   </div>
@@ -547,7 +555,7 @@ footer a:hover{color:var(--ink);border-bottom-color:var(--accent)}
     <h1>Lease a floor. <em>Get the whole desk.</em></h1>
     <p class="standfirst-h">AUSTIN POWERZ works pump.fun, from the minute a coin is created. Your floor copies the desk, traded from your own wallet.</p>
   </div>
-  <p class="figcap">Fig. 1 — Claude Tower, 50 floors, dusk. The crown is the house desk.</p>
+  <p class="figcap">Fig. 1 — Claude Tower on Robinhood Chain, 50 floors, night. The crown is the house desk.</p>
 </section>
 
 <main id="main">
@@ -767,21 +775,23 @@ if(sg){spark(sg);
 var wins=document.getElementById("wins"),refl=document.getElementById("refl"),stars=document.getElementById("stars");
 if(wins&&refl){
   var rand=mulberry(50);
-  var LIT=["#ffbb50","#f6c76d","#e8a23c","#cf9542"],UNLIT="#241e33";
+  /* Robinhood green in four values — a floor is lit or it is not, and a glass
+     curtain wall reads colder than masonry when it is dark. */
+  var LIT=["#00c805","#3ee063","#0aa83f","#17d451"],UNLIT="#111a1e";
   var BASE=880,FH=14,WW=24,WH=8,GROUND=902;
   /* the same setbacks the 3D tower has: bands narrow at floors 16, 29 and 41 */
   function band(f){return f>40?{x0:258,cols:6,step:32}:f>28?{x0:246,cols:7,step:31}
                         :f>15?{x0:244,cols:7,step:34}:{x0:230,cols:8,step:34};}
   for(var f=1;f<=50;f++){
     var top=BASE-f*FH;
-    if(f===50){for(var k=0;k<6;k++)R(wins,262+k*33,181,30,13,"#ffe3a6",1);continue;}
+    if(f===50){for(var k=0;k<6;k++)R(wins,262+k*33,181,30,13,"#8bff9f",1);continue;}
     var bd=band(f),X0=bd.x0,STEP=bd.step;
     var p=(f%10===0?0.32:0.13+0.08*Math.abs(Math.sin(f*1.7)));
     for(var c=0;c<bd.cols;c++){
       var lit=rand()<p;
       var fill=lit?LIT[(rand()*4)|0]:UNLIT;
       R(wins,X0+c*STEP,top+3,WW,WH,fill,lit?(0.84+rand()*0.16).toFixed(2):1);
-      if(c===0&&f%10===0)R(wins,X0-16,top+13,STEP*bd.cols+8,2,"#d9c69c",0.34);
+      if(c===0&&f%10===0)R(wins,X0-16,top+13,STEP*bd.cols+8,2,"#00c805",0.3);
       if(lit){
         var d=GROUND-(top+3+WH);
         if(d<=260){var ro=0.26*(1-d/280);
@@ -791,7 +801,7 @@ if(wins&&refl){
   }
   if(stars){var sr=mulberry(7);
     for(var i=0;i<30;i++){var s=sr();
-      R(stars,(12+sr()*696).toFixed(1),(12+sr()*318).toFixed(1),1.6,1.6,"#efe6ff",(0.1+s*0.35).toFixed(2));}}
+      R(stars,(12+sr()*696).toFixed(1),(12+sr()*318).toFixed(1),1.6,1.6,"#dcf3e6",(0.1+s*0.3).toFixed(2));}}
 }
 
 /* the nav turns charcoal only after the evening scrolls away */
