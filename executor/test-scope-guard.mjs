@@ -8,7 +8,8 @@
  * The live half runs against chain 4663 and is skipped without a network, because a
  * test that silently passes offline is worse than one that is honestly absent.
  */
-import { classifyFromBeaconWord, classifyToken, beaconFromSlotWord,
+import { classifyFromBeaconWord, classifyToken, beaconFromSlotWord, classifyPairAsset,
+  classifyPairAssetOnChain, ALLOWED_PAIR_EQUITIES,
   KNOWN_STOCK_TOKEN_BEACON, ERC1967_BEACON_SLOT } from "./scope-guard.mjs";
 
 let pass = 0, fail = 0;
@@ -54,6 +55,43 @@ console.log("\nAN UNREADABLE SLOT IS NEVER 'NO BEACON'");
   let threw = false;
   try { await classifyToken("not-an-address", async () => EMPTY); } catch { threw = true; }
   ok("a bad address is a programming error, not a refusal", threw);
+}
+
+console.log("\nAN EQUITY MAY BE A PAIR ASSET, NEVER A POSITION");
+{
+  /* PONS V2 lets a launch pair against any ERC-20, so a token paired to GOOGL can only be
+     bought by someone holding GOOGL. Trading that pool means touching an equity. The line
+     moved exactly this far and no further: the desk may hold one as the medium of
+     exchange, in and out inside a round trip, and may never take a view on it. */
+  const GOOGL = "0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3";
+  const TSLA = "0x322F0929c4625eD5bAd873c95208D54E1c003b2d";
+  const eq = word(KNOWN_STOCK_TOKEN_BEACON);
+
+  ok("GOOGL is still refused as a position", classifyFromBeaconWord(eq, { address: GOOGL }).tradeable === false);
+  ok("...and allowed as a pair asset", classifyPairAsset(eq, { address: GOOGL }).allowedAsPair === true);
+  ok("...named, so the log says which equity is being held",
+    classifyPairAsset(eq, { address: GOOGL }).pairSymbol === "GOOGL");
+  ok("...and the reason states the limit, not just the permission",
+    /never taken as a position/.test(classifyPairAsset(eq, { address: GOOGL }).reason));
+
+  /* THE ALLOWLIST IS THE POINT. "It is a stock, so it is fine" would readmit everything
+     the guard exists to keep out — including a token that merely looks like an equity. */
+  ok("an equity NOT on the list is refused as a pair asset too",
+    classifyPairAsset(eq, { address: TSLA }).allowedAsPair === false, "TSLA");
+  ok("...and says it was never chosen deliberately",
+    /allowlist/.test(classifyPairAsset(eq, { address: TSLA }).reason));
+  ok("the list is short and explicit", ALLOWED_PAIR_EQUITIES.size <= 5, `${ALLOWED_PAIR_EQUITIES.size} entries`);
+  ok("...and is matched case-insensitively, as addresses arrive either way",
+    classifyPairAsset(eq, { address: GOOGL.toLowerCase() }).allowedAsPair === true);
+
+  ok("a plain token is fine as either", classifyPairAsset(EMPTY, { address: "0xCASHCAT" }).allowedAsPair === true);
+  /* An unknown beacon must not become allowed just because it is being spent rather
+     than bought. Fail closed on both sides. */
+  ok("an unknown beacon is refused as a pair asset",
+    classifyPairAsset(word("0x1234567890abcdef1234567890abcdef12345678"), { address: "0xNEW" }).allowedAsPair === false);
+  ok("an unreadable slot is refused as a pair asset",
+    (await classifyPairAssetOnChain("0x020bfC650A365f8BB26819deAAbF3E21291018b4",
+      async () => { throw new Error("RPC down"); })).allowedAsPair === false);
 }
 
 console.log("\nAGAINST THE LIVE CHAIN");

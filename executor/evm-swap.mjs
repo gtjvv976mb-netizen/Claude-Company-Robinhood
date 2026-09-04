@@ -32,7 +32,7 @@
  * Everything here is read-only. Nothing in this file signs, holds a key, or sends.
  */
 
-import { classifyToken } from "./scope-guard.mjs";
+import { classifyToken, classifyPairAssetOnChain } from "./scope-guard.mjs";
 
 const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const AGG = "https://aggregator-api.kyberswap.com/robinhood/api/v1";
@@ -133,7 +133,7 @@ export function embeddedFloor(calldata, quotedOut, { floorBand = 5000n } = {}) {
  */
 export async function prepareSwap(rpc, {
   tokenIn, tokenOut, amountIn, sender, recipient = sender, slippageBps,
-  scopeCheck = true,
+  scopeCheck = true, direction = "buy",
 }) {
   if (!(BigInt(amountIn) > 0n)) throw new Error("amountIn must be positive");
 
@@ -141,10 +141,23 @@ export async function prepareSwap(rpc, {
      the last thing between a decision and money moving, and it does not get to assume
      the caller screened. An unreadable slot refuses. */
   if (scopeCheck) {
-    for (const t of [tokenIn, tokenOut]) {
-      if (isNative(t)) continue;
-      const v = await classifyToken(t, (addr, slot) => rpc("eth_getStorageAt", [addr, slot, "latest"]));
+    /* TWO DIFFERENT QUESTIONS, NOT ONE FLAG. A swap has a thing being speculated on and a
+       thing being spent, and this desk treats them differently: an equity may be the
+       medium of exchange for a memecoin trade, and may never be the position. Which side
+       is which depends on direction — buying, the target is tokenOut and we spend
+       tokenIn; selling, the reverse. */
+    const read = (addr, slot) => rpc("eth_getStorageAt", [addr, slot, "latest"]);
+    const selling = !isNative(tokenIn) && isNative(tokenOut) === false && direction === "sell";
+    const target = selling ? tokenIn : tokenOut;
+    const paidWith = selling ? tokenOut : tokenIn;
+
+    if (!isNative(target)) {
+      const v = await classifyToken(target, read);
       if (!v.tradeable) throw new Error(`scope guard: ${v.reason}`);
+    }
+    if (!isNative(paidWith)) {
+      const v = await classifyPairAssetOnChain(paidWith, read);
+      if (!v.allowedAsPair) throw new Error(`scope guard, pair asset: ${v.reason}`);
     }
   }
 
