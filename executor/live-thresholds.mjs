@@ -27,10 +27,27 @@ export const GAS_PRICE_GWEI = defineThreshold("chain.gasPriceGwei", 0.309,
   { ...M("2026-09-04", "eth_gasPrice returned 309,210,000 wei"), unit: "gwei", live: false,
     note: "a spot reading, not a distribution — re-read per trade, never cached as a constant" });
 
-export const SWAP_GAS = defineThreshold("swap.gasUnits", 227_860,
-  { ...M("2026-09-04", "eth_estimateGas on a real built swap, one route, one sample"),
+export const ROUND_TRIP_GAS = defineThreshold("swap.roundTripGasUnits", 660_996,
+  { ...M("2026-09-04", "median of 9 KyberSwap-routed round trips (buy then sell the exact output) " +
+    "across CASHCAT, PONS and AI at 0.01/0.05/0.2 ETH; range 618,079-823,333"),
     unit: "gas", live: true,
-    note: "ONE sample on ONE route. Widen before sizing anything on it." });
+    note: "BOTH legs. At 0.326 gwei this is 0.00021548 ETH, about $0.54 — and it is FLAT, " +
+      "not proportional. On Solana a round trip cost 4.5-5.6% of the trade at any size; here " +
+      "the same $0.54 is 4.31% of a 0.005 ETH clip and 0.04% of a 0.5 ETH one. That inverts " +
+      "the sizing logic: small clips are punished and large ones are nearly free, which is the " +
+      "opposite of the regime every inherited threshold was tuned in." });
+
+/* THE PROBE'S OWN NOISE, WHICH BOUNDS WHAT IT CAN RESOLVE.
+   Measured: of nine units-consistent round trips, THREE returned negative — more ETH back
+   than went in, to -0.869%. That is not arbitrage, it is the two legs being quoted moments
+   apart against a moving pool. So a quote-based exit probe on this chain cannot resolve a
+   cost below roughly a percent, and the Solana desk's probe only worked because the costs
+   it measured (4.5-5.6%) sat far above its noise. Anything tighter has to be simulated
+   on-chain with eth_call, or medianed over repeats. Registered so nobody reads a single
+   sub-percent probe reading as a fact. */
+export const EXIT_PROBE_NOISE_PCT = defineThreshold("probe.quoteNoisePct", 0.9,
+  { ...M("2026-09-04", "spread of 9 round trips that should all have been positive: -0.869% to +0.665%"),
+    unit: "%", live: false });
 
 export const ROUND_TRIP_DEEP_PCT = defineThreshold("roundTrip.deepPct", 0.017,
   { ...M("2026-09-04", "CASHCAT (~$5.9M liquidity), 0.1 ETH clip, three consecutive passes: 0.015-0.018%"),

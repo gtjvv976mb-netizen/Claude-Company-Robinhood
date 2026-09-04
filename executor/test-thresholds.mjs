@@ -62,8 +62,16 @@ console.log("\nWHAT IS MEASURED IS MEASURED ON THIS CHAIN");
   ok("...and a date", measured.every((t) => t.at));
   const chain = threshold("chain.id");
   ok("the chain it was measured against is this one", chain.value === 4663, String(chain.value));
-  const swap = threshold("swap.gasUnits");
-  ok("a one-sample measurement says so in its note", /ONE sample/.test(swap.note ?? ""), swap.note?.slice(0, 46));
+  const swap = threshold("swap.roundTripGasUnits");
+  ok("the round-trip gas names how many samples it is",
+    /median of 9/.test(swap.method ?? ""), swap.method?.slice(0, 52));
+  /* The cost regime INVERTED between chains and the note has to say so, because every
+     inherited threshold was tuned where cost was proportional to size. */
+  ok("...and records that the cost is flat, not proportional",
+    /FLAT/.test(swap.note ?? "") && /inverts/.test(swap.note ?? ""));
+  const noise = threshold("probe.quoteNoisePct");
+  ok("the probe's own noise floor is registered, so a sub-percent reading is not a fact",
+    noise.value >= 0.5, `${noise.value}%`);
 }
 
 console.log("\nNOTHING INHERITED IS PRETENDING TO BE MEASURED");
