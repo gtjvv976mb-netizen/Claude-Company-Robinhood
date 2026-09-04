@@ -32,7 +32,7 @@
  * Everything here is read-only. Nothing in this file signs, holds a key, or sends.
  */
 
-import { classifyToken, classifyPairAssetOnChain } from "./scope-guard.mjs";
+import { classifyToken, classifyPairAssetOnChain, SELECTOR_NAME } from "./scope-guard.mjs";
 
 const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const AGG = "https://aggregator-api.kyberswap.com/robinhood/api/v1";
@@ -147,16 +147,18 @@ export async function prepareSwap(rpc, {
        is which depends on direction — buying, the target is tokenOut and we spend
        tokenIn; selling, the reverse. */
     const read = (addr, slot) => rpc("eth_getStorageAt", [addr, slot, "latest"]);
+    /* The second signal: name(). See scope-guard.mjs — it can only add a refusal. */
+    const readName = (addr) => rpc("eth_call", [{ to: addr, data: SELECTOR_NAME }, "latest"]);
     const selling = !isNative(tokenIn) && isNative(tokenOut) === false && direction === "sell";
     const target = selling ? tokenIn : tokenOut;
     const paidWith = selling ? tokenOut : tokenIn;
 
     if (!isNative(target)) {
-      const v = await classifyToken(target, read);
+      const v = await classifyToken(target, read, readName);
       if (!v.tradeable) throw new Error(`scope guard: ${v.reason}`);
     }
     if (!isNative(paidWith)) {
-      const v = await classifyPairAssetOnChain(paidWith, read);
+      const v = await classifyPairAssetOnChain(paidWith, read, readName);
       if (!v.allowedAsPair) throw new Error(`scope guard, pair asset: ${v.reason}`);
     }
   }

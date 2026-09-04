@@ -30,8 +30,30 @@
  *
  * FAIL CLOSED ON ANYTHING UNFAMILIAR, both sides. The check is not "is this the known
  * equity beacon" — it is "does this token hand its logic to a beacon at all". A second
- * equity beacon, or an equity behind a different proxy, is refused rather than waved
- * through for failing to match one hardcoded address.
+ * equity beacon is refused rather than waved through for failing to match one hardcoded
+ * address.
+ *
+ * BUT "DELEGATES" DOES NOT MEAN "EQUITY", measured 2026-09-05 over all 800 listed tokens:
+ * 130 are 283-byte beacon proxies and every one is a Robinhood Token; 90 are 44-byte
+ * EIP-1167 clones (PONS launches, the memecoins this desk exists to trade); USDG is a
+ * 170-byte proxy that delegates through the ERC-1967 IMPLEMENTATION slot, not the beacon.
+ * So the beacon slot alone would pass an equity that Robinhood chose to ship behind a
+ * different proxy. Hence a SECOND, INDEPENDENT signal: every one of the 130 carries
+ * "• Robinhood Token" in name(), and none of the other 670 on that list does. A token is
+ * refused if EITHER signal fires. The name is defence in depth, never a grant: a token
+ * that fails the beacon test is refused before its name is read, and a token whose name
+ * cannot be read is judged on the beacon alone — the secondary read can add a refusal,
+ * not remove one.
+ *
+ * OFF THE WHITELIST, IMPERSONATORS USE THE MARKER TOO — found 2026-09-05 through the
+ * Blockscout index (robinhoodchain.blockscout.com; 403 to a curl UA, 200 to a browser
+ * UA): "AnthropicAI • Robinhood Token" as a 44-byte clone, "ANTHROPIC • Pre IPO Token"
+ * behind a 295-byte proxy on a beacon that is not Robinhood's. The name signal refuses
+ * the first and the unknown-beacon rule refuses the second, and both refusals are
+ * deliberate: a memecoin dressed as a security is not one this desk wants to be seen
+ * holding, whatever it is under the costume. Robinhood's own registry —
+ * https://api.robinhood.com/rhj/assets, 194 assets, no auth — is the authority on which
+ * tokens are genuine; a beacon match is how the chain agrees with it.
  */
 
 /** bytes32(uint256(keccak256("eip1967.proxy.beacon")) - 1) */
@@ -75,8 +97,12 @@ export function classifyFromBeaconWord(word, { address = null } = {}) {
  *
  * GOOGL and AMZN are here because they are Anthropic's two largest outside shareholders
  * and so the nearest honest thing to the pairing the owner asked for. There is no Claude
- * or Anthropic stock token on this chain and there cannot be: Anthropic is private, so
- * there are no listed shares for a Stock Token to track. */
+ * or Anthropic stock token on this chain — measured 2026-09-05 across all 130 equity
+ * proxies, none is Anthropic, Claude or OpenAI. NOT because Anthropic is private: SPCX
+ * (0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea) is "Space Exploration Technologies Corp.
+ * Class A Common Stock • Robinhood Token", 283 bytes on the same beacon, and SpaceX is
+ * private too. Robinhood tokenizes private companies; it simply has not tokenized this
+ * one. That is an absence, not an impossibility, so re-measure before assuming. */
 export const ALLOWED_PAIR_EQUITIES = Object.freeze(new Map([
   ["0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3", "GOOGL"],
   ["0x12f190a9f9d7d37a250758b26824b97ce941bf54", "AMZN"],
@@ -106,18 +132,57 @@ export function classifyPairAsset(word, { address = null } = {}) {
 }
 
 /** The live-chain form of classifyPairAsset. Same injected reader as classifyToken. */
-export async function classifyPairAssetOnChain(address, readStorage) {
-  const v = await classifyToken(address, readStorage);
+export async function classifyPairAssetOnChain(address, readStorage, readName = null) {
+  const v = await classifyToken(address, readStorage, readName);
   if (v.kind === "unreadable" || v.kind === "unknown_beacon") return { ...v, allowedAsPair: false };
+  /* Refused by NAME while passing the beacon test means an equity behind an unfamiliar
+     proxy. Nothing on the allowlist looks like that — the three allowed equities are all
+     beacon proxies — so this is refused as a pair asset too, with the name in the reason. */
+  if (v.kind === "stock_token_by_name") return { ...v, allowedAsPair: false };
   const word = v.beacon ? "0x" + v.beacon.replace(/^0x/, "").padStart(64, "0") : "0x" + "0".repeat(64);
   return classifyPairAsset(word, { address });
 }
 
+/** The marker every Robinhood Stock Token carries in name(), 130/130 measured 2026-09-05.
+ *  U+2022 bullet, then the words. Matched case-insensitively on the words alone as well,
+ *  so a renamed bullet does not become a loophole. */
+export const ROBINHOOD_TOKEN_MARKER = "• Robinhood Token";
+const MARKER_RE = /robinhood\s+token/i;
+
+/** ERC-20 name() / symbol() selector words. */
+export const SELECTOR_NAME = "0x06fdde03";
+
+/** Decode a single ABI-encoded string return. Returns null for anything that is not
+ *  one — an empty return, a short return, a bytes32-style name — rather than throwing,
+ *  because "this contract has no readable name" is not evidence of anything. */
+export function decodeAbiString(hex) {
+  if (typeof hex !== "string" || !hex.startsWith("0x")) return null;
+  const b = hex.slice(2);
+  if (b.length < 128) return null;
+  const off = Number(BigInt("0x" + b.slice(0, 64)));
+  if (!Number.isFinite(off) || off * 2 + 64 > b.length) return null;
+  const len = Number(BigInt("0x" + b.slice(off * 2, off * 2 + 64)));
+  const start = off * 2 + 64;
+  if (!Number.isFinite(len) || start + len * 2 > b.length) return null;
+  try { return Buffer.from(b.slice(start, start + len * 2), "hex").toString("utf8"); }
+  catch { return null; }
+}
+
+/** The name-marker signal on its own. Pure. */
+export function classifyFromName(name, { address = null } = {}) {
+  if (typeof name !== "string" || !MARKER_RE.test(name)) return { equityByName: false, name: name ?? null };
+  return { equityByName: true, name,
+    reason: `${address ?? "token"} names itself "${name}" — a Robinhood Stock Token by its own label, ` +
+      `whatever proxy it sits behind; this desk is scoped to memecoins only` };
+}
+
 /**
  * The same decision against a live chain. `readStorage(address, slot)` is injected so
- * this file needs no transport and can be tested without a network.
+ * this file needs no transport and can be tested without a network. `readName(address)`
+ * is optional and returns the raw eth_call hex of name(); when given it is the second
+ * signal described at the top of this file.
  */
-export async function classifyToken(address, readStorage) {
+export async function classifyToken(address, readStorage, readName = null) {
   if (typeof address !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(address))
     throw new Error(`scope guard needs a 20-byte address, got ${String(address)}`);
   let word;
@@ -129,5 +194,17 @@ export async function classifyToken(address, readStorage) {
     return { tradeable: false, kind: "unreadable", beacon: null,
       reason: `could not read the beacon slot of ${address}: ${e.message} — refusing rather than assuming it has none` };
   }
-  return classifyFromBeaconWord(word, { address });
+  const primary = classifyFromBeaconWord(word, { address });
+  if (!primary.tradeable || typeof readName !== "function") return primary;
+
+  /* THE SECOND SIGNAL. Only reached by a token the beacon test already passed, and only
+     able to take that pass away. A transport failure here changes nothing — the primary
+     gate has spoken, and a secondary that could refuse on its own hiccup would turn every
+     RPC 429 into a missed trade without making the desk any safer. */
+  let name = null;
+  try { name = decodeAbiString(await readName(address)); } catch { name = null; }
+  const byName = classifyFromName(name, { address });
+  if (byName.equityByName)
+    return { tradeable: false, kind: "stock_token_by_name", beacon: null, name, reason: byName.reason };
+  return { ...primary, name };
 }
