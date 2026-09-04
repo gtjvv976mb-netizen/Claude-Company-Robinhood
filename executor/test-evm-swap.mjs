@@ -90,6 +90,42 @@ console.log("\nTHE FLOOR COMES OUT OF THE CALLDATA");
     INFO_FIELD !== AT_100 && INFO_FIELD !== AT_1000);
 }
 
+console.log("\nA LOW-BALLED QUOTE CANNOT LOWER OUR FLOOR");
+{
+  /* THE SOLANA DESK LOST THIS ARGUMENT ONCE. Impact, minOut and the round-trip preflight
+     were all authored by the same API response they were checking, so a self-consistent
+     quote at a fraction of fair value passed every check and the wallet signed an
+     on-chain floor far below fair value. The trade still fills — the pool pays what the
+     pool pays — but the gap between the floor you signed and what the trade is worth is
+     exactly what anyone watching it in flight can take.
+     Only the simulated output is independent of the party being checked, so the floor is
+     measured against THAT. These cases are the arithmetic of that rule. */
+  const FAIR = 100_000_000_000_000_000_000n;   // what the chain actually returns
+  const gapBps = (floor) => Number((FAIR - floor) * 10_000n / FAIR);
+
+  const honest = FAIR * 99n / 100n;            // floor 1% under fair
+  ok("a floor 1% under what the chain yields is fine at 100bps", gapBps(honest) <= 100, `${gapBps(honest)}bps`);
+
+  /* A quote low-balled to 40% of fair value: OUR floor is a percentage off that quote, so
+     it moves down with it, and every quote-anchored check still passes. */
+  const lowBalled = FAIR * 40n / 100n;
+  const floorFromLowBall = floorFrom(lowBalled, 100);
+  ok("the low-balled floor still clears a quote-derived floor", floorFromLowBall <= lowBalled);
+  ok("...and the simulated output clears it easily, so quote-anchored checks all pass",
+    FAIR > floorFromLowBall);
+  ok("...but against the chain it is a 60% giveaway", gapBps(floorFromLowBall) > 5900,
+    `${gapBps(floorFromLowBall)}bps extractable`);
+  ok("...which is far outside any tolerance we would agree to", gapBps(floorFromLowBall) > 300);
+
+  /* The bound is the tolerance itself: whatever the quote said, the distance between what
+     we accept and what the trade is worth cannot exceed what we chose to risk. */
+  for (const bps of [50, 100, 300]) {
+    const atLimit = FAIR - (FAIR * BigInt(bps) / 10_000n);
+    ok(`at ${bps}bps the widest allowed floor is exactly ${bps}bps under fair`,
+      gapBps(atLimit) === bps, `${gapBps(atLimit)}bps`);
+  }
+}
+
 console.log("\nTHE SCOPE GUARD IS RE-RUN AT THE LAST MOMENT");
 {
   /* The desk screens upstream, but the executor is the last thing between a decision

@@ -179,6 +179,35 @@ export async function prepareSwap(rpc, {
     throw new Error(`the calldata embeds a floor of ${embedded} but executing those exact bytes ` +
       `returns ${sim.amountOut} — it would revert on chain and burn gas for nothing`);
 
+  /* THE COUNTERPARTY MAY NOT AUTHOR THE NUMBER THAT CHECKS THE COUNTERPARTY.
+   *
+   * Every check above this line is anchored, one way or another, on the aggregator's own
+   * quote: our floor is a percentage off it, and the embedded floor is checked against
+   * our floor. A quote that is uniformly low-balled satisfies all of them — the floor
+   * moves down with it and nothing notices.
+   *
+   * That is not a theoretical shape. The Solana desk lost the argument to it once: impact,
+   * minOut and the round-trip preflight were all authored by the same API response they
+   * were checking, so a self-consistent quote at a fraction of fair value passed cleanly,
+   * and the wallet signed an on-chain floor far below fair value. The trade still FILLS
+   * correctly — the pool pays what the pool pays — but the gap between the floor you
+   * signed and the value the trade is really worth is exactly what anyone watching the
+   * transaction in flight can take.
+   *
+   * The anchor has to come from somewhere the counterparty cannot write, and it already
+   * does: sim.amountOut is what the CHAIN returns when those exact bytes execute against
+   * live pool state. So the floor is measured against that, not against the quote. The
+   * distance between what we would accept and what the trade is actually worth is capped
+   * at the tolerance we chose, whatever the quote claimed. */
+  const extractable = sim.amountOut - embedded;
+  const allowed = sim.amountOut * BigInt(slippageBps) / BPS;
+  if (extractable > allowed)
+    throw new Error(`the floor in the calldata is ${embedded} but the chain says these bytes yield ` +
+      `${sim.amountOut} — a gap of ${extractable}, which is ${Number(extractable * BPS / sim.amountOut)}bps ` +
+      `and above the ${slippageBps}bps we agreed to risk. That gap is not a discount, it is the amount ` +
+      `anyone watching the transaction can take. The quote may be low-balled: our floor is derived from ` +
+      `it, so only the simulated output is independent of the party being checked.`);
+
   const gotRecipient = String(built.data).toLowerCase().includes(String(recipient).toLowerCase().slice(2));
   if (!gotRecipient)
     throw new Error(`the calldata does not mention the recipient ${recipient} — refusing to sign a ` +
@@ -187,6 +216,7 @@ export async function prepareSwap(rpc, {
   return Object.freeze({
     to: built.routerAddress, data: built.data, value,
     quotedOut, ourFloor, embeddedFloor: embedded, simulatedOut: sim.amountOut,
+    extractableGap: extractable,
     slippageBps, gas: Number(built.gas ?? route.gas ?? 0),
     driftFromQuoteBps: Number((sim.amountOut - quotedOut) * BPS / quotedOut),
   });
