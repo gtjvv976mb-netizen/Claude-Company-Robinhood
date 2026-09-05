@@ -1220,12 +1220,12 @@ function drawSkyline(day) {
   let seed = 0x5eed;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const sky = x.createLinearGradient(0, 0, 0, H);
-  if (day) { sky.addColorStop(0, "#0d2529"); sky.addColorStop(1, "#1b3f45"); }
-  else { sky.addColorStop(0, "#05090c"); sky.addColorStop(0.6, "#071016"); sky.addColorStop(0.88, "#0d2529"); sky.addColorStop(1, "#1bab59"); }
+  if (day) { sky.addColorStop(0, "#9dc4d6"); sky.addColorStop(0.55, "#c9dee4"); sky.addColorStop(1, "#e6ecd8"); }
+  else { sky.addColorStop(0, "#1d3a4d"); sky.addColorStop(0.55, "#2f5a6b"); sky.addColorStop(0.88, "#4d7f7a"); sky.addColorStop(1, "#68b07f"); }
   x.fillStyle = sky; x.fillRect(0, 0, W, H);
-  if (!day) {   // horizon band in the bottom 12%
+  if (!day) {   // a soft green horizon under the dusk sky, not a glow over a void
     const hb = x.createLinearGradient(0, H * 0.88, 0, H);
-    hb.addColorStop(0, "rgba(27,171,89,0)"); hb.addColorStop(1, "rgba(27,171,89,.55)");
+    hb.addColorStop(0, "rgba(60,190,120,0)"); hb.addColorStop(1, "rgba(60,190,120,.35)");
     x.fillStyle = hb; x.fillRect(0, H * 0.88, W, H * 0.12);
   }
   const lit = ["#00c805", "#3ee063", "#8bff9f"];
@@ -1233,7 +1233,7 @@ function drawSkyline(day) {
   for (let i = 0; i < 12 && px < W; i++) {
     const w = 90 + Math.floor(rnd() * 170), h = H * (0.40 + rnd() * 0.30);
     const top = H - h;
-    x.fillStyle = day ? "#16242a" : "#131f24";
+    x.fillStyle = day ? "#7e94a0" : "#24414f";
     x.fillRect(px, top, w, h);
     if (rnd() < 0.5) { x.fillRect(px + w * 0.35, top - 14, w * 0.3, 14); }   // a crown
     for (let wx = px + 8; wx < px + w - 8; wx += 9) {
@@ -3427,7 +3427,7 @@ function buildAvatar(spec, index) {
         trousers: 0xb85f42, apron: P.claude, boots: 0x7d3f2c }
     : grok
     ? { skin: 0x17181a, head: 0x0d0d0f, hair: 0x0d0d0f, eye: 0xfafafa, shirt: 0x0d0d0f,
-        trousers: 0x1b1c1e, apron: 0x0d0d0f, boots: 0x090a0b }
+        trousers: 0x4e5157, apron: 0x0d0d0f, boots: 0x090a0b }
     : { skin: SKINS[index % SKINS.length], hair: HAIRS[(index * 3 + 1) % HAIRS.length],
         eye: 0x2a2320, shirt: SHIRTS[index % SHIRTS.length],
         trousers: TROUSERS[(index * 2) % TROUSERS.length],
@@ -3631,7 +3631,7 @@ const BRAIN_LOOKS = {
   claude: { band: "#d97757", bandInk: "#2a1a14", bg: "#070c0e", ink: "#e9f2ef",
             soft: "#6f8a83", frame: 0x1e2b30, rug: 0xd97757, tag: "A CLAUDE DESK" },
   grok:   { band: "#0d0d0f", bandInk: "#f5f5f5", bg: "#0b0b0d", ink: "#fafafa",
-            soft: "#8a9095", frame: 0x1b1c1e, rug: 0x121316, tag: "A GROK DESK" },
+            soft: "#8a9095", frame: 0x4e5157, rug: 0x3f4247, tag: "A GROK DESK" },
 };
 
 /* THE FLOOR'S OWN TAPE. The board used to print three settled numbers and stop,
@@ -4469,7 +4469,7 @@ const CODEX_DAIS = 0.22;                         // the same junior step as Grox
    keeps its name — every call site means "the house accent of this room" — and
    is simply white. Anything that has to signal a STATE keeps a hue, because a
    status light that cannot be told apart from its neighbour is decoration. */
-const GPT_GREEN = 0xf2f4f5, GPT_INK = 0x0b0b0c, GPT_EDGE = 0x24262a;
+const GPT_GREEN = 0xf2f4f5, GPT_INK = 0x2b2f33, GPT_EDGE = 0x4a4f55;
 const GPT_DIM = 0x8b9096;                       // the grey between the two
 
 /* ── HIS RECORD, AND THE WALL THAT SHOWS IT ───────────────────────────────────
@@ -4500,7 +4500,7 @@ scene.add(codexOffice);
     codexOffice.add(m); return m;
   };
 
-  const dais = bx(W, CODEX_DAIS, D, O.cx, CODEX_DAIS / 2, zc, 0x101417, 0.35, null, 0, 0.1);
+  const dais = bx(W, CODEX_DAIS, D, O.cx, CODEX_DAIS / 2, zc, 0x39424a, 0.35, null, 0, 0.1);
   dais.receiveShadow = true;
   bx(W, 0.05, 0.12, O.cx, CODEX_DAIS, O.z1 - 0.02, GPT_GREEN, 0.5, GPT_GREEN, 0.25);  // white nosing
   /* His step is BLUE where the boss's is coral and Grox's is white — the three
@@ -4641,7 +4641,7 @@ scene.add(codexOffice);
   mesh.position.set(O.cx, CODEX_DAIS + 2.0, O.z0 + 0.32);
   mesh.userData.noBake = true;
   const frame = new THREE.Mesh(new THREE.BoxGeometry(3.22, 1.97, 0.1),
-    new THREE.MeshStandardMaterial({ color: 0x1e2320, roughness: 0.7, metalness: 0.25 }));
+    new THREE.MeshStandardMaterial({ color: 0x46443a, roughness: 0.7, metalness: 0.25 }));
   frame.position.set(O.cx, CODEX_DAIS + 2.0, O.z0 + 0.24);
   codexOffice.add(mesh, frame);
   window.__codexBoard = { c, tex, mesh, frame, log: CODEX_LOG, draw: paint };
@@ -4721,19 +4721,19 @@ scene.add(grokOffice);
 
 const grokBoard = (() => {
   const O = GROK_OFFICE;
-  const dark = 0x121316, darker = 0x0d0d0f, edge = 0x2a2c30;
+  const dark = 0x3f4247, darker = 0x0d0d0f, edge = 0x2a2c30;
   const W = O.x1 - O.x0, D = O.z1 - O.z0, zc = (O.z0 + O.z1) / 2;
 
   // ── the dais: the boss sits on 0.35 of basalt; the AD on 0.22 of slate,
   //    with a steel nosing where the boss has green.
-  const dais = box(grokOffice, [W, GROX_DAIS, D], [O.cx, GROX_DAIS / 2, zc], 0x111316, 0.9);
+  const dais = box(grokOffice, [W, GROX_DAIS, D], [O.cx, GROX_DAIS / 2, zc], 0x3a3d42, 0.9);
   dais.receiveShadow = true;
   box(grokOffice, [W, 0.05, 0.12], [O.cx, GROX_DAIS, O.z1 - 0.02], edge, 0.5, 0.35);
   const gStep = glow(grokOffice, [3.6, 0.02, 0.05], [O.cx, 0.02, -8.56], 0xf2f2f4, 0.8);
 
   // ── his own back wall: a solid dark partition in front of the building
   //    glazing, so the board hangs on HIS wall the way the boss's hangs on his.
-  box(grokOffice, [W - 0.16, 3.1, 0.12], [O.cx, GROX_DAIS + 1.55, O.z0 + 0.15], 0x141517, 0.88);
+  box(grokOffice, [W - 0.16, 3.1, 0.12], [O.cx, GROX_DAIS + 1.55, O.z0 + 0.15], 0x44474c, 0.88);
 
   // ── front glass flanking a doorway, exactly the suite's language in his colours
   const glassMat = new THREE.MeshPhysicalMaterial({
@@ -4752,8 +4752,8 @@ const grokBoard = (() => {
   box(grokOffice, [0.14, 2.7, 0.28], [O.cx + 0.7, GROX_DAIS + 1.35, O.z1], edge, 0.45, 0.4);
   box(grokOffice, [1.68, 0.2, 0.32], [O.cx, GROX_DAIS + 2.66, O.z1], edge, 0.45, 0.4);
   // side sills, like the suite's
-  box(grokOffice, [0.34, 0.45, D], [O.x0, GROX_DAIS + 0.22, zc], 0x1b1c1e, 0.88);
-  box(grokOffice, [0.34, 0.45, D], [O.x1, GROX_DAIS + 0.22, zc], 0x1b1c1e, 0.88);
+  box(grokOffice, [0.34, 0.45, D], [O.x0, GROX_DAIS + 0.22, zc], 0x4e5157, 0.88);
+  box(grokOffice, [0.34, 0.45, D], [O.x1, GROX_DAIS + 0.22, zc], 0x4e5157, 0.88);
 
   // ── floor: his own dark deck with a white X laid into it
   const deck = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.3, D - 0.3),
