@@ -278,8 +278,10 @@ if [ "$MODE" = "live" ]; then
   secondary_lower="${SECONDARY_RPC,,}"
   # The public endpoint 429s on batches above ~10 and is shared with every bot on the
   # chain; an absence proof built on it is built on a coin toss (poller.mjs).
-  if [[ "$rpc_lower" =~ rpc\.mainnet\.chain\.robinhood\.com ]] ||
-     [[ "$secondary_lower" =~ rpc\.mainnet\.chain\.robinhood\.com ]]; then
+  # Any host the chain operator runs, not just the one public URL: sequencer.mainnet.
+  # chain.robinhood.com is a different hostname on the same infrastructure.
+  if [[ "$rpc_lower" =~ chain\.robinhood\.com ]] ||
+     [[ "$secondary_lower" =~ chain\.robinhood\.com ]]; then
     echo "the rate-limited public Robinhood Chain RPC is not accepted for either live endpoint; use two private providers" >&2
     exit 1
   fi
@@ -312,11 +314,20 @@ if [ "$MODE" = "live" ]; then
 const primary = new URL(process.env.PRIMARY_RPC);
 const secondary = new URL(process.env.SECONDARY_RPC_VALUE);
 const host = (url) => url.hostname.toLowerCase().replace(/[.]$/, "");
+// Two subdomains of one provider are one provider, so independence is judged on the
+// registrable domain (a.alchemy.com and b.alchemy.com are NOT two providers).
+const TWO_PART = new Set(["co.uk", "org.uk", "ac.uk", "com.au", "co.jp", "co.nz", "com.br", "co.in", "com.sg"]);
+const registrable = (h) => {
+  const parts = h.split(".").filter(Boolean);
+  if (parts.length <= 2) return parts.join(".");
+  const lastTwo = parts.slice(-2).join(".");
+  return TWO_PART.has(lastTwo) ? parts.slice(-3).join(".") : lastTwo;
+};
 if (primary.protocol !== "https:" || secondary.protocol !== "https:") {
   console.error("both live RPC endpoints must use HTTPS");
   process.exit(1);
 }
-if (host(primary) === host(secondary)) {
+if (host(primary) === host(secondary) || registrable(host(primary)) === registrable(host(secondary))) {
   console.error("--secondary-rpc must use an independent provider hostname from --rpc");
   process.exit(1);
 }

@@ -65,6 +65,24 @@ const MAX_FUTURE_SKEW_MS = Number(process.env.MAX_FUTURE_SKEW_MIN || 5) * 60_000
 const MAX_ENTRY_MARK_AGE_MS = Number(process.env.MAX_ENTRY_MARK_AGE_MIN || 15) * 60_000;
 const MAX_ENTRY_DEVIATION_PCT = Number(process.env.MAX_ENTRY_DEVIATION_PCT || 10);
 export const PUBLIC_RPC_HOST = "rpc.mainnet.chain.robinhood.com";
+/* Every host the chain operator runs, not just the one public URL. `sequencer.mainnet.
+   chain.robinhood.com` is a DIFFERENT hostname on the SAME infrastructure: a plain
+   hostname-inequality test accepts it as the "independent" second provider and the
+   ETH/USD cross-check then asks one operator to check itself. Measured 2026-09-05:
+   rpc.mainnet.chain.robinhood.com is a CNAME to customer-origin.offchainlabs.com. */
+export const CHAIN_OPERATOR_SUFFIX = "chain.robinhood.com";
+/* Two subdomains of one provider are one provider (a.alchemy.com / b.alchemy.com), so
+   independence is judged on the registrable domain, not the full hostname. Naive eTLD+1
+   with the few two-part suffixes that would otherwise collapse to a public suffix. */
+const TWO_PART_SUFFIXES = new Set(["co.uk", "org.uk", "ac.uk", "com.au", "co.jp", "co.nz", "com.br", "co.in", "com.sg"]);
+export function registrableDomain(host) {
+  const parts = String(host || "").toLowerCase().replace(/\.$/, "").split(".").filter(Boolean);
+  if (parts.length <= 2) return parts.join(".");
+  const lastTwo = parts.slice(-2).join(".");
+  return TWO_PART_SUFFIXES.has(lastTwo) ? parts.slice(-3).join(".") : lastTwo;
+}
+export const isChainOperatorHost = (host) =>
+  host === CHAIN_OPERATOR_SUFFIX || String(host || "").endsWith("." + CHAIN_OPERATOR_SUFFIX);
 const RPC = process.env.RH_RPC || `https://${PUBLIC_RPC_HOST}`;
 const SECONDARY_RPC = process.env.RH_RPC_SECONDARY || "";
 const KEY_FILE = path.resolve(process.env.KEY_FILE || "./burner.key");
@@ -220,9 +238,9 @@ if (EXECUTE) {
   /* The public endpoint 429s on batches larger than ~10 and is shared with every bot
      on the chain; an absence proof built on it is an absence proof built on a coin
      toss. Two private providers on different hostnames, or no live mode. */
-  if (primaryHost === PUBLIC_RPC_HOST || secondaryHost === PUBLIC_RPC_HOST)
+  if (isChainOperatorHost(primaryHost) || isChainOperatorHost(secondaryHost))
     fatal("the rate-limited public Robinhood Chain RPC is not accepted for either live endpoint");
-  if (primaryHost === secondaryHost)
+  if (primaryHost === secondaryHost || registrableDomain(primaryHost) === registrableDomain(secondaryHost))
     fatal("RH_RPC_SECONDARY must use an independent provider hostname");
   const legacy = path.resolve(process.env.STATE_FILE || "./.cc-state.json");
   if (fs.existsSync(legacy)) {

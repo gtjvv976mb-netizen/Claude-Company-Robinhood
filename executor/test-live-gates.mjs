@@ -132,6 +132,38 @@ ok("different API-key paths on one RPC provider are not independent", () => {
   assert.match(result.stderr, /independent provider hostname/);
 });
 
+/* The bypass this closes, found 2026-09-05 while sourcing a real second provider:
+   the gate compared hostnames for INEQUALITY and refused one exact public URL, so
+   `sequencer.mainnet.chain.robinhood.com` — a different hostname on the SAME operator
+   (rpc.mainnet.chain.robinhood.com is a CNAME to customer-origin.offchainlabs.com) —
+   passed as the "independent" second provider. The ETH/USD cross-check exists so the
+   swap API cannot author the anchor used to judge its own quote; one operator checking
+   itself is exactly the thing it is there to prevent. */
+for (const [name, host] of [
+  ["the chain operator's sequencer is not an independent provider", "https://sequencer.mainnet.chain.robinhood.com"],
+  ["any other host on the operator's domain is refused too", "https://rpc-2.mainnet.chain.robinhood.com"],
+  ["the bare operator domain is refused", "https://chain.robinhood.com"],
+]) {
+  ok(name, () => {
+    const result = run({ RH_RPC: "https://primary-private-rpc.invalid", RH_RPC_SECONDARY: host });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /public Robinhood Chain RPC is not accepted for either live endpoint/);
+  });
+}
+
+ok("two subdomains of one provider are one provider", () => {
+  const result = run({ RH_RPC: "https://robinhood-mainnet.g.alchemy.com/v2/a", RH_RPC_SECONDARY: "https://eth.g.alchemy.com/v2/b" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /independent provider hostname/);
+});
+
+ok("two genuinely different providers still pass the independence gate", () => {
+  // Reaching a LATER gate (the missing live journal) proves the RPC pair was accepted.
+  const result = run({ RH_RPC: "https://robinhood-mainnet.g.alchemy.com/v2/a", RH_RPC_SECONDARY: "https://robinhood-chain.gateway.tenderly.co/x" });
+  assert.doesNotMatch(result.stderr, /independent provider hostname/);
+  assert.doesNotMatch(result.stderr, /public Robinhood Chain RPC is not accepted/);
+});
+
 ok("a plain-HTTP API is refused in live mode even on loopback", () => {
   const result = run({ CC_API: "http://127.0.0.1:8787" });
   assert.notEqual(result.status, 0);
