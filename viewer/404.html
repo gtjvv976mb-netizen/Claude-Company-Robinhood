@@ -1,5 +1,15 @@
 <title>Claude Company — Robinhood</title>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+/* The two shifts, stamped before first paint. This page exists for a fraction of a
+   second, and that fraction must already be the building — never a white flash. */
+(function () {
+  let t = null;
+  try { t = localStorage.getItem("cc_theme"); } catch {}
+  document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
+})();
+</script>
 <script>
 /* GitHub Pages serves files, not routes. The Node server's /floor/50 and /tower
    paths live on in bookmarks and old links — catch them here and land them on
@@ -13,4 +23,61 @@
   location.replace("/");
 })();
 </script>
-<p style="font-family:sans-serif">Redirecting to <a href="/">Claude Company — Robinhood</a>…</p>
+<style>
+/* The tower's HUD theme, same tokens as viewer/office3d.html. No fonts are fetched:
+   this page is gone before a webfont could arrive, and the system stack is enough. */
+:root{
+  /* NIGHT FIRST. The bare :root IS the tower after the bell — polished black stone,
+     smoked oak, brushed steel, aged brass, and Robinhood green used only as light.
+     Brass (--amber) stays brass everywhere it is used; green never becomes paint. */
+  --cream:#d4dde0; --path-stone:#cfc7ad; --timber:#a96934; --timber-dark:#5f3e29;
+  --teal:#1f8f5f; --solar-navy:#287e9d; --amber:#d1a84f; --glass-aqua:#3ee063;
+  --metal:#70828a; --terracotta:#bf623c; --coral:#e06b57; --leaf:#5aa552;
+  --charcoal:#30454a; --water:#3ee063; --claude:#d97757;
+  /* the emitted light: the building's own green, never a surface colour */
+  --rh-green:#00c805; --rh-soft:#3ee063; --rh-pale:#8bff9f;
+
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --on-dark:#e9f2ef;
+  /* the shell: the ground this page paints while it hands the visitor on */
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme: dark){
+    --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+    --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+    --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+    --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+    --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+}
+/* THE DAWN SHIFT. Same tower, first light through the north glazing: only the
+   surfaces move; ink, brass and green inherit from the bare :root above. */
+:root[data-theme="light"]{
+  --panel:#0d2529; --panel-line:#1d3d43; --card:#11313a; --card-line:#24484f;
+  --bar:#0d2529; --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92);
+  --shadow:rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+/* The loading screen paints the SHELL, not the panel, so the first frame is the building. */
+html,body{height:100%}
+body{margin:0;background:var(--bar);color:var(--bar-ink);
+  font-family:Archivo,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;font-weight:450;-webkit-font-smoothing:antialiased;
+  display:grid;place-content:center;gap:10px;text-align:center;padding:24px}
+p{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+a{color:var(--amber);font-weight:600;text-decoration:none;border-bottom:1px solid var(--rh-green)}
+a:hover{color:var(--ink)}
+a:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+</style>
+<p>Redirecting to <a href="/">Claude Company — Robinhood</a>…</p>

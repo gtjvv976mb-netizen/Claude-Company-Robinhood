@@ -4,48 +4,123 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap">
 <style>
-:root{--amber:#e0ad3d;--teal:#267f82;--charcoal:#30454a;--claude:#d97757;--terracotta:#bf623c;
-  --bg:#f7efdd;--ink:#22343a;--ink-soft:#5b6f72;--ink-faint:#8a9a99;--card:#fffaf0;--line:#e3d5b6;--on-dark:#f4ecd8}
-:root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
-  --bg:#151f22;--ink:#eadfc6;--ink-soft:#a9b7b2;--ink-faint:#7b8a88;--card:#22343a;--line:#33474c}}
-:root[data-theme="dark"]{--bg:#151f22;--ink:#eadfc6;--ink-soft:#a9b7b2;--ink-faint:#7b8a88;--card:#22343a;--line:#33474c}
+/* The tower's HUD theme, same tokens as viewer/office3d.html. The older names on this
+   page (--bg, --card, --line, --on-dark) are kept and re-pointed at the new slots
+   rather than deleted: a script or a rule may still read them. */
+:root{
+  /* NIGHT FIRST. The bare :root IS the tower after the bell — polished black stone,
+     smoked oak, brushed steel, aged brass, and Robinhood green used only as light.
+     Brass (--amber) stays brass everywhere it is used; green never becomes paint. */
+  --cream:#d4dde0; --path-stone:#cfc7ad; --timber:#a96934; --timber-dark:#5f3e29;
+  --teal:#1f8f5f; --solar-navy:#287e9d; --amber:#d1a84f; --glass-aqua:#3ee063;
+  --metal:#70828a; --terracotta:#bf623c; --coral:#e06b57; --leaf:#5aa552;
+  --charcoal:#30454a; --water:#3ee063; --claude:#d97757;
+  /* the emitted light: the building's own green, never a surface colour */
+  --rh-green:#00c805; --rh-soft:#3ee063; --rh-pale:#8bff9f;
+
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --on-dark:#e9f2ef;
+  /* the shell: masthead bar, ground. Night = the dark tower; the DAWN SHIFT ('light')
+     lifts the same page to the teal-dark of first light, never to paper. */
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+  /* kept names, re-pointed: the page's ground, its card and its hairline */
+  --bg:#05090c; --line:#1e2f34;
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme: dark){
+    --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+    --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+    --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+    --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+    --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+    --bg:#05090c; --line:#1e2f34;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+  --bg:#05090c; --line:#1e2f34;
+}
+/* THE DAWN SHIFT. Same tower, first light through the north glazing: the surfaces lift
+   to teal-dark. Ink, good/warn/bad and every brass and green token inherit from the
+   bare :root above — only the surfaces move. */
+:root[data-theme="light"]{
+  --panel:#0d2529; --panel-line:#1d3d43; --card:#11313a; --card-line:#24484f;
+  --bar:#0d2529; --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92);
+  --shadow:rgba(0,0,0,.5);
+  --bg:#0d2529; --line:#24484f;
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,system-ui,sans-serif;line-height:1.6;
-  -webkit-font-smoothing:antialiased}
-nav{background:var(--charcoal);color:var(--on-dark);border-bottom:3px solid var(--amber);padding:13px 0}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;font-weight:450;line-height:1.6;-webkit-font-smoothing:antialiased}
+/* the hairline, not the bar: one emitted pixel with a bleed */
+nav{background:var(--bar);color:var(--bar-ink);border-bottom:1px solid var(--rh-green);
+  box-shadow:0 1px 14px rgba(0,200,5,.28);padding:13px 0}
 .wrap{max-width:760px;margin:0 auto;padding:0 24px}
 nav .wrap{display:flex;align-items:center;gap:16px}
-.brand{font-family:"Instrument Serif",Georgia,serif;font-size:24px;text-decoration:none;color:inherit}
-.brand em{font-style:italic;color:var(--amber)}
+.brand{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:24px;text-decoration:none;color:inherit}
+.brand em{font-style:italic;color:var(--rh-soft)}
 nav a.back{margin-left:auto;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;
-  color:rgba(244,236,216,.8);text-decoration:none;border:1px solid rgba(244,236,216,.3);padding:6px 12px;border-radius:5px}
-nav a.back:hover{background:var(--amber);color:#2a2018;border-color:var(--amber)}
+  color:var(--ink-soft);text-decoration:none;border:1px solid var(--panel-line);padding:6px 12px;border-radius:6px}
+nav a.back:hover{background:var(--panel-line);color:var(--ink);border-color:var(--panel-line)}
+nav a.back:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.shift{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;letter-spacing:.08em;
+  padding:5px 10px;border-radius:3px;border:1px solid var(--panel-line);background:var(--card);
+  color:var(--ink-soft);cursor:pointer}
+.shift:hover{color:var(--ink);border-color:var(--ink-faint)}
+.shift:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 main{padding:56px 0 80px}
 h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:44px;line-height:1.05;margin:0 0 8px}
-.floorno{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--amber);font-weight:600}
-.notice{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--terracotta);
-  border-radius:10px;padding:20px 22px;margin:26px 0}
-.notice h2{margin:0 0 8px;font-size:17px}
+.floorno{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--amber);font-weight:600;font-variant-numeric:tabular-nums}
+/* a boundary worth reading: brass rule, brass-tinted ground */
+.notice{background:color-mix(in srgb,var(--amber) 8%,var(--card));
+  border:1px solid color-mix(in srgb,var(--amber) 58%,var(--card-line));
+  border-left:4px solid var(--amber);border-radius:10px;padding:20px 22px;margin:26px 0}
+.notice h2{margin:0 0 8px;font-size:17px;color:var(--ink)}
 .notice p{margin:0 0 10px;color:var(--ink-soft);font-size:14.5px}
 .notice p:last-child{margin:0}
 ol{counter-reset:s;margin:22px 0 0;padding:0;list-style:none;display:grid;gap:12px}
 ol li{counter-increment:s;position:relative;padding-left:38px;color:var(--ink-soft);font-size:15px}
 ol li::before{content:counter(s);position:absolute;left:0;top:2px;width:25px;height:25px;border-radius:50%;
-  background:var(--teal);color:#f0e4c7;font-size:12px;font-weight:700;display:grid;place-content:center;
-  font-family:"JetBrains Mono",monospace}
+  background:var(--amber);color:#2a2018;font-size:12px;font-weight:700;display:grid;place-content:center;
+  font-family:"JetBrains Mono",ui-monospace,monospace}
 ol b{color:var(--ink)}
+ol code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;color:var(--ink);
+  background:var(--card);border:1px solid var(--card-line);border-radius:4px;padding:1px 5px}
 .btn{display:inline-block;margin-top:26px;padding:12px 20px;border-radius:7px;background:var(--teal);
-  color:#f0e4c7;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.btn:hover{background:var(--claude);color:#2a1a14}
+  color:var(--cream);text-decoration:none;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+/* the control lights up under the cursor: paint at rest, emitted green on hover */
+.btn:hover{background:var(--rh-green);color:#04140a}
 .btn:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
-.fine{margin-top:30px;font-size:13px;color:var(--ink-faint);line-height:1.6}
+/* The disclaimer is the most legally material prose on the page, so it takes the
+   CONTEXT ink step, not the label step: --ink-faint is licensed for 9-10.5px
+   uppercase keys and would land this at 2.80:1 in the dawn shift. */
+.fine{margin-top:30px;font-size:13px;color:var(--ink-soft);line-height:1.6}
+.fine b{color:var(--ink)}
 </style>
+<script>
+/* The two shifts. Applied before first paint, so the page never flashes the
+   other theme's ground. The choice is the viewer's own and persists on this
+   device. Default: night, for everyone. */
+(function () {
+  let t = null;
+  try { t = localStorage.getItem("cc_theme"); } catch {}
+  document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
+})();
+</script>
 <nav><div class="wrap">
   <a class="brand" href="/">Claude <em>Tower</em></a>
   <a class="back" href="/tower">Back to the tower</a>
+  <button class="shift" id="shiftbtn" type="button" aria-label="Switch between day and night shift" title="Switch the floor's lighting">&#9790;</button>
 </div></nav>
 <main><div class="wrap">
   <div class="floorno" id="floorno">A floor</div>
@@ -92,4 +167,23 @@ ol b{color:var(--ink)}
     const el = document.getElementById("floorno");
     el.textContent = Number(n) === 50 ? "Floor 50 — the Penthouse" : `Floor ${n} — Desk ${String(n).padStart(2, "0")}`;
   }
+
+  /* ── the shift switch: Night Shift ⇄ Day Shift ─────────────────────────── */
+  (function shiftSwitch() {
+    const btn = document.getElementById("shiftbtn");
+    if (!btn) return;
+    const label = () => {
+      const day = document.documentElement.dataset.theme === "light";
+      btn.textContent = day ? "☀" : "☾";
+      btn.title = day ? "Day shift. Click for the night shift."
+                      : "Night shift. Click for the day shift.";
+    };
+    btn.addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("cc_theme", next); } catch {}
+      label();
+    });
+    label();
+  })();
 </script>

@@ -4,64 +4,146 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@500;700&display=swap">
 
 <style>
+/* THE TOWER'S OWN THEME, lifted verbatim from the trading floor inside it
+   (viewer/office3d.html lines 12-56), so the building and its rooms are one world.
+   NIGHT FIRST: the bare :root IS the tower after the bell. Brass (--amber) stays
+   brass everywhere it is used; the building's green is emitted light, never paint. */
 :root{
-  --cream:#f0e4c7; --teal:#267f82; --amber:#e0ad3d; --glass:#73c9d2; --leaf:#66a348;
-  --charcoal:#30454a; --coral:#df7655; --claude:#d97757; --timber:#a96934; --metal:#70828a;
-  --ink:#22343a; --ink-soft:#5b6f72; --ink-faint:#8a9a99;
-  --panel:#f6edd8; --panel-line:#ddceac; --card:#fffaf0; --card-line:#e6d8ba;
-  --good:#4f8f52; --on-dark:#f4ecd8;
+  --cream:#d4dde0; --path-stone:#cfc7ad; --timber:#a96934; --timber-dark:#5f3e29;
+  --teal:#1f8f5f; --solar-navy:#287e9d; --amber:#d1a84f; --glass-aqua:#3ee063;
+  --metal:#70828a; --terracotta:#bf623c; --coral:#e06b57; --leaf:#5aa552;
+  --charcoal:#30454a; --water:#3ee063; --claude:#d97757;
+  /* kept name, re-pointed at the night value: the old --glass was the daylight aqua */
+  --glass:#3ee063;
+  /* the emitted light: the building's own green, never a surface colour */
+  --rh-green:#00c805; --rh-soft:#3ee063; --rh-pale:#8bff9f;
+
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --on-dark:#e9f2ef;
+  /* the shell: masthead bar and ground. Night = the dark tower; the DAWN SHIFT
+     ('light') lifts the same tower to the teal-dark of first light, never to paper. */
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
 }
 :root:not([data-theme="light"]){ @media (prefers-color-scheme: dark){
-  --ink:#eadfc6; --ink-soft:#a9b7b2; --ink-faint:#7b8a88;
-  --panel:#1b2b2f; --panel-line:#2d4247; --card:#22343a; --card-line:#354c51; --good:#7bbd80;
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
 }}
 :root[data-theme="dark"]{
-  --ink:#eadfc6; --ink-soft:#a9b7b2; --ink-faint:#7b8a88;
-  --panel:#1b2b2f; --panel-line:#2d4247; --card:#22343a; --card-line:#354c51; --good:#7bbd80;
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#5f7570;
+  --panel:#0b1417; --panel-line:#16252a; --card:#0f1a1e; --card-line:#1e2f34;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+}
+/* THE DAWN SHIFT. Same tower, first light through the glazing: the surfaces lift to
+   teal-dark and the bar goes with them. Ink, good/warn/bad and every brass and green
+   token inherit from the bare :root above — only the surfaces move. This is NOT a
+   paper theme; the ground never gets bright enough to need dark ink. */
+:root[data-theme="light"]{
+  --panel:#0d2529; --panel-line:#1d3d43; --card:#11313a; --card-line:#24484f;
+  --bar:#0d2529; --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92);
+  --shadow:rgba(0,0,0,.5);
 }
 *{box-sizing:border-box} html,body{height:100%}
-/* DAY SHIFT chrome: every word on the masthead must survive the cream. */
-:root[data-theme="light"] .topbar{background:#efe6cf;color:#22343a}
-:root[data-theme="light"] body{background:#e7ded9}
-:root[data-theme="light"] .firm em{color:#8a651c}
-:root[data-theme="light"] .tag{color:rgba(34,52,58,.62)}
-:root[data-theme="light"] .stat{color:rgba(34,52,58,.72)}
-:root[data-theme="light"] .stat b{color:#8a651c}
-:root[data-theme="light"] .home, :root[data-theme="light"] button.home{color:#22343a;border-color:#b9ac89}
-:root[data-theme="light"] .home:hover{background:#c99b3f;color:#2a2018}
-:root[data-theme="light"] .hint{color:rgba(34,52,58,.75);background:rgba(240,236,222,.75)}
-body{margin:0;background:var(--charcoal);color:var(--ink);
-  font-family:Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+body{margin:0;background:var(--bar);color:var(--ink);
+  font-family:Archivo,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;font-weight:450;-webkit-font-smoothing:antialiased;overflow:hidden}
 
+/* THE HAIRLINE, NOT THE BAR: one emitted pixel with a 14px bleed, in place of the
+   old three-pixel brass rule. */
 .topbar{position:relative;z-index:5;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
-  padding:12px 20px;background:var(--charcoal);color:var(--on-dark);border-bottom:3px solid var(--amber)}
+  padding:12px 20px;background:var(--bar);color:var(--bar-ink);
+  border-bottom:1px solid var(--rh-green);box-shadow:0 1px 14px rgba(0,200,5,.28)}
 .firm{font-family:"Instrument Serif",Georgia,serif;font-size:26px;line-height:1}
-.firm em{font-style:italic;color:var(--amber)}
-.tag{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:rgba(244,236,216,.6);font-weight:600}
+.firm em{font-style:italic;color:var(--rh-soft)}
+.tag{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--bar-soft);font-weight:600}
 .topbar .spacer{margin-left:auto}
-.stat{display:flex;gap:6px;align-items:baseline;font-size:12px;color:rgba(244,236,216,.72)}
-.stat b{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--amber);font-variant-numeric:tabular-nums}
-.home{color:var(--on-dark);text-decoration:none;font-size:11px;letter-spacing:.12em;
-  text-transform:uppercase;font-weight:600;border:1px solid rgba(244,236,216,.3);padding:5px 11px;border-radius:5px}
-.home:hover{background:var(--amber);color:#2a2018;border-color:var(--amber)}
-button.home{font-family:inherit;cursor:pointer;background:transparent;color:var(--on-dark)}
-button.home.on{background:var(--good,#4f8f52);color:#fff;border-color:transparent}
+.stat{display:flex;gap:6px;align-items:baseline;font-size:12px;color:var(--bar-soft)}
+.stat b{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;color:var(--amber);font-variant-numeric:tabular-nums}
+.home{color:var(--ink-soft);text-decoration:none;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;font-weight:600;border:1px solid var(--panel-line);padding:5px 11px;border-radius:5px}
+.home:hover{background:var(--panel-line);color:var(--ink);border-color:var(--panel-line)}
+.home:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.home{font-family:inherit;cursor:pointer;background:transparent;color:var(--ink-soft)}
+/* the one place the pure emitted green becomes a fill on this page: a live connection */
+button.home.on{background:var(--rh-green);color:#04140a;border-color:var(--rh-green)}
 .wallet{padding:12px 16px;border-bottom:1px solid var(--panel-line);font-size:12px;color:var(--ink-soft);display:none}
 .wallet.on{display:block}
-.wallet .addr{font-family:"JetBrains Mono",monospace;color:var(--ink);font-size:11.5px}
+.wallet .addr{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--ink);font-size:11.5px;font-variant-numeric:tabular-nums}
 .wallet .bal{margin-top:5px}
-.wallet .bal b{font-family:"JetBrains Mono",monospace;color:var(--ink)}
+.wallet .bal b{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--ink);font-variant-numeric:tabular-nums}
 .wallet .mine{margin-top:6px;color:var(--good,#4f8f52);font-weight:600}
 .msg{margin-top:10px;font-size:12px;line-height:1.5}
 .msg.err{color:var(--bad,#b0503f)} .msg.ok{color:var(--good,#4f8f52)}
 
 .wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;height:calc(100vh - 58px)}
+#stage{position:relative;min-width:0;overflow:hidden}
+#stage canvas{display:block;width:100%;height:100%;cursor:grab}
+#stage canvas.dragging{cursor:grabbing}
+#stage canvas.overFloor{cursor:pointer}
+.hint{position:absolute;left:14px;bottom:12px;z-index:3;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--bar-soft);background:var(--hint-bg);
+  padding:5px 10px;border-radius:5px;backdrop-filter:blur(3px)}
+
+/* TWO SURFACE DEPTHS: the rail is the outer container (--panel); anything that sits
+   inside it — a hovered row, a selected row — rises to --card. */
+.rail{background:var(--panel);border-left:1px solid var(--panel-line);display:flex;flex-direction:column;min-height:0}
+.railhead{padding:13px 16px;border-bottom:1px solid var(--panel-line)}
+.railhead h2{margin:0 0 3px;font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:21px;color:var(--ink)}
+.railhead p{margin:0;font-size:11.5px;color:var(--ink-soft);line-height:1.5}
+.sel{padding:16px;border-bottom:1px solid var(--panel-line)}
+.sel .num{font-family:"Instrument Serif",Georgia,serif;font-size:34px;line-height:1;color:var(--ink)}
+.sel .who{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11.5px;color:var(--ink-soft);margin-top:4px;overflow-wrap:anywhere}
+.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 8px;border-radius:4px;margin-top:8px}
+/* ink-on-accent is always a near-black of the accent's own hue */
+.chip.vacant{background:var(--amber);color:#2a2018}
+.chip.owned{background:var(--good);color:#04140a}
+.chip.hq{background:var(--claude);color:#2a1a14}
+.act{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
+.btn{font:inherit;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  padding:9px 14px;border-radius:6px;border:0;cursor:pointer;text-decoration:none;display:inline-block}
+/* paint at rest, the building's light under the cursor */
+.btn.primary{background:var(--teal);color:var(--cream)}
+.btn.primary:hover{background:var(--rh-green);color:#04140a}
+.btn.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--card-line)}
+.btn.ghost:hover{color:var(--ink);border-color:var(--ink-faint)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.price{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:var(--ink-soft);margin-top:9px;font-variant-numeric:tabular-nums}
+.price b{color:var(--ink)}
+
+.list{flex:1;min-height:0;overflow-y:auto;padding:8px 10px}
+.row{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:9px;
+  padding:7px 9px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--ink)}
+.row:hover{background:var(--card)}
+.row[aria-selected="true"]{background:var(--card);outline:1px solid var(--amber)}
+.row .n{font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.row .s{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)}
+.row.owned .s{color:var(--good)} .row.hq .s{color:var(--claude)} .row.vacant .s{color:var(--amber)}
+.row .p{margin-left:auto;font-size:10.5px;opacity:.72;white-space:nowrap;font-variant-numeric:tabular-nums}
+.row .p.up{color:var(--good);opacity:1} .row .p.down{color:var(--bad);opacity:1}
+.perf{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 2px;font-size:12px;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+.perf b{display:block;font-size:15px;font-family:"JetBrains Mono",ui-monospace,monospace;color:var(--ink)}
+.perf .up b{color:var(--good)} .perf .down b{color:var(--bad)}
+.cost{font-size:12px;opacity:.85;margin:6px 0 2px;line-height:1.45;color:var(--ink-soft)}
+.cost b{color:var(--ink)}
+.offline{font-size:12px;opacity:.75;padding:10px 2px;color:var(--ink-soft)}
+.note{padding:10px 14px;font-size:10.5px;color:var(--ink-soft);border-top:1px solid var(--panel-line);line-height:1.5}
+
 /* MOBILE: hiding the rail deleted the entire lease flow on phones. The page
    becomes a column instead — tower on top, directory and leasing beneath it —
-   and the masthead compacts so nothing wraps or clips. */
+   and the masthead compacts so nothing wraps or clips.
+   THIS BLOCK MUST STAY LAST: its overrides only win if they come after the
+   desktop rules they override. */
 @media (max-width:980px){
   .wrap{grid-template-columns:1fr; grid-template-rows:46vh minmax(0,1fr); height:auto; min-height:calc(100vh - 50px)}
   .rail{display:flex; border-left:none; border-top:1px solid var(--panel-line)}
@@ -77,52 +159,18 @@ button.home.on{background:var(--good,#4f8f52);color:#fff;border-color:transparen
   .row{font-size:12px}
   body{overflow:auto}
 }
-#stage{position:relative;min-width:0;overflow:hidden}
-#stage canvas{display:block;width:100%;height:100%;cursor:grab}
-#stage canvas.dragging{cursor:grabbing}
-#stage canvas.overFloor{cursor:pointer}
-.hint{position:absolute;left:14px;bottom:12px;z-index:3;font-size:10.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:rgba(244,236,216,.66);background:rgba(48,69,74,.55);
-  padding:5px 10px;border-radius:5px}
-
-.rail{background:var(--panel);border-left:1px solid var(--panel-line);display:flex;flex-direction:column;min-height:0}
-.railhead{padding:13px 16px;border-bottom:1px solid var(--panel-line)}
-.railhead h2{margin:0 0 3px;font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:21px}
-.railhead p{margin:0;font-size:11.5px;color:var(--ink-faint);line-height:1.5}
-.sel{padding:16px;border-bottom:1px solid var(--panel-line)}
-.sel .num{font-family:"Instrument Serif",Georgia,serif;font-size:34px;line-height:1}
-.sel .who{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-soft);margin-top:4px;overflow-wrap:anywhere}
-.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-  padding:3px 8px;border-radius:4px;margin-top:8px}
-.chip.vacant{background:var(--amber);color:#2a2018}
-.chip.owned{background:var(--good);color:#fff}
-.chip.hq{background:var(--claude);color:#2a1a14}
-.act{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
-.btn{font:inherit;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
-  padding:9px 14px;border-radius:6px;border:0;cursor:pointer;text-decoration:none;display:inline-block}
-.btn.primary{background:var(--teal);color:var(--cream)}
-.btn.primary:hover{background:var(--claude);color:#2a1a14}
-.btn.ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--panel-line)}
-.btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
-.price{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-soft);margin-top:9px}
-.price b{color:var(--ink)}
-
-.list{flex:1;min-height:0;overflow-y:auto;padding:8px 10px}
-.row{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:9px;
-  padding:7px 9px;border-radius:6px;cursor:pointer;font-size:12px}
-.row:hover{background:var(--card)}
-.row[aria-selected="true"]{background:var(--card);outline:1px solid var(--amber)}
-.row .n{font-family:"JetBrains Mono",monospace;color:var(--ink-faint);font-variant-numeric:tabular-nums}
-.row .s{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint)}
-.row.owned .s{color:var(--good)} .row.hq .s{color:var(--claude)} .row.vacant .s{color:var(--amber)}
-.row .p{margin-left:auto;font-size:10.5px;opacity:.72;white-space:nowrap;font-variant-numeric:tabular-nums}
-.row .p.up{color:var(--good);opacity:1} .row .p.down{color:#d97757;opacity:1}
-.perf{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 2px;font-size:12px;font-variant-numeric:tabular-nums}
-.perf b{display:block;font-size:15px} .perf .up b{color:var(--good)} .perf .down b{color:#d97757}
-.cost{font-size:12px;opacity:.85;margin:6px 0 2px;line-height:1.45}
-.offline{font-size:12px;opacity:.75;padding:10px 2px}
-.note{padding:10px 14px;font-size:10.5px;color:var(--ink-faint);border-top:1px solid var(--panel-line);line-height:1.5}
 </style>
+
+<script>
+/* Stamp the shift BEFORE first paint so the tower never flashes the other theme.
+   Storage key cc_theme; night is the default for everyone; a private window throws
+   on localStorage, so the read is guarded. */
+(function () {
+  let t = null;
+  try { t = localStorage.getItem("cc_theme"); } catch {}
+  document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
+})();
+</script>
 
 <div class="topbar">
   <div class="firm">Claude <em>Tower</em></div>
@@ -990,9 +1038,9 @@ const isMobile = () => /Android|iPhone|iPad/i.test(navigator.userAgent);
 
 function overlay(inner) {
   const ov = document.createElement("div");
-  ov.style.cssText = "position:fixed;inset:0;z-index:80;background:rgba(10,14,16,.6);display:grid;place-items:center";
+  ov.style.cssText = "position:fixed;inset:0;z-index:80;background:rgba(5,9,12,.66);display:grid;place-items:center";
   const bx = document.createElement("div");
-  bx.style.cssText = "background:var(--panel,#1b2b2f);color:inherit;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:20px 22px;max-width:360px;min-width:260px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5";
+  bx.style.cssText = "background:var(--panel,#1b2b2f);color:inherit;border:1px solid var(--panel-line,#16252a);border-radius:10px;padding:20px 22px;max-width:360px;min-width:260px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5";
   ov.appendChild(bx);
   document.body.appendChild(ov);
   const close = () => ov.remove();
@@ -1023,7 +1071,7 @@ function noWalletModal(resolve) {
         `</div><div style='opacity:.8;font-size:12px'>If one IS installed: unlock it, then press Connect again — a locked wallet does not announce itself.</div>`);
   const cl = document.createElement("button");
   cl.textContent = "Close";
-  cl.style.cssText = "font:inherit;font-size:11px;opacity:.7;background:none;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:6px 10px;color:inherit;cursor:pointer;align-self:flex-start";
+  cl.style.cssText = "font:inherit;font-size:11px;opacity:.7;background:none;border:1px solid var(--card-line,#1e2f34);border-radius:6px;padding:6px 10px;color:inherit;cursor:pointer;align-self:flex-start";
   cl.onclick = () => { close(); resolve(null); };
   bx.appendChild(cl);
 }
@@ -1044,7 +1092,7 @@ function chooseWallet(preferRdns = null) {
     bx.innerHTML = "<div style='font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.7'>Sign in with</div>";
     for (const [, entry] of list) {
       const btn = document.createElement("button");
-      btn.style.cssText = "display:flex;align-items:center;gap:10px;font:inherit;padding:10px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;cursor:pointer;text-align:left";
+      btn.style.cssText = "display:flex;align-items:center;gap:10px;font:inherit;padding:10px 12px;border-radius:7px;border:1px solid var(--card-line,#1e2f34);background:var(--card,#0f1a1e);color:inherit;cursor:pointer;text-align:left";
       const ico = entry.info.icon ? `<img src="${entry.info.icon}" width="22" height="22" style="border-radius:5px" alt="">` : "👛";
       btn.innerHTML = `${ico}<span></span>`;
       btn.querySelector("span").textContent = entry.info.name;

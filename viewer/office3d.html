@@ -1122,6 +1122,29 @@ const HALF_W = 17, HALF_D = 12.5;               // a 34 × 25 floor
 const room = new THREE.Group();
 scene.add(room);
 
+/* The Claude mark: twelve rounded petals about a small ringed centre — the same
+   figure that is on the token, laid into the floor. */
+function drawHouseMark(c) {
+  const x = c.getContext("2d"), W = c.width, R = W / 2;
+  x.clearRect(0, 0, W, W);
+  x.save(); x.translate(R, R);
+  const INK = "#c8674a", RINGC = "#f2e8d5", DOT = "#e8b96a";
+  const petals = 12, outer = R * 0.80, inner = R * 0.20, w = R * 0.108;
+  x.fillStyle = INK;
+  for (let i = 0; i < petals; i++) {
+    x.save(); x.rotate((i * Math.PI * 2) / petals);
+    x.beginPath();
+    if (x.roundRect) x.roundRect(-w / 2, -outer, w, outer - inner, w / 2);
+    else x.rect(-w / 2, -outer, w, outer - inner);
+    x.fill(); x.restore();
+  }
+  x.beginPath(); x.arc(0, 0, R * 0.175, 0, Math.PI * 2); x.fillStyle = INK; x.fill();
+  x.beginPath(); x.arc(0, 0, R * 0.130, 0, Math.PI * 2); x.fillStyle = RINGC; x.fill();
+  x.beginPath(); x.arc(0, 0, R * 0.092, 0, Math.PI * 2); x.fillStyle = INK; x.fill();
+  x.beginPath(); x.arc(0, 0, R * 0.048, 0, Math.PI * 2); x.fillStyle = DOT; x.fill();
+  x.restore();
+}
+
 (function buildShell() {
   // POLISHED BLACK STONE: the floor reads as a dark mirror under the moon.
   const floor = new THREE.Mesh(
@@ -1150,7 +1173,7 @@ scene.add(room);
   path.position.set(0, 0.018, 1.2);
   path.receiveShadow = true;
   room.add(path);
-  for (const x of [-2.6, 2.6]) box(room, [0.05, 0.012, HALF_D * 2 - 3], [x, 0.016, 1.2], RH_GREEN, 0.31, 0.11);
+    // (the two green rails that ran down the middle are gone: the floor's mark is the centre now)
 
   // Sills, not walls: 0.45 high, so nothing can stand between camera and staff.
   // Dark-glass band, a trim cap, and a green light line on the INNER face.
@@ -2214,28 +2237,35 @@ function archiveFile(decision) {
      The table's footprint is unchanged (the FITOUT table is zone E's); what
      is new is the light in the floor: a deep-green pool with a green ring
      around it that quickens when somebody actually stands in it. */
-  solidRect(SPOTS.meeting[0], SPOTS.meeting[1], 2.6, 1.5);
-  const rug = new THREE.Mesh(new THREE.CircleGeometry(3.0, 32),
-    new THREE.MeshStandardMaterial({ color: P.teal, roughness: 0.95, transparent: true, opacity: 0.22 }));
-  rug.rotation.x = -Math.PI / 2;
-  rug.position.set(SPOTS.meeting[0], 0.022, SPOTS.meeting[1]);
-  rug.receiveShadow = true;
-  room.add(rug);
-  const meetRing = new THREE.Mesh(new THREE.RingGeometry(2.84, 3.0, 48),
-    new THREE.MeshStandardMaterial({
-      color: RH_GREEN, emissive: new THREE.Color(RH_GREEN),
-      emissiveIntensity: 0.5 * GLOW_SCALE, roughness: 1, metalness: 0, side: THREE.DoubleSide,
-    }));
-  meetRing.rotation.x = -Math.PI / 2;
-  meetRing.position.set(SPOTS.meeting[0], 0.028, SPOTS.meeting[1]);
-  meetRing.castShadow = false;
-  meetRing.receiveShadow = false;
-  meetRing.userData.noBake = true;
-  room.add(meetRing);
-  GLOWS.push({ mat: meetRing.material, base: 0.5 });
-  pulse(meetRing, { period: 7.0, floor: 0.45 });
-  GLOWS[GLOWS.length - 1].mat = meetRing.material;
-  window.__meetRing = meetRing;
+
+    /* ── THE MARK IN THE FLOOR ──────────────────────────────────────────────
+       The middle of the room used to be a green pool with a neon ring. It is
+       now the house mark, inlaid in the floor the way a lobby has a medallion.
+       Painted once to a canvas, so it costs one texture and no geometry, and
+       it still answers STATION_FX.meeting: the handle and the pulse()
+       registration below are what stationFlash() looks up. */
+    solidRect(SPOTS.meeting[0], SPOTS.meeting[1], 2.6, 1.5);
+    const markC = document.createElement("canvas"); markC.width = markC.height = 1024;
+    drawHouseMark(markC);
+    const markTex = new THREE.CanvasTexture(markC);
+    markTex.colorSpace = THREE.SRGBColorSpace; markTex.anisotropy = 4;
+    const medallion = new THREE.Mesh(
+      new THREE.PlaneGeometry(6.0, 6.0),
+      new THREE.MeshStandardMaterial({
+        map: markTex, transparent: true, roughness: 0.82, metalness: 0.04,
+        emissive: new THREE.Color(RH_GREEN), emissiveMap: markTex,
+        emissiveIntensity: 0.16 * GLOW_SCALE, depthWrite: false,
+      }));
+    medallion.rotation.x = -Math.PI / 2;
+    medallion.position.set(SPOTS.meeting[0], 0.024, SPOTS.meeting[1]);
+    medallion.receiveShadow = true; medallion.castShadow = false;
+    medallion.userData.noBake = true;
+    room.add(medallion);
+    GLOWS.push({ mat: medallion.material, base: 0.16 });
+    pulse(medallion, { period: 9.0, floor: 0.7 });
+    GLOWS[GLOWS.length - 1].mat = medallion.material;
+    window.__meetRing = medallion;      // STATION_FX.meeting flashes this
+    window.__medallion = medallion;
 
   for (const at of [[-16, 11.4], [16, 11.4], [-16, -11.4], [16, -11.4]]) buildPlant(at);
 })();

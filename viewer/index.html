@@ -14,7 +14,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Caveat:wght@500;700&display=swap">
 <style>
 /* ══════════════════════════════════════════════════════════════════════
    CLAUDE COMPANY — THE DEVELOPMENT
@@ -24,33 +24,50 @@
 
 /* ── 1 · tokens ─────────────────────────────────────────────────────── */
 :root{
-  /* house palette — unchanged */
-  --cream:#f0e4c7; --path-stone:#cfc7ad; --timber:#a96934; --timber-dark:#5f3e29;
-  --teal:#267f82; --amber:#e0ad3d; --glass:#73c9d2; --metal:#70828a;
-  --terracotta:#bf623c; --coral:#df7655; --leaf:#66a348; --charcoal:#30454a;
-  --claude:#d97757;
+  /* NIGHT FIRST. The bare :root IS the tower after the bell — polished black
+     stone, smoked oak, brushed steel, aged brass, and Robinhood green used only
+     as light. Brass (--amber) stays brass everywhere it is used; green never
+     becomes paint. The broadsheet below the fold is printed on the same stone
+     as the trading floor upstairs: one palette, one building. */
+  --cream:#d4dde0; --path-stone:#cfc7ad; --timber:#a96934; --timber-dark:#5f3e29;
+  --teal:#1f8f5f; --solar-navy:#287e9d; --amber:#d1a84f; --glass-aqua:#3ee063;
+  --glass:#3ee063; --metal:#70828a; --terracotta:#bf623c; --coral:#e06b57;
+  --leaf:#5aa552; --charcoal:#30454a; --water:#3ee063; --claude:#d97757;
+  /* the emitted light: the building's own green, never a surface colour */
+  --rh-green:#00c805; --rh-soft:#3ee063; --rh-pale:#8bff9f;
 
-  /* the sheet (light — "the morning edition") */
-  --bg:#faf4e6;          /* paper            */
-  --bg-2:#f2e8d1;        /* tinted band      */
-  --card:#fffdf5;        /* inset stock      */
-  --ink:#1d2f34;         /* body ink         */
-  --ink-soft:#48595d;    /* secondary ink    */
-  --ink-faint:#5f6f6d;   /* captions, slugs  */
-  --rule:#cdbc95;        /* hairline         */
-  --rule-soft:#e2d5b4;   /* lighter hairline */
-  --accent:#bf623c;      /* display accent (terracotta) — large type only */
-  --accent-ink:#8f4a1e;  /* accent at caption size — passes AA on paper   */
-  --hot:#e0ad3d;         /* the one fill below the fold                   */
-  --hot-ink:#2a2018;
-  --kind-model:#1f6b6e;  /* the "model" tag, dark enough for 9px on paper */
-  --on-dark:#f4ecd8;
+  /* the ink ladder — three steps, never more. --ink-faint is lifted off the
+     floor's #5f7570 because this page sets running prose in it (.fine and
+     .verified are 11.5–12px sentences, not 9px keys); at #849a94 its worst
+     ground — the dawn band — measures 4.61:1 instead of 2.80:1. */
+  --ink:#e9f2ef;         /* body ink         */
+  --ink-soft:#9fb3ad;    /* secondary ink    */
+  --ink-faint:#849a94;   /* captions, slugs  */
+  --on-dark:#e9f2ef;
 
-  /* the evening (hero) — fixed in both schemes: it is a picture of dusk */
-  --dusk-ink:#f8f0dc;
-  --dusk-soft:#e9dcbd;
-  --dusk-amber:#5cf07a;
-  --dusk-bar:rgba(7,14,16,.94);
+  /* the floor's surfaces, under their floor names, so the two files quote one
+     list; the page's own names carry the work and keep their meaning. */
+  --bar:#05090c; --panel:#0b1417; --panel-line:#16252a; --card-line:#1e2f34;
+  --bg:#05090c;          /* the ground = --bar (the shell, below the panel) */
+  --bg-2:#0b1417;        /* tinted band = --panel   */
+  --card:#0f1a1e;        /* inset stock = --card    */
+  --rule:#1e2f34;        /* hairline = --card-line       */
+  --rule-soft:#16252a;   /* lighter hairline = --panel-line */
+
+  --accent:#d1a84f;      /* display accent — BRASS, at display size        */
+  --accent-ink:#d1a84f;  /* brass at caption size, and every focus ring    */
+  --hot:#1f8f5f;         /* the paint: the one resting fill, --teal        */
+  --hot-ink:#04140a;     /* near-black of the paint's own hue — 4.64:1     */
+  --kind-model:#e0ad3d;  /* the "model" role swatch, as on the floor's dossier */
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+
+  /* the evening (hero) — the building's own night, lit by its own green */
+  --dusk-ink:#e9f2ef;
+  --dusk-soft:#9fb3ad;
+  --dusk-amber:#3ee063;
+  --dusk-bar:rgba(5,9,12,.94);
   --hero-sky:linear-gradient(180deg,
     #05090c 0%, #071016 17%, #0a1a1e 33%, #0d2529 47%,
     #103330 59%, #124338 69%, #14563d 77%, #156a41 83%,
@@ -58,54 +75,65 @@
   --hero-horizon:linear-gradient(180deg,#0b1a17 0%, #08120f 38%, #04090a 100%);
   --hero-horizon-line:rgba(0,200,5,.32);
 }
+/* The two echo blocks below are redundant on purpose: they restate the same
+   surface/ink/status/shell values as the bare :root, so a system-dark viewer
+   with no stored choice and an explicit "dark" land on identical values, and
+   the switch wins in both directions. They move no house colour, no green and
+   no brass — those keep their only home on the bare :root above. */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#131c1f; --bg-2:#1a2629; --card:#1d292d;
-    --ink:#ece0c6; --ink-soft:#a9b7b3; --ink-faint:#8b9a96;
-    --rule:#3a4c50; --rule-soft:#2a393d;
-    --accent:#e0ad3d; --accent-ink:#e8bb5c;
-    --hot:#e0ad3d; --hot-ink:#231a12;
-    --kind-model:#73c9d2;
-    --dusk-ink:#f8f0dc; --dusk-soft:#e9dcbd; --dusk-amber:#5cf07a;
-    --dusk-bar:rgba(14,12,28,.94);
+    --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#849a94;
+    --bar:#05090c; --panel:#0b1417; --panel-line:#16252a; --card-line:#1e2f34;
+    --bg:#05090c; --bg-2:#0b1417; --card:#0f1a1e;
+    --rule:#1e2f34; --rule-soft:#16252a;
+    --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+    --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+    --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+    --dusk-bar:rgba(5,9,12,.94);
   }
 }
-/* THE DAY SHIFT — chosen, never inferred: the same tower on a clear morning.
-   The dusk stays the default and the night; flipping the switch relights the
-   hero, re-inks its type, and lets the broadsheet below run in daylight. */
-:root[data-theme="light"]{
-  --dusk-ink:#233036; --dusk-soft:#48575a; --dusk-amber:#0f7a33;
-  --dusk-bar:rgba(240,236,222,.95);
-  --hero-sky:linear-gradient(180deg,
-    #6f9fb8 0%, #86b2c4 22%, #a4c8d2 44%, #c2dcde 64%,
-    #dbe7dc 80%, #e7eee2 90%, #e2ecdf 100%);
-  --hero-horizon:linear-gradient(180deg,#c9d4cd 0%,#b6c2bb 55%,#a7b4ac 100%);
-  --hero-horizon-line:rgba(0,140,20,.26);
+:root[data-theme="dark"]{
+  --ink:#e9f2ef; --ink-soft:#9fb3ad; --ink-faint:#849a94;
+  --bar:#05090c; --panel:#0b1417; --panel-line:#16252a; --card-line:#1e2f34;
+  --bg:#05090c; --bg-2:#0b1417; --card:#0f1a1e;
+  --rule:#1e2f34; --rule-soft:#16252a;
+  --good:#3ee063; --warn:#e0ad3d; --bad:#ff6b5a;
+  --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
+  --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
+  --dusk-bar:rgba(5,9,12,.94);
 }
-:root[data-theme="light"] .shade{display:none}
-/* the tower changes shift: stars out, lamps down, night glass lifted to
-   daylight, the reflections calmed. The crest stays coral at any hour — the
-   desk is Claude's whatever chain it trades on. */
+/* THE DAWN SHIFT — chosen, never inferred, and it is NOT a light theme: the
+   same tower at first light through the north glazing, teal-dark instead of
+   black. It moves surfaces and the sky, and nothing else. The ink is not
+   redefined, because the ground never gets bright enough to need dark ink. */
+:root[data-theme="light"]{
+  --panel:#0d2529; --panel-line:#1d3d43; --card-line:#24484f; --bar:#0a2024;
+  --bg:#0a2024;          /* the dawn shell, one step under the panel */
+  --bg-2:#0d2529;        /* tinted band = dawn --panel */
+  --card:#11313a;        /* inset stock = dawn --card  */
+  --rule:#24484f; --rule-soft:#1d3d43;
+  --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92); --shadow:rgba(0,0,0,.5);
+  --dusk-bar:rgba(13,37,41,.94);
+  --hero-sky:linear-gradient(180deg,
+    #0d2529 0%, #11313a 18%, #16404a 36%, #1a4f55 50%,
+    #1d5a52 62%, #1f6a4d 72%, #218149 80%, #239c4d 88%, #26b355 100%);
+  --hero-horizon:linear-gradient(180deg,#123a35 0%,#0e2a26 45%,#0a1f1d 100%);
+  --hero-horizon-line:rgba(0,200,5,.28);
+}
+/* first light is still low light: the shade thins, it does not lift */
+:root[data-theme="light"] .shade{opacity:.66}
+/* the tower changes shift: the stars go out and the glass warms, but the lamps
+   stay on and the plaza stays lit — this is dawn, not noon. The crest stays
+   coral at any hour — the desk is Claude's whatever chain it trades on. */
 :root[data-theme="light"] .hero-art #stars{display:none}
-:root[data-theme="light"] .hero-art #wins{opacity:.3}
-:root[data-theme="light"] .hero-art #refl{opacity:.4}
-:root[data-theme="light"] .hero-art #trees{fill:#3f4f52}
-:root[data-theme="light"] .hero-art #plazalight{opacity:.35}
-:root[data-theme="light"] .hero-art #tower{filter:brightness(1.5) saturate(.7)}
+:root[data-theme="light"] .hero-art #wins{opacity:.7}
+:root[data-theme="light"] .hero-art #refl{opacity:.62}
+:root[data-theme="light"] .hero-art #trees{fill:#12302f}
+:root[data-theme="light"] .hero-art #plazalight{opacity:.7}
+:root[data-theme="light"] .hero-art #tower{filter:brightness(1.14) saturate(.92)}
 :root[data-theme="light"] .hero::before{content:"";position:absolute;top:9%;right:15%;
   width:78px;height:78px;border-radius:50%;z-index:1;
-  background:radial-gradient(circle,#fffdf2 0 36%,#f7dd94 58%,rgba(247,221,148,0) 72%)}
-
-:root[data-theme="dark"]{
-  --bg:#131c1f; --bg-2:#1a2629; --card:#1d292d;
-  --ink:#ece0c6; --ink-soft:#a9b7b3; --ink-faint:#8b9a96;
-  --rule:#3a4c50; --rule-soft:#2a393d;
-  --accent:#e0ad3d; --accent-ink:#e8bb5c;
-  --hot:#e0ad3d; --hot-ink:#231a12;
-  --kind-model:#73c9d2;
-  --dusk-ink:#f8f0dc; --dusk-soft:#e9dcbd; --dusk-amber:#eec27a;
-  --dusk-bar:rgba(14,12,28,.94);
-}
+  background:radial-gradient(circle,#dff7d8 0 30%,#7fd68a 54%,rgba(127,214,138,0) 74%)}
 
 /* ── 2 · base ───────────────────────────────────────────────────────── */
 *{box-sizing:border-box}
@@ -153,18 +181,23 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent-ink);outline
   letter-spacing:.2em;text-transform:uppercase;text-decoration:none;
   color:var(--dusk-soft);padding:6px 0;border-bottom:1px solid transparent}
 .nlinks a:hover{color:var(--dusk-ink);border-bottom-color:var(--amber)}
+/* the lease CTA is the one control that LIGHTS UP: it rests on the building's
+   green at its lowest step and takes the pure signal under the cursor */
 .pill{flex:none;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10.5px;
   font-weight:500;letter-spacing:.18em;text-transform:uppercase;text-decoration:none;
-  color:var(--dusk-amber);border:1px solid rgba(229,176,79,.85);border-radius:999px;
+  color:var(--dusk-amber);border:1px solid rgba(0,200,5,.55);border-radius:999px;
   padding:10px 20px;background:transparent;
   transition:background .12s linear,color .12s linear}
-.pill:hover{background:var(--amber);border-color:var(--amber);color:#241a0d}
-.topnav a:focus-visible{outline-color:#f2c76e}
-.shiftbtn{font-size:15px;line-height:1;background:none;border:1px solid rgba(128,128,128,.35);
+.pill:hover{background:var(--rh-green);border-color:var(--rh-green);color:#04140a}
+.topnav a:focus-visible{outline-color:var(--amber)}
+.shiftbtn{font-size:15px;line-height:1;background:none;border:1px solid rgba(233,242,239,.24);
   color:var(--dusk-ink);border-radius:50%;width:32px;height:32px;cursor:pointer;flex:none}
 .shiftbtn:hover{border-color:var(--dusk-amber)}
+/* the masthead's signature is a one-pixel emitted line with a bleed, never a
+   thick brass bar */
 .topnav.scrolled{position:fixed;background:var(--dusk-bar);
-  border-bottom:1px solid rgba(238,194,122,.16);
+  border-bottom:1px solid var(--rh-green);
+  box-shadow:0 1px 14px rgba(0,200,5,.28);
   backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
   animation:navin .28s ease}
 @keyframes navin{from{transform:translateY(-100%)}to{transform:translateY(0)}}
@@ -214,7 +247,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent-ink);outline
 
 /* ── 5 · the figure rail — the only stats moment ────────────────────── */
 .railsec{padding:clamp(44px,7vw,88px) 0 clamp(18px,3vw,34px)}
-.rail{border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);
+.rail{border-top:2px solid var(--rule);border-bottom:1px solid var(--rule);
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:680px){.rail{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .fig{padding:clamp(14px,2vw,20px) clamp(10px,1.6vw,20px);border-left:1px solid var(--rule)}
@@ -267,7 +300,7 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 
 /* pull-quote — ruled top and bottom, italic */
 .pull{margin:clamp(30px,4.4vw,52px) 0;padding:clamp(18px,2.6vw,26px) 0;
-  border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+  border-top:1px solid var(--accent);border-bottom:1px solid var(--accent)}
 .pull p{font-family:"Instrument Serif",Georgia,serif;font-style:italic;
   font-size:clamp(23px,3.5vw,40px);line-height:1.16;letter-spacing:-.015em;
   margin:0;max-width:26ch;text-wrap:balance}
@@ -281,7 +314,7 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 .grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:860px){.grid3,.grid2{grid-template-columns:minmax(0,1fr);gap:24px}}
-.note{background:transparent;border:0;border-top:2px solid var(--ink);
+.note{background:transparent;border:0;border-top:2px solid var(--rule);
   border-radius:0;padding:13px 0 0}
 .note .kicker{display:block;margin:0 0 9px;font-size:9.5px;letter-spacing:.18em;
   color:var(--accent-ink)}
@@ -292,17 +325,19 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 .staffbox+.grid3{margin-top:clamp(28px,4vw,46px)}
 .secbtns{margin:clamp(26px,4vw,40px) 0 0}
 
-.btn{display:inline-block;text-decoration:none;border:1px solid var(--ink);
+.btn{display:inline-block;text-decoration:none;border:1px solid var(--rule);
   padding:11px 20px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;
   letter-spacing:.14em;text-transform:uppercase;font-weight:500;line-height:1.2;
   background:transparent;color:var(--ink);transition:background .12s linear,color .12s linear}
 .btn.solid{background:var(--hot);border-color:var(--hot);color:var(--hot-ink);font-weight:700}
-.btn.solid:hover{background:var(--ink);border-color:var(--ink);color:var(--bg)}
-.btn.line:hover{background:var(--ink);color:var(--bg)}
+/* the primary control lights up under the cursor — paint at rest, the
+   building's own signal on hover; the ghost lifts to the panel hairline */
+.btn.solid:hover{background:var(--rh-green);border-color:var(--rh-green);color:#04140a}
+.btn.line:hover{background:var(--rule-soft);border-color:var(--ink-faint);color:var(--ink)}
 
 /* ── 8 · the staff box — the sixteen ───────────────────────────────── */
-.staffbox{margin-top:clamp(26px,4vw,44px);border-top:3px solid var(--ink);
-  border-bottom:3px solid var(--ink)}
+.staffbox{margin-top:clamp(26px,4vw,44px);border-top:3px solid var(--rule);
+  border-bottom:3px solid var(--rule)}
 .boxhead{display:flex;justify-content:space-between;gap:6px 14px;flex-wrap:wrap;
   padding:9px 0;border-bottom:1px solid var(--rule);
   font-size:9.5px;letter-spacing:.18em;color:var(--ink-faint)}
@@ -344,7 +379,7 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 .steps{counter-reset:s;list-style:none;margin:0;padding:0;max-width:72ch}
 .steps li{counter-increment:s;position:relative;padding:15px 0 15px 58px;
   border-top:1px solid var(--rule-soft);color:var(--ink-soft);font-size:15.5px}
-.steps li:first-child{border-top:1px solid var(--ink)}
+.steps li:first-child{border-top:1px solid var(--rule)}
 .steps li:last-child{border-bottom:1px solid var(--rule-soft)}
 .steps li::before{content:counter(s,decimal-leading-zero);position:absolute;left:0;top:13px;
   font-family:"Instrument Serif",Georgia,serif;font-size:25px;line-height:1;
@@ -354,7 +389,7 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 /* ── 10 · the rate (display figure) ─────────────────────────────────── */
 .rate{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);
   gap:clamp(20px,4vw,56px);align-items:start;
-  border-top:2px solid var(--ink);padding-top:clamp(20px,3vw,30px)}
+  border-top:2px solid var(--rule);padding-top:clamp(20px,3vw,30px)}
 @media (max-width:760px){.rate{grid-template-columns:minmax(0,1fr);gap:20px}}
 .rate .big{font-family:"Instrument Serif",Georgia,serif;
   font-size:clamp(76px,13vw,152px);line-height:.82;letter-spacing:-.03em;
@@ -367,7 +402,8 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 
 /* ── 11 · the notice (small print) ──────────────────────────────────── */
 .plain{margin:clamp(30px,4vw,46px) 0 0;padding:clamp(18px,2.6vw,24px);
-  background:var(--card);border:1px solid var(--rule);
+  background:color-mix(in srgb,var(--amber) 8%,var(--card));
+  border:1px solid color-mix(in srgb,var(--amber) 58%,var(--rule));
   font-size:13.5px;line-height:1.62;color:var(--ink-soft);max-width:none}
 .plain b{color:var(--ink);font-weight:600}
 @media (min-width:1060px){.plain{column-count:2;column-gap:40px}}
@@ -386,27 +422,27 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
   letter-spacing:.06em;color:var(--ink-faint);max-width:32ch}
 .coin{border:1px solid var(--rule)}
 .coin-bg{fill:var(--card)}
-.coin-ring{fill:none;stroke:var(--ink);stroke-width:2}
-.coin-mill{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-dasharray:2 5;opacity:.6}
+.coin-ring{fill:none;stroke:var(--accent);stroke-width:2}
+.coin-mill{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-dasharray:2 5;opacity:.6}
 #coinspark{color:var(--claude)}
 .ticker{font-size:10.5px;letter-spacing:.2em;color:var(--accent-ink);margin:0 0 10px}
 .tokencopy{max-width:58ch}
 .ca{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:22px;
-  padding:12px 14px;background:var(--card);border:1px solid var(--ink);border-radius:0}
+  padding:12px 14px;background:var(--card);border:1px solid var(--accent);border-radius:0}
 .ca .calabel{font-size:9.5px;letter-spacing:.18em;color:var(--accent-ink);flex:none}
 .ca code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:var(--ink);
   word-break:break-all;overflow-wrap:anywhere;flex:1;min-width:150px}
 .cacopy{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;font-weight:500;
-  letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--ink);
-  background:transparent;color:var(--ink);border-radius:0;padding:7px 12px;
+  letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--rule);
+  background:transparent;color:var(--ink-soft);border-radius:0;padding:7px 12px;
   cursor:pointer;flex:none}
-.cacopy:hover{background:var(--ink);color:var(--bg)}
-.cacopy.done{background:var(--leaf);border-color:var(--leaf);color:#12240f}
+.cacopy:hover{background:var(--rh-green);border-color:var(--rh-green);color:#04140a}
+.cacopy.done{background:var(--good);border-color:var(--good);color:#04140a}
 .tokenlinks{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
 .verified{margin-top:16px;font-size:12px;line-height:1.6;color:var(--ink-faint)}
 
 /* ── 13 · colophon ──────────────────────────────────────────────────── */
-footer{border-top:4px double var(--ink);padding:clamp(30px,4vw,46px) 0 clamp(34px,5vw,54px);
+footer{border-top:4px double var(--rule);padding:clamp(30px,4vw,46px) 0 clamp(34px,5vw,54px);
   background:var(--bg)}
 footer .wrap{display:flex;gap:18px 28px;flex-wrap:wrap;align-items:baseline}
 footer .fbrand{font-family:"Instrument Serif",Georgia,serif;font-size:21px;line-height:1.2;margin:0}
@@ -460,7 +496,9 @@ footer a:hover{color:var(--ink);border-bottom-color:var(--accent)}
 (function () {
   let t = null;
   try { t = localStorage.getItem("cc_theme"); } catch {}
-  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  /* night is the default for everyone, stamped before first paint so the page
+     never flashes the other shift's ground */
+  document.documentElement.dataset.theme = t === "light" ? "light" : "dark";
   addEventListener("DOMContentLoaded", () => {
     const b = document.getElementById("shiftbtn");
     if (!b) return;
