@@ -19,7 +19,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { evaluateExit } from "./src/calls.js";
-import { needsFastExitLane, FAST_LANE_MIN_PASSES } from "./src/penthouse.js";
+import { needsFastExitLane, FAST_LANE_MIN_PASSES, exitClockBlocks, blocksFor, BLOCK_MS } from "./src/penthouse.js";
 import { CAP_BANDS } from "./src/bands.js";
 
 let pass = 0, fail = 0;
@@ -49,6 +49,29 @@ console.log("\nWHICH CALLS CANNOT WAIT FOR THE SLOW TIMER");
     needsFastExitLane({ hold_max_ms: 5 * HOUR }, { monitorMs: 60 * MIN }), "5h hold vs a 1h timer");
   ok("...and speeding it up pushes them off",
     !needsFastExitLane({ hold_max_ms: 30 * MIN }, { monitorMs: MIN }), "30m hold vs a 1m timer");
+}
+
+console.log("\nTHE CLOCKS ARE STATED IN THE CHAIN'S BLOCKS");
+{
+  /* Chain 4663 seals a block every ~100 ms (100.6 ms over 10,000 blocks, measured
+   * 2026-09-04). The hold windows are the owner's and are NOT re-derived; only the
+   * comparison is read in blocks. The numbers below are the ones the code must print. */
+  ok("the block clock is 100 ms", BLOCK_MS === 100, `${BLOCK_MS} ms`);
+  ok("a ten-minute monitor pass is 6,000 blocks", blocksFor(10 * MIN) === 6_000, `${blocksFor(10 * MIN)}`);
+  ok("a nano hold (30 m) is 18,000 blocks", blocksFor(CAP_BANDS.nano.holdMaxMs) === 18_000,
+    `${blocksFor(CAP_BANDS.nano.holdMaxMs)}`);
+  const nanoClocks = exitClockBlocks({ hold_max_ms: CAP_BANDS.nano.holdMaxMs }, { monitorMs: 10 * MIN, subTickSecs: 45 });
+  ok("a nano call gets 3 slow passes and 40 sub-ticks",
+    nanoClocks.slowPasses === 3 && nanoClocks.subTicks === 40,
+    `hold ${nanoClocks.holdBlocks} blocks / slow ${nanoClocks.slowBlocks} = ${nanoClocks.slowPasses}; ` +
+    `/ sub-tick ${nanoClocks.subTickBlocks} = ${nanoClocks.subTicks}`);
+  const vh = exitClockBlocks({ hold_max_ms: CAP_BANDS.very_high.holdMaxMs }, { monitorMs: 10 * MIN });
+  ok("a very-high call gets 144 slow passes over its 864,000 blocks",
+    vh.holdBlocks === 864_000 && vh.slowPasses === 144, `${vh.holdBlocks} blocks, ${vh.slowPasses} passes`);
+  ok("the fast-lane verdict is the same ratio read in blocks",
+    needsFastExitLane({ hold_max_ms: CAP_BANDS.nano.holdMaxMs }, { monitorMs: 10 * MIN }) ===
+    (nanoClocks.slowPasses < FAST_LANE_MIN_PASSES));
+  ok("no clock, no blocks", exitClockBlocks({}) === null && blocksFor(0) === null && blocksFor("soon") === null);
 }
 
 console.log("\nA PRICE-ONLY READ MAY FIRE ON PRICE, AND ON NOTHING ELSE");

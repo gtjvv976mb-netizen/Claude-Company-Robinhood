@@ -32,7 +32,8 @@
  * Everything here is read-only. Nothing in this file signs, holds a key, or sends.
  */
 
-import { classifyToken, classifyPairAssetOnChain, SELECTOR_NAME } from "./scope-guard.mjs";
+import { classifyToken, classifyPairAssetOnChain, SELECTOR_NAME, assertNotAccessToken } from "./scope-guard.mjs";
+import { classifyErc20Hazards } from "./erc20-hazards.mjs";
 
 const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const AGG = "https://aggregator-api.kyberswap.com/robinhood/api/v1";
@@ -133,9 +134,10 @@ export function embeddedFloor(calldata, quotedOut, { floorBand = 5000n } = {}) {
  */
 export async function prepareSwap(rpc, {
   tokenIn, tokenOut, amountIn, sender, recipient = sender, slippageBps,
-  scopeCheck = true, direction = "buy",
+  scopeCheck = true, direction = "buy", hazards = { maxTaxBps: 0 }, maxPriceImpactPct = null,
 }) {
   if (!(BigInt(amountIn) > 0n)) throw new Error("amountIn must be positive");
+  if (slippageBps == null) throw new Error("slippageBps is unset — the thresholds registry has not supplied it");
 
   /* MEMECOINS ONLY, CHECKED HERE TOO. The desk screens upstream, but the executor is
      the last thing between a decision and money moving, and it does not get to assume
@@ -154,6 +156,7 @@ export async function prepareSwap(rpc, {
     const paidWith = selling ? tokenOut : tokenIn;
 
     if (!isNative(target)) {
+      assertNotAccessToken(target);
       const v = await classifyToken(target, read, readName);
       if (!v.tradeable) throw new Error(`scope guard: ${v.reason}`);
     }
@@ -164,9 +167,43 @@ export async function prepareSwap(rpc, {
   }
 
   const route = await quote({ tokenIn, tokenOut, amountIn, to: recipient });
-  const built = await build(route, { sender, recipient, slippageBps });
-
   const quotedOut = BigInt(route.amountOut);
+
+  /* WHAT THE TOKEN CAN DO TO A TRANSFER, measured before it is bought. token2022.mjs
+     did this job on Solana by reading extensions; here the tax is measured by executing
+     a transfer in eth_call (erc20-hazards.mjs), and pausable/blocklist selectors are
+     refused. BUYS ONLY: a token already held must remain sellable whatever it does to
+     a transfer, or a tax discovered late would strand the position. */
+  let hazardVerdict = null;
+  if (hazards && direction === "buy" && !isNative(tokenOut)) {
+    const holders = [...new Set((route.route ?? []).flat().map((hop) => hop?.pool)
+      .filter((p) => typeof p === "string" && /^0x[0-9a-fA-F]{40}$/.test(p)))];
+    hazardVerdict = await classifyErc20Hazards(rpc, { token: tokenOut, amount: quotedOut, holders,
+      maxTaxBps: Number(hazards.maxTaxBps ?? 0) });
+    if (!hazardVerdict.tradeable) throw new Error(`hazard guard: ${hazardVerdict.reason}`);
+  }
+
+  /* PRICE IMPACT, from the curvature of the route rather than a field the aggregator
+     labels "impact". Two quotes from one source can still lie in level; they cannot
+     easily lie about their RATIO at two sizes, and the absolute floor is anchored on
+     the chain below anyway. Uniswap v3/v4 depth is range-dependent — a pool can read
+     deep while being empty just below the tick — which is what this catches. */
+  let priceImpactPct = null;
+  if (maxPriceImpactPct != null) {
+    const small = BigInt(amountIn) / 50n > 0n ? BigInt(amountIn) / 50n : 1n;
+    const smallRoute = await quote({ tokenIn, tokenOut, amountIn: small, to: recipient });
+    const smallOut = BigInt(smallRoute.amountOut);
+    if (smallOut > 0n) {
+      // rate at clip vs rate at 2% of clip, both as out-per-in, in 1e6 fixed point
+      const rateBig = quotedOut * 1_000_000n / BigInt(amountIn);
+      const rateSmall = smallOut * 1_000_000n / small;
+      priceImpactPct = rateSmall > 0n ? Number((rateSmall - rateBig) * 10_000n / rateSmall) / 100 : null;
+    }
+    if (priceImpactPct == null || priceImpactPct > Number(maxPriceImpactPct))
+      throw new Error(`price impact ${priceImpactPct == null ? "unmeasurable" : priceImpactPct.toFixed(2) + "%"} exceeds cap ${maxPriceImpactPct}% at ${amountIn} in`);
+  }
+
+  const built = await build(route, { sender, recipient, slippageBps });
   const ourFloor = floorFrom(quotedOut, slippageBps);
   const embedded = embeddedFloor(built.data, quotedOut);
   const value = isNative(tokenIn) ? BigInt(amountIn) : 0n;
@@ -234,5 +271,6 @@ export async function prepareSwap(rpc, {
     extractableGap: extractable,
     slippageBps, gas: Number(built.gas ?? route.gas ?? 0),
     driftFromQuoteBps: Number((sim.amountOut - quotedOut) * BPS / quotedOut),
+    priceImpactPct, hazards: hazardVerdict,
   });
 }

@@ -210,6 +210,71 @@ console.log("\nCOMPLIANCE — a WATCH ticket must be audited exactly like a PROP
   // No ticket at all (alwaysTicket off) must behave exactly as before.
   const noTicket = complianceCheck({ pm: { decision: "WATCH" }, risk, redteam: {}, ticket: null, ev });
   ok("a WATCH with no ticket is unaffected", noTicket.pass === true);
+  ok("...but the bundle's missing chain facts are on the tape as a warning",
+    noTicket.warnings.some((w) => w.code === "evm_gates_unverified" && /launch\.phase/.test(w.detail)),
+    noTicket.warnings.map((w) => w.code).join(","));
+}
+
+/* THE CHAIN'S GATES AT THE DOOR. The same facts that zero Risk's size veto here, from
+ * the evidence contract's fields only, so a PM that talked itself past a curve token or an
+ * equity-quoted pool is stopped by code. A clean graduate passes with no warning. */
+console.log("\nCOMPLIANCE — the chain's deterministic gates are a veto, from the bundle's own fields");
+{
+  const { complianceCheck } = await import("./src/agents/compliance.js");
+  const now = 1_800_000_000_000;
+  const risk = { position_size_usd: 50, stop_price: 0.8, max_loss_usd: 11.5 };
+  const ticket = { entry_zone_low: 0.95, entry_zone_high: 1.05, stop_price: 0.8,
+    take_profit: [{ price: 1.6, pct_to_sell: 100 }], max_slippage_bps: 500,
+    execution_warnings: ["a send with no receipt was dropped by the sequencer: reconcile by nonce and re-send"] };
+  const graduate = {
+    pair: { priceUsd: 1.0 }, exitProbe: { roundTripLossPct: 3 },
+    launch: { phase: "graduated", graduatedAt: now - 3 * 3600e3, exemptShareOfSupplyPct: 4 },
+    pairs: { pools: [{ pairToken: "0x0bd7d308f8e1639fab988df18a8011f41eacad73", pairTokenClass: "weth" }] },
+    contract: { cloneOf: "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e", verifiedSource: false, flags: [] },
+    sellSim: { ok: true },
+  };
+  const check = (over) => complianceCheck({ pm: { decision: "PROPOSE", how_red_team_was_answered: "x" }, risk,
+    redteam: { verdict: "survives" }, ticket, ev: { ...graduate, ...over }, now });
+  const clean = check({});
+  ok("a clean graduate passes", clean.pass === true, clean.violations.map((v) => v.code).join(",") || "clear");
+  ok("...with no unverified-gate warning", !clean.warnings.some((w) => w.code === "evm_gates_unverified"),
+    clean.warnings.map((w) => w.code).join(",") || "none");
+  for (const [name, over, code] of [
+    ["a token still on the curve", { launch: { ...graduate.launch, phase: "curve", graduatedAt: null } }, "not_graduated"],
+    ["a pool graduated 30 seconds ago", { launch: { ...graduate.launch, graduatedAt: now - 30e3 } }, "graduated_too_recently"],
+    ["a pool quoted in an unlisted equity", { pairs: { pools: [{ pairToken: "0x4a0e", pairTokenClass: "equity_unlisted" }] } }, "pair_token_gate"],
+    ["an exempt list holding 60% of supply", { launch: { ...graduate.launch, exemptShareOfSupplyPct: 60 } }, "insider_float"],
+    ["bespoke unverified code whose sell reverts", { contract: { cloneOf: null, verifiedSource: false, flags: [] }, sellSim: { ok: false, revertReason: "y" } }, "unverified_code"],
+    ["a live blacklist role", { contract: { ...graduate.contract, flags: [{ flag: "blacklist" }] } }, "live_authority"],
+  ]) {
+    const r = check(over);
+    ok(`${name} is vetoed as ${code}`, r.pass === false && r.violations.some((v) => v.code === code),
+      r.violations.map((v) => v.code).join(",") || "passed");
+  }
+  // An allowlisted equity is a pair asset and passes; the seats price the leg.
+  const nvda = check({ pairs: { pools: [{ pairToken: "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec", pairTokenClass: "allowed_equity" }] } });
+  ok("an allowlisted equity as the pair asset passes", nvda.pass === true, nvda.violations.map((v) => v.code).join(","));
+  // The one execution fact unique to this chain must be on every ticket.
+  const silent = complianceCheck({ pm: { decision: "PROPOSE", how_red_team_was_answered: "x" }, risk,
+    redteam: { verdict: "survives" }, ticket: { ...ticket, execution_warnings: ["thin book"] }, ev: graduate, now });
+  ok("a ticket without the no-receipt warning is warned", silent.warnings.some((w) => w.code === "no_receipt_warning_missing"));
+  // EVM signing vocabulary is execution language too.
+  const signing = complianceCheck({ pm: { decision: "PROPOSE", how_red_team_was_answered: "x", thesis: "call eth_sendRawTransaction from the desk" }, risk,
+    redteam: { verdict: "survives" }, ticket, ev: graduate, now });
+  ok("eth_sendRawTransaction in a seat's output is a veto", signing.violations.some((v) => v.code === "execution_language"));
+  // Gas is inside the loss arithmetic and the edge floor.
+  const gassed = complianceCheck({ pm: { decision: "PROPOSE", how_red_team_was_answered: "x" },
+    risk: { ...risk, max_loss_usd: 12.04 }, redteam: { verdict: "survives" }, ticket,
+    ev: { ...graduate, exitProbe: { roundTripLossPct: 3, gasUsdRoundTrip: 0.54 } }, now });
+  ok("the recomputed loss carries the $0.54 of gas", !gassed.violations.some((v) => v.code === "risk_arithmetic_mismatch"),
+    gassed.violations.map((v) => `${v.code}: ${v.detail}`).join(" | ") || "matches");
+  const thinEdge = complianceCheck({ pm: { decision: "PROPOSE", how_red_team_was_answered: "x" },
+    risk: { ...risk, position_size_usd: 5, max_loss_usd: 1.69 }, redteam: { verdict: "survives" },
+    ticket: { ...ticket, take_profit: [{ price: 1.2, pct_to_sell: 100 }] },
+    ev: { ...graduate, exitProbe: { roundTripLossPct: 3, gasUsdRoundTrip: 0.54 } }, now });
+  ok("on a $5 clip the gas makes a 20% target fall under 5x cost",
+    thinEdge.violations.some((v) => v.code === "edge_below_cost" && /gas/.test(v.detail)),
+    thinEdge.violations.filter((v) => v.code === "edge_below_cost").map((v) => v.detail).join("") || "no edge_below_cost");
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

@@ -49,7 +49,7 @@ const pub = publishCall(approved(), { category: "memecoin", launchpad: "pump.fun
 ok("the approval published", pub.outcome === "published", `callId=${pub.callId} tier=${pub.tier}`);
 const del = db.prepare("SELECT * FROM deliveries WHERE call_id=? AND floor_no=?").get(pub.callId, FLOOR);
 ok("it was delivered to the floor that paid for it", !!del,
-  del ? `verdict=${del.verdict} size=${del.size_sol}` : "no delivery row");
+  del ? `verdict=${del.verdict} size=${del.size_eth} ETH` : "no delivery row");
 ok("and OFFERED, so the bot's feed will carry it", del?.verdict === "offered", del?.reason ?? "");
 
 console.log("\nONE FLOOR'S RUN MUST NOT PUT THE WHOLE BUILDING IN A POSITION");

@@ -46,7 +46,8 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { ROOT } from "./config.js";
-import { PAD_QUOTA, cellOf } from "./categories.js";
+import { PAD_QUOTA, PREFERRED_PAD, cellOf } from "./categories.js";
+import { canonicalAddress, canonicalLaunchpad } from "./canonical.js";
 
 const db = new DatabaseSync(process.env.CLAUDE_CO_DB || path.join(ROOT, "claude-co.db"));
 
@@ -129,8 +130,11 @@ export function observe(coins) {
                       cell_key=COALESCE(?,cell_key), band=COALESCE(?,band), coin_type=COALESCE(?,coin_type)
     WHERE mint=?`);
 
-  for (const c of coins) {
-    if (!c?.mint) continue;
+  for (const raw of coins) {
+    if (!raw?.mint) continue;
+    // One spelling per coin: the funnel is keyed on the address, and a coin arriving
+    // lowercase from one feed and EIP-55 from another must not become two rows.
+    const c = { ...raw, mint: canonicalAddress(raw.mint), launchpad: canonicalLaunchpad(raw.launchpad) };
     const p = c.pair ?? {};
     const cell = c.cellKey ? { key: c.cellKey, band: c.band, type: c.coinType } : cellOf(c);
     const f = [
@@ -224,6 +228,7 @@ export function dueForScreen(limit = 200) {
  * its own price-move test, both re-checked below.
  */
 export function recordScreen(mint, kill) {
+  mint = canonicalAddress(mint);
   const now = Date.now();
   if (kill) {
     db.prepare(`UPDATE funnel SET screened_at=?, screen_kill=?, stage='watch' WHERE mint=?`)
@@ -253,11 +258,13 @@ export function recordScreen(mint, kill) {
  * entered — so a good name found twenty minutes ago is still a candidate instead of
  * having been forgotten and re-discovered.
  *
- * The board spread and the pump.fun quota both still apply, for the same reasons they
- * apply anywhere else: one per cell before doubling up, and the pad carrying the volume
- * gets the majority of the attention.
+ * The board spread and the preferred-pad quota both still apply, for the same reasons
+ * they apply anywhere else: one per cell before doubling up, and the pad carrying the
+ * volume gets the majority of the attention. The pad is PREFERRED_PAD (PONS V2 on 4663)
+ * — until 2026-09-05 this defaulted to "pump.fun", which no coin here carries, so the
+ * quota pass took nothing and the PONS preference the copy promises did not exist.
  */
-export function dueForStudy(limit = 8, { padQuota = PAD_QUOTA, pad = "pump.fun" } = {}) {
+export function dueForStudy(limit = 8, { padQuota = PAD_QUOTA, pad = PREFERRED_PAD } = {}) {
   const now = Date.now();
   const pool = db.prepare(`
     SELECT * FROM funnel
@@ -294,7 +301,10 @@ export function dueForStudy(limit = 8, { padQuota = PAD_QUOTA, pad = "pump.fun" 
       if (!took) break;
     }
   };
-  fill(Math.min(limit, Math.ceil(limit * padQuota)), (r) => r.launchpad === pad);
+  // Both sides through the alias table: a row written by the sweep says "pons", the
+  // constant says "pons-v2", and the quota must not miss on the spelling.
+  const want = canonicalLaunchpad(pad);
+  fill(Math.min(limit, Math.ceil(limit * padQuota)), (r) => canonicalLaunchpad(r.launchpad) === want);
   const fromPad = picked.length;
   fill(limit, () => true);
 
@@ -304,6 +314,7 @@ export function dueForStudy(limit = 8, { padQuota = PAD_QUOTA, pad = "pump.fun" 
 
 /** Record a paid verdict, and promote or demote on what it said. */
 export function recordStudy(mint, { eligible, verdict, conviction, thesis }) {
+  mint = canonicalAddress(mint);
   const now = Date.now();
   const row = db.prepare("SELECT h1 FROM funnel WHERE mint=?").get(mint);
   db.prepare(`
@@ -336,7 +347,7 @@ export function readyPool(limit = 5) {
 /** Take a coin out of the funnel — it has been traded, or the desk refused it outright. */
 export function retire(mint, reason) {
   db.prepare("UPDATE funnel SET stage='watch', stage_since=?, drop_reason=? WHERE mint=?")
-    .run(Date.now(), reason, mint);
+    .run(Date.now(), reason, canonicalAddress(mint));
 }
 
 /**

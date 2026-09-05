@@ -98,6 +98,16 @@ const ScorecardSchema = z.object({
 
 const NamedCountSchema = (key) => z.object({ [key]: bounded(120), count }).strict();
 
+// One registry row from executor/thresholds.mjs, reduced to the four fields the bundle
+// carries (see thresholdSummary in improvement-bundle.js). `value` is scalar or the
+// canonical JSON / digest of a table; `at` is the measurement date or null.
+const ThresholdSchema = z.object({
+  name: z.string().min(1).max(120).regex(/^[\w.-]+$/),
+  value: z.union([z.number().finite(), z.boolean(), z.null(), z.string().max(400)]),
+  provenance: z.enum(["measured", "inherited", "assumed"]),
+  at: z.string().max(40).nullable(),
+}).strict();
+
 export const ImprovementBundleSchema = z.object({
   reviewId: z.string().regex(/^review_[0-9a-f]{24}$/),
   contentSha256: hash,
@@ -116,6 +126,15 @@ export const ImprovementBundleSchema = z.object({
     decisionManifest: manifestSchema("decision-manifest.v1"),
     testManifest: manifestSchema("test-manifest.v1"),
   }).strict(),
+  thresholds: z.array(ThresholdSchema).max(100).superRefine((rows, ctx) => {
+    const names = rows.map((row) => row.name);
+    if (new Set(names).size !== names.length) {
+      ctx.addIssue({ code: "custom", message: "threshold names must be unique" });
+    }
+    if (names.some((value, index) => index > 0 && names[index - 1].localeCompare(value) > 0)) {
+      ctx.addIssue({ code: "custom", message: "thresholds must be sorted by name" });
+    }
+  }),
   privacy: z.object({
     scope: z.literal("house-aggregate-only"),
     tenantDataIncluded: z.literal(false), rawWorkupsIncluded: z.literal(false),

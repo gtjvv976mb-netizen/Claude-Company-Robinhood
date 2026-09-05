@@ -2,6 +2,7 @@
 # publishes dist/ to GitHub Pages on every push to main.
 #
 # One-time setup after creating the repo: Settings → Pages → Source: "GitHub Actions".
+# The full runbook, in order, is docs/DEPLOY-ROBINHOOD.md.
 name: Deploy site
 
 on:
@@ -39,9 +40,12 @@ jobs:
         run: npm test
       - name: Build static site
         # SITE_URL (the custom domain) makes og:image absolute for link-preview crawlers.
-        # API_BASE points the static site at the Render service; Pages cannot run the
-        # scanner or the database itself.
-        run: SITE_URL="https://claudedotcompany.com" API_BASE="${{ vars.API_BASE }}" EXECUTOR_COMMIT="${{ github.sha }}" npm run build
+        # This is the Robinhood edition's own host, NOT the Solana desk's apex — the apex
+        # already binds to that Pages site, and a second Pages site claiming it would
+        # fail verification. API_BASE is the repository VARIABLE (Settings → Secrets and
+        # variables → Actions → Variables) set to https://claude-company-robinhood-api.onrender.com;
+        # Pages cannot run the scanner or the database itself.
+        run: SITE_URL="https://robinhood.claudedotcompany.com" API_BASE="${{ vars.API_BASE }}" EXECUTOR_COMMIT="${{ github.sha }}" npm run build
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: dist

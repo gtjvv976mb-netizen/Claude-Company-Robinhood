@@ -1,6 +1,6 @@
 import { runCycle, workup } from "./desk.js";
 import { startOffice } from "./office.js";
-import { startScanner } from "./scanner.js";
+import { startScanner } from "./treasury-evm.js";
 import { runPenthouseCycle, monitorCalls, freshScan, promoteWatches, startSubTickMarks } from "./penthouse.js";
 import { autoSyncAll, collectOwed } from "./perf.js";
 import { startWorld } from "./world.js";
@@ -10,8 +10,11 @@ import { bus } from "./lib/bus.js";
 import { spend } from "./lib/llm.js";
 import * as store from "./lib/store.js";
 import db from "./lib/store.js";
-import * as sol from "./data/solana.js";
-import { cfg, maskRpc } from "./config.js";
+import { cfg } from "./config.js";
+
+/** The chain the doctor checks. Same env name and default as the executor's poller. */
+const RH_RPC = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
+const RH_CHAIN_ID_HEX = "0x1237";   // 4663
 
 const [, , cmd, ...args] = process.argv;
 
@@ -350,17 +353,41 @@ function startPenthouse() {
   setInterval(promote, promoteMins * 60000);
 
   /* THE LORE LANE. Grok reads what X is accelerating on, and the desk hunts the coins
-   * wearing that story before the story is priced — pump.fun first, where a coin for a
-   * theme that broke ten minutes ago actually is. This lane was written in full and
-   * never called by anything: a repo-wide search for scanTrends found its definition
-   * and nothing else, so the desk has never once front-run a narrative it could see.
+   * wearing that story before the story is priced — the launchpads (PONS, hood.fun,
+   * pools.trade) first, where a coin for a theme that broke ten minutes ago actually
+   * is. This lane was written in full and never called by anything: a repo-wide search
+   * for scanTrends found its definition and nothing else, so the desk has never once
+   * front-run a narrative it could see.
    *
    * It costs one Grok call per pass, so it runs on its own slow clock rather than
    * inside the research loop, and each theme carries its own 90-minute cooldown. With
-   * no XAI key it returns "no grok key" and nothing happens. */
+   * no XAI key it returns "no grok key" and nothing happens.
+   *
+   * GATED ON DESK STATE. Ungated, this was ~120 Grok calls a day (every 12 minutes
+   * while a key exists), each reserving twelve searches, spent on days the desk could
+   * not have worked a candidate up anyway: the only guard was the provider ceiling
+   * inside xai(). Two conditions now stop the scan before it costs anything —
+   *   book full  — trendHandoff refuses the workup when a call is live (penthouse.js),
+   *                so the scan would buy an answer nothing can act on;
+   *   no budget  — assertDailyBudget on the "trend" lane, the same lane the handoff's
+   *                workup is charged to, so the scan and its consequence share a brake.
+   * Both are checked here, in the scheduler, so the Grok call is never made. */
   const trendMins = Number(process.env.PENTHOUSE_TREND_MINS || 12);
   const trendHunt = async () => {
     try {
+      const { bookState } = await import("./mandate.js");
+      const book = bookState();
+      if (book.full) {
+        console.log(`[trend] scan skipped — book full at ${book.live}` +
+          (book.holding?.symbol ? ` (${book.holding.symbol})` : ""));
+        return;
+      }
+      const { assertDailyBudget, BudgetExhausted } = await import("./lib/llm.js");
+      try { assertDailyBudget(cfg.dailyBudgetUsd, { lane: "trend" }); }
+      catch (e) {
+        if (e instanceof BudgetExhausted) { console.log(`[trend] scan skipped — ${e.message}`); return; }
+        throw e;
+      }
       const { scanTrends } = await import("./trends.js");
       const r = await scanTrends({ maxThemes: 4 });
       if (!r.ok) { console.log(`[trend] ${r.error}`); return; }
@@ -407,19 +434,26 @@ async function main() {
           console.log(`  API call     : ${C.r}${e.status || ""} ${String(e.message).slice(0, 80)}${C.x}`);
         }
       }
-      console.log(`  Treasury     : ${process.env.TREASURY_OWNER ? C.g + "set — leasing open" + C.x : C.y + "not set — leasing closed" + C.x}`);
-      console.log(`  RPC          : ${maskRpc()}`);
-      const h = await sol.health();
-      console.log(`  RPC reachable: ${h.ok ? C.g + "yes (slot " + h.slot + ")" + C.x : C.r + h.error + C.x}`);
-      // Holder concentration is the datum the red team called dominant. The public RPC
-      // blocks the call outright, so flag it here rather than letting every workup lose
-      // it silently mid-run.
-      const holderProbe = await import("./lib/http.js").then(({ readRpc }) =>
-        readRpc(cfg.rpc, "getTokenLargestAccounts",
-          ["DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"], { attempts: 1 }));
-      console.log(`  Holder data  : ${holderProbe.ok
-        ? C.g + "available" + C.x
-        : C.r + `UNAVAILABLE (${holderProbe.error}) — set SOLANA_RPC to a paid endpoint or every workup loses holder concentration` + C.x}`);
+      console.log(`  Treasury     : ${process.env.TREASURY_OWNER_RH ? C.g + "set — leasing open" + C.x : C.y + "TREASURY_OWNER_RH not set — leasing closed" + C.x}`);
+      // The endpoint may carry a key in its query string; print the origin only.
+      /* Host only: an Alchemy/Infura/QuickNode key lives in the PATH, and a URL printed
+         with just its query stripped put it into scrollback and Render logs (LESSONS 313). */
+      console.log(`  RPC          : ${(() => { try { return new URL(RH_RPC).host; } catch { return "(unparseable RH_RPC)"; } })()}`);
+      /* Two reads, no ALLOWED list: readRpc() refuses anything that is not a Solana
+       * read method, and eth_* is deliberately not on that list, so the doctor speaks
+       * plain JSON-RPC. eth_chainId proves the endpoint is Robinhood Chain and not some
+       * other EVM — a wrong RPC answers every other call plausibly — and eth_blockNumber
+       * proves it is live. Both are read-only. */
+      const { rpc } = await import("./lib/http.js");
+      const chain = await rpc(RH_RPC, "eth_chainId", []);
+      const chainOk = chain.ok && String(chain.data).toLowerCase() === RH_CHAIN_ID_HEX;
+      console.log(`  Chain id     : ${!chain.ok ? C.r + chain.error + C.x
+        : chainOk ? C.g + `${chain.data} (4663, Robinhood Chain)` + C.x
+        : C.r + `${chain.data} — NOT Robinhood Chain (expected ${RH_CHAIN_ID_HEX}); fix RH_RPC` + C.x}`);
+      const head = await rpc(RH_RPC, "eth_blockNumber", []);
+      console.log(`  RPC reachable: ${head.ok
+        ? C.g + `yes (block ${parseInt(head.data, 16)})` + C.x
+        : C.r + head.error + C.x}`);
       console.log(`  Book equity  : $${cfg.equityUsd}  |  max risk/idea ${cfg.maxRiskPct}%`);
       console.log(`  Screen floors: liq $${cfg.screen.minLiquidityUsd}, age ${cfg.screen.minPairAgeHours}h, vol $${cfg.screen.minVolume24hUsd}`);
       const { spendSince } = await import("./lib/llm.js");
@@ -430,7 +464,7 @@ async function main() {
     }
     case "office": {
       const { url } = startOffice(Number(args[0]) || Number(process.env.PORT) || 4949);
-      startScanner();          // watches the treasury for $CLAUDECO; no-ops until TREASURY_OWNER is set
+      startScanner();          // watches the treasury's ERC-20 Transfer logs on 4663; no-ops until TREASURY_OWNER_RH is set
       startBooks();            // rent + fill sync, always
       startWorld();            // the server runs the office; clients only watch
       startMonitoring();       // exit checks are a DUTY: they run with no key and no research

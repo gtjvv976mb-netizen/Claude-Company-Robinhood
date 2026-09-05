@@ -1,0 +1,3376 @@
+{
+ "recordedAt": "2026-09-05T01:08:44.098Z",
+ "sources": {
+  "new_pools": "https://api.geckoterminal.com/api/v2/networks/robinhood/new_pools?page=1"
+ },
+ "new_pools": {
+  "data": [
+   {
+    "id": "robinhood_0xd3423229d8f883473c2fdf0f02563487f3d5633a",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000503482793777246",
+     "base_token_price_native_currency": "0.00000000205041210732246",
+     "quote_token_price_usd": "2455.52",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000002050412107",
+     "quote_token_price_base_token": "487706835.337533",
+     "address": "0xd3423229d8f883473c2fdf0f02563487f3d5633a",
+     "name": "RAINBOW CAT / WETH",
+     "pool_created_at": "2026-09-05T01:06:57Z",
+     "fdv_usd": "4293.693588",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "0",
+      "h24": "0"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 2,
+       "buyers": 0,
+       "sellers": 2
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 2,
+       "buyers": 0,
+       "sellers": 2
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 2,
+       "buyers": 0,
+       "sellers": 2
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 2,
+       "buyers": 0,
+       "sellers": 2
+      },
+      "h6": {
+       "buys": 0,
+       "sells": 2,
+       "buyers": 0,
+       "sellers": 2
+      },
+      "h24": {
+       "buys": 0,
+       "sells": 2,
+       "buyers": 0,
+       "sellers": 2
+      }
+     },
+     "volume_usd": {
+      "m5": "250.3253956285",
+      "m15": "250.3253956285",
+      "m30": "250.3253956285",
+      "h1": "250.3253956285",
+      "h6": "250.3253956285",
+      "h24": "250.3253956285"
+     },
+     "reserve_in_usd": "5025.2217"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0xd1a8548c05943997ef8bbf609ce6277a1a303ff2",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0xa71494bbd919f6fb23c0284d6933763db713be47",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000364039633548162",
+     "base_token_price_native_currency": "0.00000000138351713091619",
+     "quote_token_price_usd": "1.0006361040856",
+     "quote_token_price_native_currency": "0.000407549878794666",
+     "base_token_price_quote_token": "0.000003394718543",
+     "quote_token_price_base_token": "294575.231262066",
+     "address": "0xa71494bbd919f6fb23c0284d6933763db713be47",
+     "name": "TOP / USDG",
+     "pool_created_at": "2026-09-05T01:07:02Z",
+     "fdv_usd": "3439.586064",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "0",
+      "h24": "0"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "h24": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      }
+     },
+     "volume_usd": {
+      "m5": "60.7556142167",
+      "m15": "60.7556142167",
+      "m30": "60.7556142167",
+      "h1": "60.7556142167",
+      "h6": "60.7556142167",
+      "h24": "60.7556142167"
+     },
+     "reserve_in_usd": "3398.2538092672"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x3c0e71e114c622fe6adec2ff0f0cefc0452761e1",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x2efb9c1dae760880b9d53315ceb45d4f48b4ad57dbe88cad68e1873b9673d5a3",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000646008093783908",
+     "base_token_price_native_currency": "0.00000000263111887858682",
+     "quote_token_price_usd": "27.7939096093169",
+     "quote_token_price_native_currency": "0.011320149234426",
+     "base_token_price_quote_token": "0.0000002324279322",
+     "quote_token_price_base_token": "4302408.88260666",
+     "address": "0x2efb9c1dae760880b9d53315ceb45d4f48b4ad57dbe88cad68e1873b9673d5a3",
+     "name": "CHAD / HIMS",
+     "pool_created_at": "2026-09-05T01:06:47Z",
+     "fdv_usd": "5025.091573",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "0",
+      "h24": "0"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      },
+      "h24": {
+       "buys": 1,
+       "sells": 0,
+       "buyers": 1,
+       "sellers": 0
+      }
+     },
+     "volume_usd": {
+      "m5": "34.52206683",
+      "m15": "34.52206683",
+      "m30": "34.52206683",
+      "h1": "34.52206683",
+      "h6": "34.52206683",
+      "h24": "34.52206683"
+     },
+     "reserve_in_usd": "424.76"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x7127f23c74b352b286aa505a3f457efcdcf8fe01",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xccee82fe024c36fa15e1005ede3e9e4787e23d09",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "o1-launchpad-robinhood",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0xe834b5346b3a05816cb1e5b64b0000fd226ad973",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000420953927806729",
+     "base_token_price_native_currency": "0.00000000171431683637979",
+     "quote_token_price_usd": "2455.52",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001714316836",
+     "quote_token_price_base_token": "583322743.368578",
+     "address": "0xe834b5346b3a05816cb1e5b64b0000fd226ad973",
+     "name": "CTE / WETH",
+     "pool_created_at": "2026-09-05T01:06:42Z",
+     "fdv_usd": "4209.539278",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "-2.412",
+      "m15": "-2.412",
+      "m30": "-2.412",
+      "h1": "-2.412",
+      "h6": "-2.412",
+      "h24": "-2.412"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "m15": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "m30": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "h1": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "h6": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "h24": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      }
+     },
+     "volume_usd": {
+      "m5": "250.8737957856",
+      "m15": "250.8737957856",
+      "m30": "250.8737957856",
+      "h1": "250.8737957856",
+      "h6": "250.8737957856",
+      "h24": "250.8737957856"
+     },
+     "reserve_in_usd": "4209.2524"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0xbe367d6df34c344ee44c2f01eb14844974a881dc",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0xf05613046e72cb81949c0fec17e2505a692b2bb3d4a7ea85cb8aa819ad5fe3b3",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.0000235001410178179",
+     "base_token_price_native_currency": "0.00000000954274123170156",
+     "quote_token_price_usd": "501.935839314611",
+     "quote_token_price_native_currency": "0.203290943694926",
+     "base_token_price_quote_token": "0.00000004694130028",
+     "quote_token_price_base_token": "21303201.95832",
+     "address": "0xf05613046e72cb81949c0fec17e2505a692b2bb3d4a7ea85cb8aa819ad5fe3b3",
+     "name": "Kitty / MSFT",
+     "pool_created_at": "2026-09-05T01:06:30Z",
+     "fdv_usd": "23432.39195",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "-0.771",
+      "m15": "-0.771",
+      "m30": "-0.771",
+      "h1": "-0.771",
+      "h6": "-0.771",
+      "h24": "-0.771"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 5,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      },
+      "m15": {
+       "buys": 5,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      },
+      "m30": {
+       "buys": 5,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      },
+      "h1": {
+       "buys": 5,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      },
+      "h6": {
+       "buys": 5,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      },
+      "h24": {
+       "buys": 5,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      }
+     },
+     "volume_usd": {
+      "m5": "413.7700567169",
+      "m15": "413.7700567169",
+      "m30": "413.7700567169",
+      "h1": "413.7700567169",
+      "h6": "413.7700567169",
+      "h24": "413.7700567169"
+     },
+     "reserve_in_usd": "23349.7681"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0xf14c46ea209bf4311d7d1b954c9041b6243e1e18",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xe93237c50d904957cf27e7b1133b510c669c2e74",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "bankr-robinhood",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0xd23974f72dd34bcaeb49b0a20b1f2f296c87f4e5",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000413962286797162",
+     "base_token_price_native_currency": "0.00000000168571324300167",
+     "quote_token_price_usd": "2455.71",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001685713243",
+     "quote_token_price_base_token": "593220705.924661",
+     "address": "0xd23974f72dd34bcaeb49b0a20b1f2f296c87f4e5",
+     "name": "CULIO / WETH",
+     "pool_created_at": "2026-09-05T01:06:29Z",
+     "fdv_usd": "4139.622868",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "-1.695",
+      "m15": "-1.695",
+      "m30": "-1.695",
+      "h1": "-1.695",
+      "h6": "-1.695",
+      "h24": "-1.695"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "m15": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "m30": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "h1": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "h6": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      },
+      "h24": {
+       "buys": 2,
+       "sells": 1,
+       "buyers": 2,
+       "sellers": 1
+      }
+     },
+     "volume_usd": {
+      "m5": "193.6043090792",
+      "m15": "193.6043090792",
+      "m30": "193.6043090792",
+      "h1": "193.6043090792",
+      "h6": "193.6043090792",
+      "h24": "193.6043090792"
+     },
+     "reserve_in_usd": "4139.2701"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x44deac9e67b2f53939e32e4e9e4f31677d588a2a",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   }
+  ]
+ },
+ "pons_v2_pools": {
+  "data": [
+   {
+    "id": "robinhood_0x3fbe3680545dc2264c2ac781c469b08e3c6b2cf6",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000412632297374496",
+     "base_token_price_native_currency": "0.00000000168242802484912",
+     "quote_token_price_usd": "2452.6",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001682428025",
+     "quote_token_price_base_token": "594379067.175655",
+     "address": "0x3fbe3680545dc2264c2ac781c469b08e3c6b2cf6",
+     "name": "CHICKEN / WETH",
+     "pool_created_at": "2026-09-04T21:46:56Z",
+     "fdv_usd": "4126.322974",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "-3.36",
+      "h24": "-3.36"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 1309,
+       "sells": 1440,
+       "buyers": 309,
+       "sellers": 301
+      },
+      "h24": {
+       "buys": 1309,
+       "sells": 1440,
+       "buyers": 309,
+       "sellers": 301
+      }
+     },
+     "volume_usd": {
+      "m5": "0.0",
+      "m15": "0.0",
+      "m30": "0.0",
+      "h1": "0.0",
+      "h6": "150210.449306002",
+      "h24": "150210.449306002"
+     },
+     "reserve_in_usd": "4130.2079"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x824b71f8f405f616356e00d1349f14ddb6c7c61a",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x0d44ea39c21f31f4abe3c3f11d319b4b8134ed69",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000422066440965447",
+     "base_token_price_native_currency": "0.00000000166954680508319",
+     "quote_token_price_usd": "2528.03",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001669546805",
+     "quote_token_price_base_token": "598964938.841695",
+     "address": "0x0d44ea39c21f31f4abe3c3f11d319b4b8134ed69",
+     "name": "ROBINGOY / WETH",
+     "pool_created_at": "2026-09-04T04:31:16Z",
+     "fdv_usd": "4220.66441",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "0",
+      "h24": "-36.903"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h24": {
+       "buys": 1428,
+       "sells": 1126,
+       "buyers": 146,
+       "sellers": 142
+      }
+     },
+     "volume_usd": {
+      "m5": "0.0",
+      "m15": "0.0",
+      "m30": "0.0",
+      "h1": "0.0",
+      "h6": "0.0",
+      "h24": "151654.389088779"
+     },
+     "reserve_in_usd": "4097.8328"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x808e735478514dcda8be25d8a6d2fcfc60e24a14",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x7720344d7e46249819880d90517782a193bb49e3",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000417130569430153",
+     "base_token_price_native_currency": "0.00000000166741511408486",
+     "quote_token_price_usd": "2501.66",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001667415114",
+     "quote_token_price_base_token": "599730679.872623",
+     "address": "0x7720344d7e46249819880d90517782a193bb49e3",
+     "name": "大驴 / WETH",
+     "pool_created_at": "2026-09-04T02:45:42Z",
+     "fdv_usd": "4171.305694",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "0",
+      "h24": "-38.136"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h24": {
+       "buys": 1024,
+       "sells": 880,
+       "buyers": 130,
+       "sellers": 128
+      }
+     },
+     "volume_usd": {
+      "m5": "0.0",
+      "m15": "0.0",
+      "m30": "0.0",
+      "h1": "0.0",
+      "h6": "0.0",
+      "h24": "122840.979793982"
+     },
+     "reserve_in_usd": "4092.4332"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x689f168c5ff633185d05189f1bd25a08ecae4675",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0xe4e987603c4428d58f57e6925b7d5f601017e61c",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000414226943466019",
+     "base_token_price_native_currency": "0.0000000016876018767993",
+     "quote_token_price_usd": "2454.53",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001687601877",
+     "quote_token_price_base_token": "592556819.086144",
+     "address": "0xe4e987603c4428d58f57e6925b7d5f601017e61c",
+     "name": "WWRHS / WETH",
+     "pool_created_at": "2026-09-04T22:34:21Z",
+     "fdv_usd": "4142.269435",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "-70.893",
+      "h24": "-70.893"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 974,
+       "sells": 884,
+       "buyers": 154,
+       "sellers": 148
+      },
+      "h24": {
+       "buys": 974,
+       "sells": 884,
+       "buyers": 154,
+       "sellers": 148
+      }
+     },
+     "volume_usd": {
+      "m5": "0.0",
+      "m15": "0.0",
+      "m30": "0.0",
+      "h1": "0.0",
+      "h6": "118032.622171054",
+      "h24": "118032.622171054"
+     },
+     "reserve_in_usd": "4142.8555"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x57879d4a945dc685f9d368ca21f26f952b063ba9",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0xd69d7b0bcffed3f35c72aeda6ca2d6f1d5f337a8",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000365246695276083",
+     "base_token_price_native_currency": "0.00000000148827580628844",
+     "quote_token_price_usd": "1.00012608431238",
+     "quote_token_price_native_currency": "0.000407522771258752",
+     "base_token_price_quote_token": "0.000003652006492",
+     "quote_token_price_base_token": "273822.0762152",
+     "address": "0xd69d7b0bcffed3f35c72aeda6ca2d6f1d5f337a8",
+     "name": "dalv / USDG",
+     "pool_created_at": "2026-09-04T02:41:05Z",
+     "fdv_usd": "3652.466953",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "-2.896",
+      "h24": "-9.86"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 1,
+       "buyers": 0,
+       "sellers": 1
+      },
+      "h6": {
+       "buys": 0,
+       "sells": 3,
+       "buyers": 0,
+       "sellers": 3
+      },
+      "h24": {
+       "buys": 947,
+       "sells": 910,
+       "buyers": 520,
+       "sellers": 526
+      }
+     },
+     "volume_usd": {
+      "m5": "0.0",
+      "m15": "0.0",
+      "m30": "0.0",
+      "h1": "64.1862258559",
+      "h6": "84.107288568",
+      "h24": "131334.706219036"
+     },
+     "reserve_in_usd": "3639.491"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0xccf748f5190de4c1337f53b273fd10d802fb7295",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x003ca02162bca4faef7e61217acf82ecf868d385",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.00000413621047305498",
+     "base_token_price_native_currency": "0.00000000168455689898263",
+     "quote_token_price_usd": "2455.37",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000001684556899",
+     "quote_token_price_base_token": "593627915.212564",
+     "address": "0x003ca02162bca4faef7e61217acf82ecf868d385",
+     "name": "HOOD / WETH",
+     "pool_created_at": "2026-09-04T21:29:32Z",
+     "fdv_usd": "4136.210473",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0",
+      "m15": "0",
+      "m30": "0",
+      "h1": "0",
+      "h6": "-19.676",
+      "h24": "-19.676"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "m30": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h1": {
+       "buys": 0,
+       "sells": 0,
+       "buyers": 0,
+       "sellers": 0
+      },
+      "h6": {
+       "buys": 947,
+       "sells": 892,
+       "buyers": 151,
+       "sellers": 143
+      },
+      "h24": {
+       "buys": 947,
+       "sells": 892,
+       "buyers": 151,
+       "sellers": 143
+      }
+     },
+     "volume_usd": {
+      "m5": "0.0",
+      "m15": "0.0",
+      "m30": "0.0",
+      "h1": "0.0",
+      "h6": "113727.611520309",
+      "h24": "113727.611520309"
+     },
+     "reserve_in_usd": "4135.6088"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0xdb70b5d0378463ed84c3e9e86e6c09822237e43c",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2",
+       "type": "dex"
+      }
+     }
+    }
+   }
+  ]
+ },
+ "trending_pools": {
+  "data": [
+   {
+    "id": "robinhood_0x714442e9a611f8561a7df108d6d925132937cfb8",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.03963831228447",
+     "base_token_price_native_currency": "0.0000161450438897439",
+     "quote_token_price_usd": "2455.52",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.00001614504389",
+     "quote_token_price_base_token": "61938.5123279378",
+     "address": "0x714442e9a611f8561a7df108d6d925132937cfb8",
+     "name": "CHUMP / WETH 1%",
+     "pool_created_at": "2026-07-31T01:44:31Z",
+     "fdv_usd": "39638311.8688142",
+     "market_cap_usd": "39638312.28",
+     "price_change_percentage": {
+      "m5": "0.018",
+      "m15": "-0.072",
+      "m30": "-2.158",
+      "h1": "-0.118",
+      "h6": "8.863",
+      "h24": "-3.875"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 5,
+       "sells": 15,
+       "buyers": 4,
+       "sellers": 12
+      },
+      "m15": {
+       "buys": 42,
+       "sells": 63,
+       "buyers": 12,
+       "sellers": 19
+      },
+      "m30": {
+       "buys": 111,
+       "sells": 131,
+       "buyers": 20,
+       "sellers": 27
+      },
+      "h1": {
+       "buys": 253,
+       "sells": 253,
+       "buyers": 48,
+       "sellers": 39
+      },
+      "h6": {
+       "buys": 1714,
+       "sells": 1463,
+       "buyers": 193,
+       "sellers": 164
+      },
+      "h24": {
+       "buys": 6797,
+       "sells": 6361,
+       "buyers": 409,
+       "sellers": 467
+      }
+     },
+     "volume_usd": {
+      "m5": "1582.9796912623",
+      "m15": "14221.2669770708",
+      "m30": "31914.1877497561",
+      "h1": "76470.5949135742",
+      "h6": "588665.597521686",
+      "h24": "3043174.47096008"
+     },
+     "reserve_in_usd": "1126498.0385"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "uniswap-v3-robinhood",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x161610470ba69ac0ae86724efa3a379cfbeb81a5efcea1eacac4a3cddd230b93",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.0513412381225703",
+     "base_token_price_native_currency": "0.0000209790244260226",
+     "quote_token_price_usd": "1.00089485564554",
+     "quote_token_price_native_currency": "0.000407535955440267",
+     "base_token_price_quote_token": "0.05147772643",
+     "quote_token_price_base_token": "19.4258773508",
+     "address": "0x161610470ba69ac0ae86724efa3a379cfbeb81a5efcea1eacac4a3cddd230b93",
+     "name": "MEME / USDG 1.37%",
+     "pool_created_at": "2026-09-04T04:10:31Z",
+     "fdv_usd": "51341238.0993902",
+     "market_cap_usd": "51341238.12",
+     "price_change_percentage": {
+      "m5": "0.774",
+      "m15": "6.759",
+      "m30": "-12.109",
+      "h1": "-9.144",
+      "h6": "-12.83",
+      "h24": "211.894"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 6,
+       "sells": 6,
+       "buyers": 4,
+       "sellers": 5
+      },
+      "m15": {
+       "buys": 52,
+       "sells": 32,
+       "buyers": 37,
+       "sellers": 29
+      },
+      "m30": {
+       "buys": 181,
+       "sells": 79,
+       "buyers": 83,
+       "sellers": 61
+      },
+      "h1": {
+       "buys": 384,
+       "sells": 247,
+       "buyers": 154,
+       "sellers": 171
+      },
+      "h6": {
+       "buys": 1484,
+       "sells": 1148,
+       "buyers": 492,
+       "sellers": 549
+      },
+      "h24": {
+       "buys": 21583,
+       "sells": 17745,
+       "buyers": 4315,
+       "sellers": 4040
+      }
+     },
+     "volume_usd": {
+      "m5": "23541.8295249457",
+      "m15": "83332.834665924",
+      "m30": "339606.839866711",
+      "h1": "1473271.5590382",
+      "h6": "5056472.40548625",
+      "h24": "64021022.2699026"
+     },
+     "reserve_in_usd": "1224019.0153"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x385f4f8ae47651ce5f58f5265395a669f8281e18",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "uniswap-v4-robinhood",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.642603343459259",
+     "base_token_price_native_currency": "0.00026407822628151",
+     "quote_token_price_usd": "1.00064531484527",
+     "quote_token_price_native_currency": "0.000407467005115434",
+     "base_token_price_quote_token": "0.6480972029",
+     "quote_token_price_base_token": "1.5429784229",
+     "address": "0x4be9657ec9002e528f4f17a5c43edc525a07f888f7b180c2afbf75e096c4f38a",
+     "name": "PONS / USDG 0.3%",
+     "pool_created_at": "2026-07-18T01:42:13Z",
+     "fdv_usd": "453242563.247145",
+     "market_cap_usd": "457891186.327775",
+     "price_change_percentage": {
+      "m5": "-0.472",
+      "m15": "-3.453",
+      "m30": "-4.75",
+      "h1": "-8.341",
+      "h6": "-8.176",
+      "h24": "-3.657"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 11,
+       "sells": 17,
+       "buyers": 8,
+       "sellers": 8
+      },
+      "m15": {
+       "buys": 125,
+       "sells": 105,
+       "buyers": 51,
+       "sellers": 50
+      },
+      "m30": {
+       "buys": 139,
+       "sells": 222,
+       "buyers": 61,
+       "sellers": 76
+      },
+      "h1": {
+       "buys": 209,
+       "sells": 299,
+       "buyers": 97,
+       "sellers": 100
+      },
+      "h6": {
+       "buys": 1731,
+       "sells": 1032,
+       "buyers": 317,
+       "sellers": 370
+      },
+      "h24": {
+       "buys": 9773,
+       "sells": 6947,
+       "buyers": 1519,
+       "sellers": 1502
+      }
+     },
+     "volume_usd": {
+      "m5": "28042.0202526445",
+      "m15": "430888.070514254",
+      "m30": "591707.488149314",
+      "h1": "874581.229290194",
+      "h6": "4177749.11261633",
+      "h24": "23094122.9838879"
+     },
+     "reserve_in_usd": "5972629.3139"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "uniswap-v4-robinhood",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x4a6a85252a6f6b383a5f747259ee157e65ff1307",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.0613118072517207",
+     "base_token_price_native_currency": "0.0000248941318176824",
+     "quote_token_price_usd": "2455.52",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.00002489413182",
+     "quote_token_price_base_token": "40170.1094588764",
+     "address": "0x4a6a85252a6f6b383a5f747259ee157e65ff1307",
+     "name": "SHRUB / WETH",
+     "pool_created_at": "2026-08-30T18:41:45Z",
+     "fdv_usd": "61311719.4583791",
+     "market_cap_usd": "61311807.25",
+     "price_change_percentage": {
+      "m5": "5.36",
+      "m15": "-5.493",
+      "m30": "-7.236",
+      "h1": "-22.46",
+      "h6": "-46.455",
+      "h24": "103.752"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 8,
+       "sells": 1,
+       "buyers": 7,
+       "sellers": 1
+      },
+      "m15": {
+       "buys": 38,
+       "sells": 5,
+       "buyers": 33,
+       "sellers": 5
+      },
+      "m30": {
+       "buys": 60,
+       "sells": 6,
+       "buyers": 53,
+       "sellers": 6
+      },
+      "h1": {
+       "buys": 65,
+       "sells": 9,
+       "buyers": 57,
+       "sellers": 9
+      },
+      "h6": {
+       "buys": 583,
+       "sells": 83,
+       "buyers": 319,
+       "sellers": 83
+      },
+      "h24": {
+       "buys": 2387,
+       "sells": 481,
+       "buyers": 1095,
+       "sellers": 462
+      }
+     },
+     "volume_usd": {
+      "m5": "21488.4999694517",
+      "m15": "74918.7061870314",
+      "m30": "102795.188415813",
+      "h1": "151974.266783673",
+      "h6": "1909131.15690218",
+      "h24": "6043080.89331503"
+     },
+     "reserve_in_usd": "464037.2653"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x5d9144d2d017386519a7134fcc7f1e4ba22f920c",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "uniswap-v2-robinhood",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x2993b198be37bd7f53c64dc1c13ebf1330c9d61e65a1abe058c3b4d7a2643016",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.000284481306656883",
+     "base_token_price_native_currency": "0.000000115480082165013",
+     "quote_token_price_usd": "2455.71",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.0000001154800822",
+     "quote_token_price_base_token": "8659501.97862753",
+     "address": "0x2993b198be37bd7f53c64dc1c13ebf1330c9d61e65a1abe058c3b4d7a2643016",
+     "name": "PONSERS / WETH",
+     "pool_created_at": "2026-09-01T20:07:35Z",
+     "fdv_usd": "284481.3067",
+     "market_cap_usd": null,
+     "price_change_percentage": {
+      "m5": "0.337",
+      "m15": "3.059",
+      "m30": "7.315",
+      "h1": "10.602",
+      "h6": "-8.455",
+      "h24": "31.917"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 2,
+       "sells": 0,
+       "buyers": 2,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 8,
+       "sells": 1,
+       "buyers": 7,
+       "sellers": 1
+      },
+      "m30": {
+       "buys": 16,
+       "sells": 4,
+       "buyers": 10,
+       "sellers": 3
+      },
+      "h1": {
+       "buys": 27,
+       "sells": 9,
+       "buyers": 12,
+       "sellers": 6
+      },
+      "h6": {
+       "buys": 106,
+       "sells": 67,
+       "buyers": 50,
+       "sellers": 48
+      },
+      "h24": {
+       "buys": 524,
+       "sells": 275,
+       "buyers": 207,
+       "sellers": 123
+      }
+     },
+     "volume_usd": {
+      "m5": "77.1241197071",
+      "m15": "582.9637629255",
+      "m30": "1673.5000180323",
+      "h1": "4061.4740370299",
+      "h6": "15164.7561455038",
+      "h24": "88618.3476259665"
+     },
+     "reserve_in_usd": "46056.1043"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0xb9e75a12de07c55c1496b36dcdac55764440b8c8",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x0000000000000000000000000000000000000000",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2-dex",
+       "type": "dex"
+      }
+     }
+    }
+   },
+   {
+    "id": "robinhood_0x1a812059207d57de177f7dd3669ffa0d5b0e18543a935167ce49b48903b5aef0",
+    "type": "pool",
+    "attributes": {
+     "base_token_price_usd": "0.000775843907987749",
+     "base_token_price_native_currency": "0.000000305121965987076",
+     "quote_token_price_usd": "2455.71",
+     "quote_token_price_native_currency": "1.0",
+     "base_token_price_quote_token": "0.000000305121966",
+     "quote_token_price_base_token": "3277377.93890053",
+     "address": "0x1a812059207d57de177f7dd3669ffa0d5b0e18543a935167ce49b48903b5aef0",
+     "name": "LEGS / WETH",
+     "pool_created_at": "2026-09-03T21:03:56Z",
+     "fdv_usd": "749795.310583953",
+     "market_cap_usd": "0.0",
+     "price_change_percentage": {
+      "m5": "2.257",
+      "m15": "4.06",
+      "m30": "-7.894",
+      "h1": "-11.118",
+      "h6": "-32.387",
+      "h24": "-79.652"
+     },
+     "transactions": {
+      "m5": {
+       "buys": 4,
+       "sells": 0,
+       "buyers": 4,
+       "sellers": 0
+      },
+      "m15": {
+       "buys": 35,
+       "sells": 24,
+       "buyers": 30,
+       "sellers": 22
+      },
+      "m30": {
+       "buys": 91,
+       "sells": 45,
+       "buyers": 62,
+       "sellers": 35
+      },
+      "h1": {
+       "buys": 154,
+       "sells": 94,
+       "buyers": 90,
+       "sellers": 70
+      },
+      "h6": {
+       "buys": 1356,
+       "sells": 1148,
+       "buyers": 486,
+       "sellers": 605
+      },
+      "h24": {
+       "buys": 7778,
+       "sells": 5632,
+       "buyers": 2545,
+       "sellers": 2636
+      }
+     },
+     "volume_usd": {
+      "m5": "560.1915505905",
+      "m15": "6873.6303998018",
+      "m30": "18904.8310412789",
+      "h1": "40980.3770301232",
+      "h6": "555561.591927191",
+      "h24": "2949221.84016326"
+     },
+     "reserve_in_usd": "69539.3224"
+    },
+    "relationships": {
+     "base_token": {
+      "data": {
+       "id": "robinhood_0x8fcf98e1348d3ddee46cdd15a5c7d9a8d423077d",
+       "type": "token"
+      }
+     },
+     "quote_token": {
+      "data": {
+       "id": "robinhood_0x0000000000000000000000000000000000000000",
+       "type": "token"
+      }
+     },
+     "dex": {
+      "data": {
+       "id": "pons-v2-dex",
+       "type": "dex"
+      }
+     }
+    }
+   }
+  ]
+ },
+ "ohlcv": {
+  "data": {
+   "id": "29f3650b-d3b9-45b3-be28-582ac669c6ea",
+   "type": "ohlcv_request_response",
+   "attributes": {
+    "ohlcv_list": [
+     [
+      1788570480,
+      0.040532269795677,
+      0.040532269795677,
+      0.0396100298856727,
+      0.0396107618312864,
+      503.0377202495475
+     ],
+     [
+      1788570420,
+      0.0404448371329993,
+      0.040532269795677,
+      0.0396619533369135,
+      0.040532269795677,
+      848.2505092294974
+     ],
+     [
+      1788570360,
+      0.0396445532332518,
+      0.0404704457851131,
+      0.03963831228447,
+      0.0404448371329993,
+      1071.086859946134
+     ],
+     [
+      1788570300,
+      0.0396585790033286,
+      0.040487481987976,
+      0.0396291036097327,
+      0.0396445532332518,
+      1047.1080637929688
+     ],
+     [
+      1788570240,
+      0.0404426346954928,
+      0.0404678604054676,
+      0.0395790730391658,
+      0.0396585790033286,
+      3675.67232060435
+     ],
+     [
+      1788570180,
+      0.0404461195189277,
+      0.0404646385827271,
+      0.0396375706579823,
+      0.0404426346954928,
+      1022.3481469445265
+     ],
+     [
+      1788570120,
+      0.0396520729238568,
+      0.0404461195189277,
+      0.039626184714258,
+      0.0404461195189277,
+      995.9992913566318
+     ],
+     [
+      1788570060,
+      0.0404852711361702,
+      0.0404911695496817,
+      0.0396520729238568,
+      0.0396520729238568,
+      948.2040026614961
+     ],
+     [
+      1788570000,
+      0.0405030835715212,
+      0.0405030835715212,
+      0.0396481688185966,
+      0.0404852711361702,
+      844.0603787461982
+     ],
+     [
+      1788569940,
+      0.0396716491666874,
+      0.0405030835715212,
+      0.0396485576039278,
+      0.0405030835715212,
+      1391.4825030636864
+     ],
+     [
+      1788569880,
+      0.0405057978721691,
+      0.0405057978721691,
+      0.0396477327275123,
+      0.0396716491666874,
+      1027.9188606419395
+     ],
+     [
+      1788569820,
+      0.0396693044429645,
+      0.0405057978721691,
+      0.039650013880271,
+      0.0405057978721691,
+      890.2723866238908
+     ],
+     [
+      1788569760,
+      0.0404651970476595,
+      0.0405095594429779,
+      0.0396693044429645,
+      0.0396693044429645,
+      1334.4787435806247
+     ],
+     [
+      1788569700,
+      0.0396651198941907,
+      0.0404651970476595,
+      0.0396500710195484,
+      0.0404651970476595,
+      507.8506515851387
+     ],
+     [
+      1788569640,
+      0.0397138349530923,
+      0.0404949078408345,
+      0.0396651198941907,
+      0.0396651198941907,
+      954.0726697694987
+     ],
+     [
+      1788569580,
+      0.0404763514144534,
+      0.0405186469738553,
+      0.0397138349530923,
+      0.0397138349530923,
+      553.617188099185
+     ],
+     [
+      1788569520,
+      0.0404707278137685,
+      0.0404810248061153,
+      0.0395970462063632,
+      0.0404763514144534,
+      2891.896750869082
+     ],
+     [
+      1788569460,
+      0.0397073120278817,
+      0.0404707278137685,
+      0.0396221728132529,
+      0.0404707278137685,
+      2634.0357070712025
+     ],
+     [
+      1788569400,
+      0.0405190843163644,
+      0.0405391200043564,
+      0.0396981277239692,
+      0.0397073120278817,
+      1246.2692005104234
+     ],
+     [
+      1788569340,
+      0.0396914653776096,
+      0.0405217250734018,
+      0.0396880610730767,
+      0.0405190843163644,
+      859.0127252042857
+     ],
+     [
+      1788569280,
+      0.039696124015636,
+      0.040507515766501,
+      0.0396849842400905,
+      0.0396914653776096,
+      1022.4460572107347
+     ],
+     [
+      1788569220,
+      0.0405536023161628,
+      0.0405536023161628,
+      0.039696124015636,
+      0.039696124015636,
+      811.2363108043262
+     ],
+     [
+      1788569160,
+      0.0405327577185661,
+      0.0405536023161628,
+      0.0396648542618872,
+      0.0405536023161628,
+      1315.2034255965536
+     ],
+     [
+      1788569100,
+      0.0397440885277502,
+      0.0405327577185661,
+      0.0397096277399013,
+      0.0405327577185661,
+      1103.7487014724263
+     ],
+     [
+      1788569040,
+      0.040588374890278,
+      0.0406172716075207,
+      0.0397440885277502,
+      0.0397440885277502,
+      1034.3843873083372
+     ],
+     [
+      1788568980,
+      0.0405299343526222,
+      0.040588374890278,
+      0.039724093022369,
+      0.040588374890278,
+      795.2016165126121
+     ],
+     [
+      1788568920,
+      0.040528592698095,
+      0.0405299343526222,
+      0.0397015065574604,
+      0.0405299343526222,
+      501.8855368849061
+     ],
+     [
+      1788568860,
+      0.0396331870736559,
+      0.040528592698095,
+      0.0396331870736559,
+      0.040528592698095,
+      827.3361920347662
+     ],
+     [
+      1788568800,
+      0.0404820009581184,
+      0.0405207188597607,
+      0.0396331870736559,
+      0.0396331870736559,
+      1267.8033740141127
+     ],
+     [
+      1788568740,
+      0.0397100485932878,
+      0.0404820009581184,
+      0.0396667659686603,
+      0.0404820009581184,
+      1036.1874505319042
+     ],
+     [
+      1788568680,
+      0.0396783317358928,
+      0.0405586093690543,
+      0.0396783317358928,
+      0.0397100485932878,
+      1297.3243436541743
+     ],
+     [
+      1788568620,
+      0.0405387833944733,
+      0.0405727151592012,
+      0.0396783317358928,
+      0.0396783317358928,
+      1116.4658116838693
+     ],
+     [
+      1788568560,
+      0.0405417307312283,
+      0.0405717829485908,
+      0.0397258823207231,
+      0.0405387833944733,
+      788.6875788855049
+     ],
+     [
+      1788568500,
+      0.040558466799846,
+      0.040558466799846,
+      0.0396980214240479,
+      0.0405417307312283,
+      1151.3360523882377
+     ],
+     [
+      1788568440,
+      0.039754824274539,
+      0.0405685097597546,
+      0.0397093410991411,
+      0.040558466799846,
+      1525.8349663217543
+     ],
+     [
+      1788568380,
+      0.0397659808889048,
+      0.0405655851483337,
+      0.0397434751999655,
+      0.039754824274539,
+      403.61322851875593
+     ],
+     [
+      1788568320,
+      0.0405679989212822,
+      0.04057850300157,
+      0.0397386972147493,
+      0.0397659808889048,
+      1075.9289065369776
+     ],
+     [
+      1788568260,
+      0.0405262167129328,
+      0.0405679989212822,
+      0.0397495148787812,
+      0.0405679989212822,
+      1062.2773794365878
+     ],
+     [
+      1788568200,
+      0.0396654352438652,
+      0.0405262167129328,
+      0.0396496196485375,
+      0.0405262167129328,
+      1150.9982843345183
+     ],
+     [
+      1788568140,
+      0.0403979605310034,
+      0.0404609607563899,
+      0.0395855218926638,
+      0.0396654352438652,
+      1356.390637431447
+     ]
+    ]
+   }
+  },
+  "meta": {
+   "base": {
+    "name": "Chump Coin",
+    "symbol": "CHUMP",
+    "coingecko_coin_id": "chump-coin",
+    "address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+   },
+   "quote": {
+    "name": "WETH",
+    "symbol": "WETH",
+    "coingecko_coin_id": "robinhood-wrapped-eth-robinhood-chain",
+    "address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+   }
+  }
+ },
+ "ohlcvPool": "0x714442e9a611f8561a7df108d6d925132937cfb8",
+ "trades": {
+  "data": [
+   {
+    "id": "robinhood_54716369_0x39fe4992366b4ece4ab95f8b955967f6979e99509ee3719e2831036b4d11547c_78_1788570515",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54716369,
+     "tx_hash": "0x39fe4992366b4ece4ab95f8b955967f6979e99509ee3719e2831036b4d11547c",
+     "tx_from_address": "0x3da069489f6dcd4458e44b1ba8d3012700615096",
+     "from_token_amount": "3764.54935884895",
+     "to_token_amount": "0.0607298447328502",
+     "price_from_in_currency_token": "0.0000161320357216458",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396107618312864",
+     "price_to_in_usd": "2455.41",
+     "block_timestamp": "2026-09-05T01:08:35Z",
+     "kind": "sell",
+     "volume_in_usd": "149.116668055488",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54716293_0x9896ed826d376be9b04b974c9051948e2f75c6f244def77e753757c2e8c38903_3_1788570511",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54716293,
+     "tx_hash": "0x9896ed826d376be9b04b974c9051948e2f75c6f244def77e753757c2e8c38903",
+     "tx_from_address": "0x3464578a5ef72a9a82cd729a3e893d440bf0b818",
+     "from_token_amount": "4450.68742817024",
+     "to_token_amount": "0.0717973218491457",
+     "price_from_in_currency_token": "0.0000161317376265767",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396100298856727",
+     "price_to_in_usd": "2455.41",
+     "block_timestamp": "2026-09-05T01:08:27Z",
+     "kind": "sell",
+     "volume_in_usd": "176.291862041611",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54716201_0xa71657c719c24377b280e28dab24c76438a1963c512c5a94e5df6817ef241dda_4_1788570501",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54716201,
+     "tx_hash": "0xa71657c719c24377b280e28dab24c76438a1963c512c5a94e5df6817ef241dda",
+     "tx_from_address": "0xd6b4c66235385add4dbfec0c9aabc4607b965194",
+     "from_token_amount": "2321.89858448775",
+     "to_token_amount": "0.0374662537059364",
+     "price_from_in_currency_token": "0.0000161360422699952",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.039620599550169",
+     "price_to_in_usd": "2455.41",
+     "block_timestamp": "2026-09-05T01:08:18Z",
+     "kind": "sell",
+     "volume_in_usd": "91.9950140120934",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54716080_0x3cd9f572dd35ed46f8b1c8d87b14be2fcf3683f6e859b4a79adbe379def599cc_29_1788570511",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54716080,
+     "tx_hash": "0x3cd9f572dd35ed46f8b1c8d87b14be2fcf3683f6e859b4a79adbe379def599cc",
+     "tx_from_address": "0x3464578a5ef72a9a82cd729a3e893d440bf0b818",
+     "from_token_amount": "2158.9321769839",
+     "to_token_amount": "0.0348757136854354",
+     "price_from_in_currency_token": "0.000016154149749233",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396650608357641",
+     "price_to_in_usd": "2455.41",
+     "block_timestamp": "2026-09-05T01:08:06Z",
+     "kind": "sell",
+     "volume_in_usd": "85.6341761403551",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54716000_0xa1c35e54b7580e2d9ffa12c12afece5f7311177bcb214ac43055a7151c9a45ac_137_1788570480",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54716000,
+     "tx_hash": "0xa1c35e54b7580e2d9ffa12c12afece5f7311177bcb214ac43055a7151c9a45ac",
+     "tx_from_address": "0x3da069489f6dcd4458e44b1ba8d3012700615096",
+     "from_token_amount": "0.0244953661291626",
+     "to_token_amount": "1483.98070708485",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000165065260028088",
+     "price_from_in_usd": "2455.53",
+     "price_to_in_usd": "0.040532269795677",
+     "block_timestamp": "2026-09-05T01:07:57Z",
+     "kind": "buy",
+     "volume_in_usd": "60.1491063911427",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715893_0x021e42d015d0cebacd1900fba87405862c7d7acb1a063499ccb7efa6e473bc82_32_1788570521",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715893,
+     "tx_hash": "0x021e42d015d0cebacd1900fba87405862c7d7acb1a063499ccb7efa6e473bc82",
+     "tx_from_address": "0x17ff5e399e47075b689d5703b52f139b542c2c24",
+     "from_token_amount": "0.0210699923330481",
+     "to_token_amount": "1276.60479262168",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000165047103495343",
+     "price_from_in_usd": "2455.23",
+     "price_to_in_usd": "0.0405228599914871",
+     "block_timestamp": "2026-09-05T01:07:49Z",
+     "kind": "buy",
+     "volume_in_usd": "51.7316772758698",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715824_0xb2363c4b54bef3b9d21ea1400901f0520c71b35d66cf590e7413bd6d2b9447b5_9_1788570478",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715824,
+     "tx_hash": "0xb2363c4b54bef3b9d21ea1400901f0520c71b35d66cf590e7413bd6d2b9447b5",
+     "tx_from_address": "0x919b69dc68b58dcf230ee6af29b30641b010e168",
+     "from_token_amount": "0.0918353495131742",
+     "to_token_amount": "5565.70737788497",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.000016500211613366",
+     "price_from_in_usd": "2455.53",
+     "price_to_in_usd": "0.0405167646229685",
+     "block_timestamp": "2026-09-05T01:07:42Z",
+     "kind": "buy",
+     "volume_in_usd": "225.504455790085",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715779_0x9fb84fe0881910b88c680cbaff9ea82da5a84a93fdc012f16d87aa25c1acfbf5_96_1788570479",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715779,
+     "tx_hash": "0x9fb84fe0881910b88c680cbaff9ea82da5a84a93fdc012f16d87aa25c1acfbf5",
+     "tx_from_address": "0x09760c50888e7afd9abbde00ddf0550ea3cbdedf",
+     "from_token_amount": "0.104027456104131",
+     "to_token_amount": "6307.59612826326",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164924091506115",
+     "price_from_in_usd": "2455.53",
+     "price_to_in_usd": "0.0404976054416011",
+     "block_timestamp": "2026-09-05T01:07:38Z",
+     "kind": "buy",
+     "volume_in_usd": "255.442539287376",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715669_0x3bf6c026c2cee0cdaf2cc49f0a1823dfb08db1137d66b0f6f982ee816535d1de_90_1788570452",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715669,
+     "tx_hash": "0x3bf6c026c2cee0cdaf2cc49f0a1823dfb08db1137d66b0f6f982ee816535d1de",
+     "tx_from_address": "0x919b69dc68b58dcf230ee6af29b30641b010e168",
+     "from_token_amount": "171.635353650325",
+     "to_token_amount": "0.00277275605370203",
+     "price_from_in_currency_token": "0.0000161549237655955",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396619533369135",
+     "price_to_in_usd": "2455.1",
+     "block_timestamp": "2026-09-05T01:07:27Z",
+     "kind": "sell",
+     "volume_in_usd": "6.80739338744386",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715626_0x5ec56a0e25dda5acc61e0cdb8004444797f2c0d134a07df8530b0bc405262ccf_86_1788570469",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715626,
+     "tx_hash": "0x5ec56a0e25dda5acc61e0cdb8004444797f2c0d134a07df8530b0bc405262ccf",
+     "tx_from_address": "0x919b69dc68b58dcf230ee6af29b30641b010e168",
+     "from_token_amount": "514.906060950976",
+     "to_token_amount": "0.00831849329740664",
+     "price_from_in_currency_token": "0.0000161553610032154",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.039663026798994",
+     "price_to_in_usd": "2455.1",
+     "block_timestamp": "2026-09-05T01:07:22Z",
+     "kind": "sell",
+     "volume_in_usd": "20.422732894463",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715532_0xb5a2d0b39393ca5a1a01ca465b8290bdfc51ff7aea4b814276a077ff0c434570_21_1788570476",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715532,
+     "tx_hash": "0xb5a2d0b39393ca5a1a01ca465b8290bdfc51ff7aea4b814276a077ff0c434570",
+     "tx_from_address": "0x93e6e5c8070f68a73e7758fab27fe94b4c54138a",
+     "from_token_amount": "179.852895222268",
+     "to_token_amount": "0.00290566803222028",
+     "price_from_in_currency_token": "0.0000161558034894537",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396710601424584",
+     "price_to_in_usd": "2455.53",
+     "block_timestamp": "2026-09-05T01:07:13Z",
+     "kind": "sell",
+     "volume_in_usd": "7.13495502315787",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715465_0xf757e66a5099722665d8d5581bfa322d71af03f0ab7b3234c08ca57e936da2ea_51_1788570451",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715465,
+     "tx_hash": "0xf757e66a5099722665d8d5581bfa322d71af03f0ab7b3234c08ca57e936da2ea",
+     "tx_from_address": "0x3464578a5ef72a9a82cd729a3e893d440bf0b818",
+     "from_token_amount": "0.111111289338858",
+     "to_token_amount": "6742.38461514039",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164795240380312",
+     "price_from_in_usd": "2455.1",
+     "price_to_in_usd": "0.0404588794657703",
+     "block_timestamp": "2026-09-05T01:07:06Z",
+     "kind": "buy",
+     "volume_in_usd": "272.789326455829",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715398_0xee6c34d64ff698ae4d7abb26406f4c326b706eecd5e9e21e497749e4d32a41d5_2_1788570457",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715398,
+     "tx_hash": "0xee6c34d64ff698ae4d7abb26406f4c326b706eecd5e9e21e497749e4d32a41d5",
+     "tx_from_address": "0x17ff5e399e47075b689d5703b52f139b542c2c24",
+     "from_token_amount": "0.0325609660499723",
+     "to_token_amount": "1976.52984697181",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.000016473804379862",
+     "price_from_in_usd": "2455.1",
+     "price_to_in_usd": "0.0404448371329993",
+     "block_timestamp": "2026-09-05T01:06:59Z",
+     "kind": "buy",
+     "volume_in_usd": "79.940427749287",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715324_0xf5c2c4e8c8fc699ec5f0a66b688bdbaa5f854ded6b1311c5eed229726e0d530d_292_1788570470",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715324,
+     "tx_hash": "0xf5c2c4e8c8fc699ec5f0a66b688bdbaa5f854ded6b1311c5eed229726e0d530d",
+     "tx_from_address": "0xd6b4c66235385add4dbfec0c9aabc4607b965194",
+     "from_token_amount": "0.0328043358787507",
+     "to_token_amount": "1991.61756122468",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164712023620533",
+     "price_from_in_usd": "2455.1",
+     "price_to_in_usd": "0.040438448919077",
+     "block_timestamp": "2026-09-05T01:06:52Z",
+     "kind": "buy",
+     "volume_in_usd": "80.5379250159207",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715283_0xb2953d1bea0ccf37ebc80eca8b662e871741a0b4d7f372088506b4ac1380045f_62_1788570410",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715283,
+     "tx_hash": "0xb2953d1bea0ccf37ebc80eca8b662e871741a0b4d7f372088506b4ac1380045f",
+     "tx_from_address": "0x3464578a5ef72a9a82cd729a3e893d440bf0b818",
+     "from_token_amount": "608.676822474887",
+     "to_token_amount": "0.00982558560695025",
+     "price_from_in_currency_token": "0.0000161425328584047",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.03963831228447",
+     "price_to_in_usd": "2455.52",
+     "block_timestamp": "2026-09-05T01:06:47Z",
+     "kind": "sell",
+     "volume_in_usd": "24.1269219695785",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715248_0xaeefaecf135475f690131ae943e9f217bdbf964544f771a4ec76af4532fb009b_44_1788570406",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715248,
+     "tx_hash": "0xaeefaecf135475f690131ae943e9f217bdbf964544f771a4ec76af4532fb009b",
+     "tx_from_address": "0x019f633c3fb8c6430fd23f17420ca7b554645bfc",
+     "from_token_amount": "3338.1597631757",
+     "to_token_amount": "0.0538947358874489",
+     "price_from_in_currency_token": "0.0000161450438897439",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396475457304831",
+     "price_to_in_usd": "2455.71",
+     "block_timestamp": "2026-09-05T01:06:44Z",
+     "kind": "sell",
+     "volume_in_usd": "132.349841866167",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715193_0x182d88c703a6588d7810edd1b8dbfeff91fab4c38e9dd5be7940d0fcc27f6db8_9_1788570400",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715193,
+     "tx_hash": "0x182d88c703a6588d7810edd1b8dbfeff91fab4c38e9dd5be7940d0fcc27f6db8",
+     "tx_from_address": "0xfa7978a9cabce0217cad526461513908d93a271d",
+     "from_token_amount": "3783.34502362829",
+     "to_token_amount": "0.0610994182540814",
+     "price_from_in_currency_token": "0.000016149576068927",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396586754482247",
+     "price_to_in_usd": "2455.71",
+     "block_timestamp": "2026-09-05T01:06:38Z",
+     "kind": "sell",
+     "volume_in_usd": "150.04245240073",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715135_0xa39f927346b08a6921527d024d9feedd77911e59cd6074fbd5a08cf093479e76_74_1788570393",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715135,
+     "tx_hash": "0xa39f927346b08a6921527d024d9feedd77911e59cd6074fbd5a08cf093479e76",
+     "tx_from_address": "0x083c6931d96aeeda3249630efd372c6e3c3bbe7b",
+     "from_token_amount": "1867.51257097794",
+     "to_token_amount": "0.0301662547433799",
+     "price_from_in_currency_token": "0.0000161531735915347",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396675099204677",
+     "price_to_in_usd": "2455.71",
+     "block_timestamp": "2026-09-05T01:06:32Z",
+     "kind": "sell",
+     "volume_in_usd": "74.0795734358655",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54715078_0x19fdfcf401fd9bb90ba0701d83b6c4f217eb5e59f70e0e45842ee07af49dc73e_56_1788570412",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715078,
+     "tx_hash": "0x19fdfcf401fd9bb90ba0701d83b6c4f217eb5e59f70e0e45842ee07af49dc73e",
+     "tx_from_address": "0xfa7978a9cabce0217cad526461513908d93a271d",
+     "from_token_amount": "0.0237602394842538",
+     "to_token_amount": "1441.63826531993",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164814156614945",
+     "price_from_in_usd": "2455.52",
+     "price_to_in_usd": "0.0404704457851131",
+     "block_timestamp": "2026-09-05T01:06:27Z",
+     "kind": "buy",
+     "volume_in_usd": "58.3437432583749",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54715014_0xe86deb12c300d5444c406ab044a1efed3677febb5b6a28159fe58259847e465e_2_1788570475",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54715014,
+     "tx_hash": "0xe86deb12c300d5444c406ab044a1efed3677febb5b6a28159fe58259847e465e",
+     "tx_from_address": "0x2f8400fb4c45816d8f9a6a100e542796b9f2e12e",
+     "from_token_amount": "0.101129154236045",
+     "to_token_amount": "6137.80259233365",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164764429475719",
+     "price_from_in_usd": "2455.53",
+     "price_to_in_usd": "0.0404583999510513",
+     "block_timestamp": "2026-09-05T01:06:20Z",
+     "kind": "buy",
+     "volume_in_usd": "248.325672101234",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54714974_0x99642f85a1f78500a08f8e87e0b6bbec6d34a8eb75fd8a28bbb2ed57dec3f25a_26_1788570447",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54714974,
+     "tx_hash": "0x99642f85a1f78500a08f8e87e0b6bbec6d34a8eb75fd8a28bbb2ed57dec3f25a",
+     "tx_from_address": "0x083c6931d96aeeda3249630efd372c6e3c3bbe7b",
+     "from_token_amount": "0.0485383856546762",
+     "to_token_amount": "2946.99186824506",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164704850996352",
+     "price_from_in_usd": "2455.26",
+     "price_to_in_usd": "0.0404393232457302",
+     "block_timestamp": "2026-09-05T01:06:16Z",
+     "kind": "buy",
+     "volume_in_usd": "119.1743567625",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54714920_0xb4718cae28eb7b9311978e3922d35a21143e49fb2c40cf95265de8ea32edef29_111_1788570439",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54714920,
+     "tx_hash": "0xb4718cae28eb7b9311978e3922d35a21143e49fb2c40cf95265de8ea32edef29",
+     "tx_from_address": "0x93e6e5c8070f68a73e7758fab27fe94b4c54138a",
+     "from_token_amount": "0.00294748859502798",
+     "to_token_amount": "178.978053855016",
+     "price_from_in_currency_token": "1.0",
+     "price_to_in_currency_token": "0.0000164684358307731",
+     "price_from_in_usd": "2455.26",
+     "price_to_in_usd": "0.0404342917578639",
+     "block_timestamp": "2026-09-05T01:06:11Z",
+     "kind": "buy",
+     "volume_in_usd": "7.2368508478284",
+     "from_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+     "to_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b"
+    }
+   },
+   {
+    "id": "robinhood_54714874_0xfe573343ff4ae151fb32ac0fbbafd280e4a9ef940d669ef66986fe1d50f6fc17_73_1788570371",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54714874,
+     "tx_hash": "0xfe573343ff4ae151fb32ac0fbbafd280e4a9ef940d669ef66986fe1d50f6fc17",
+     "tx_from_address": "0x2f8400fb4c45816d8f9a6a100e542796b9f2e12e",
+     "from_token_amount": "2264.45037944685",
+     "to_token_amount": "0.0365528470468476",
+     "price_from_in_currency_token": "0.0000161420393127699",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396401673607621",
+     "price_to_in_usd": "2455.71",
+     "block_timestamp": "2026-09-05T01:06:06Z",
+     "kind": "sell",
+     "volume_in_usd": "89.7631920214141",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54714820_0x4893d54b73d151741148f992c3b43567193ef8c2420e734e6016ea74fd0772b3_31_1788570385",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54714820,
+     "tx_hash": "0x4893d54b73d151741148f992c3b43567193ef8c2420e734e6016ea74fd0772b3",
+     "tx_from_address": "0x083c6931d96aeeda3249630efd372c6e3c3bbe7b",
+     "from_token_amount": "180.756352678409",
+     "to_token_amount": "0.00291805731020101",
+     "price_from_in_currency_token": "0.0000161435947725314",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.039643987118853",
+     "price_to_in_usd": "2455.71",
+     "block_timestamp": "2026-09-05T01:06:00Z",
+     "kind": "sell",
+     "volume_in_usd": "7.16590251723372",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   },
+   {
+    "id": "robinhood_54714747_0xa3e2982de910a4adf8c173d2618259ab2281fc3702db05b9e49004955c6782bf_88_1788570385",
+    "type": "trade",
+    "attributes": {
+     "block_number": 54714747,
+     "tx_hash": "0xa3e2982de910a4adf8c173d2618259ab2281fc3702db05b9e49004955c6782bf",
+     "tx_from_address": "0x93e6e5c8070f68a73e7758fab27fe94b4c54138a",
+     "from_token_amount": "181.602577956772",
+     "to_token_amount": "0.00293176029299185",
+     "price_from_in_currency_token": "0.0000161438253023573",
+     "price_to_in_currency_token": "1.0",
+     "price_from_in_usd": "0.0396445532332518",
+     "price_to_in_usd": "2455.71",
+     "block_timestamp": "2026-09-05T01:05:53Z",
+     "kind": "sell",
+     "volume_in_usd": "7.19955306910302",
+     "from_token_address": "0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+     "to_token_address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73"
+    }
+   }
+  ]
+ },
+ "tradesPool": "0x714442e9a611f8561a7df108d6d925132937cfb8",
+ "launchLogs": {
+  "fromBlock": 54706473,
+  "toBlock": 54716472,
+  "count": 80,
+  "last3": [
+   {
+    "address": "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    "topics": [
+     "0x308c390ed1ab5873392818e036cabdf408bc8ad042fbaead3108954ff75ba980",
+     "0x0000000000000000000000004f312b01a24014deae50334e22e4dbac3b81d5bd",
+     "0x000000000000000000000000c84261c6d6f1d72c76c6c5a854cd9f024a3e4bf4",
+     "0x000000000000000000000000020d2904c61f415e5c82769bc4ee6c02739af8e3"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e6f5",
+    "transactionHash": "0x3065b94fc96cd5b3f3abee8a9593e6098955b79539675cb1b81c10900509456d",
+    "transactionIndex": "0xc",
+    "blockHash": "0xef611b1a80f018185a748163c7a5b8881d40e92fa2ff0695787cd3640577eddd",
+    "blockTimestamp": "0x0",
+    "logIndex": "0x71",
+    "removed": false
+   },
+   {
+    "address": "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    "topics": [
+     "0x308c390ed1ab5873392818e036cabdf408bc8ad042fbaead3108954ff75ba980",
+     "0x000000000000000000000000aeed4e7102d7ae5d51f251d7d0f5dd4aa156d43f",
+     "0x00000000000000000000000007e0852a462ed7ded04aaf53eb36d6f12722a498",
+     "0x000000000000000000000000c2d5d88bd35f69605b4d58c77f4fc61e781670f3"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e756",
+    "transactionHash": "0xc771010d49899c965a3cacae38707242f35c766acf7fecc90851bf25fee18a74",
+    "transactionIndex": "0x7",
+    "blockHash": "0x0466101b95d9f7bf601cb4b2fdb327324ea1768f4c410f2a27e631197ce956f6",
+    "blockTimestamp": "0x0",
+    "logIndex": "0x20",
+    "removed": false
+   },
+   {
+    "address": "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    "topics": [
+     "0x308c390ed1ab5873392818e036cabdf408bc8ad042fbaead3108954ff75ba980",
+     "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000706a6c47e562dca0f84b3771a24efd9d3c3e6f14"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x0",
+    "logIndex": "0x27",
+    "removed": false
+   }
+  ]
+ },
+ "launchReceipt": {
+  "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+  "blockNumber": "0x342e7bb",
+  "contractAddress": null,
+  "cumulativeGasUsed": "0x5d0fe0",
+  "effectiveGasPrice": "0x180189d0",
+  "from": "0xda1fdca792fc825ff73de773a4967fb93ccd5264",
+  "gasUsed": "0x5a17db",
+  "gasUsedForL1": "0x0",
+  "l1BlockNumber": "0x18b521b",
+  "logs": [
+   {
+    "address": "0xb2a748f698ae894fddfae9504807daf10f9d7a14",
+    "topics": [
+     "0x01937e4cd42e9b7187e05b387d1e47c08cd90a82522fdaa889731e4bf52c462d",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x4",
+    "removed": false
+   },
+   {
+    "address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x0000000000000000000000000000000000000000000000000000000000000000",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000026e1590150f64ab",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x5",
+    "removed": false
+   },
+   {
+    "address": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x00000000000000000000000052e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0x00000000000000000000000000000000000000000000000000000000199ed5aa",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x6",
+    "removed": false
+   },
+   {
+    "address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+     "0x00000000000000000000000052e65b17fb6e5ba00ed806f37afcd2daa50271ca"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000026e1590150f64ab",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x7",
+    "removed": false
+   },
+   {
+    "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+    "topics": [
+     "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000026e1590150f64abffffffffffffffffffffffffffffffffffffffffffffffffffffffffe6612a56000000000000000000000000000000000000000000033f491c499c8d2418746400000000000000000000000000000000000000000000000095d750065a75b1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffcf98a",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x8",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000e2b46c905e12ab8e2f864e4821a4325884c1b126",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000001360cd7c92c6972d2",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x9",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x37e7f0db430edc9dd31bc66f25f8449353aa0818f503b906747dd8f286cd3802",
+     "0x000000000000000000000000e2b46c905e12ab8e2f864e4821a4325884c1b126",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000001360cd7c92c6972d2000000000000000000000000000000000000000000000001360cd7c92c6972d2",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0xa",
+    "removed": false
+   },
+   {
+    "address": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+     "0x000000000000000000000000e2b46c905e12ab8e2f864e4821a4325884c1b126"
+    ],
+    "data": "0x00000000000000000000000000000000000000000000000000000000199ed5aa",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0xb",
+    "removed": false
+   },
+   {
+    "address": "0xe2b46c905e12ab8e2f864e4821a4325884c1b126",
+    "topics": [
+     "0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904"
+    ],
+    "data": "0xfffffffffffffffffffffffffffffffffffffffffffffffec9f32836d3968d2e00000000000000000000000000000000000000000000000000000000199ed5aa000000000000000000000000000000000000000000004992694c2b6dba61c10e000000000000000000000000000000000000000000000000582cc654bdd179befffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc3c1a",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0xc",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000001360cd7c92c6972d2",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0xd",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x37e7f0db430edc9dd31bc66f25f8449353aa0818f503b906747dd8f286cd3802",
+     "0x0000000000000000000000008876789976decbfcbbbe364623c63652db8c0904",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000001360cd7c92c6972d2000000000000000000000000000000000000000000000001360cd7c92c6972d2",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0xe",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df536",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0xf",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df536",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x10",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x37e7f0db430edc9dd31bc66f25f8449353aa0818f503b906747dd8f286cd3802",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df536000000000000000000000000000000000000000000000000d47b8a85de1df536",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x11",
+    "removed": false
+   },
+   {
+    "address": "0x7895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x0000000000000000000000000000000000000000000000000000000000000000",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x0000000000000000000000000000000000000000033b2e3c9fd0803ce8000000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x12",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0x908408e307fc569b417f6cbec5d5a06f44a0a505ac0479b47d421a4b2fd6a1e6"
+    ],
+    "data": "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x13",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xe4b7e48fbd47c2f602bacadee76ad33b16542ddb4997cfc0de04c311adcfa8c7",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x14",
+    "removed": false
+   },
+   {
+    "address": "0x263ed295dafae1d9aadd6e56c4b6f9f38ee019dd",
+    "topics": [
+     "0x3d0ce9bfc3ed7d6862dbb28b2dea94561fe714a1b4d019aa8af39730d1ad7c3d",
+     "0x0000000000000000000000007ed598bcef8bd9edd8c97a195c6d13f40801ec7e"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000001c6bf52634000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x15",
+    "removed": false
+   },
+   {
+    "address": "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    "topics": [
+     "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607",
+     "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb"
+    ],
+    "data": "0x0000000000000000000000001b0e319c6a659f002271b69db8a7df2f911c153e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400e758f447240000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x16",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xe4b7e48fbd47c2f602bacadee76ad33b16542ddb4997cfc0de04c311adcfa8c7",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x17",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xe4b7e48fbd47c2f602bacadee76ad33b16542ddb4997cfc0de04c311adcfa8c7",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x18",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xe4b7e48fbd47c2f602bacadee76ad33b16542ddb4997cfc0de04c311adcfa8c7",
+     "0x0000000000000000000000002e3f0e3892e37166b4d2c16a2aca809069ed06a7"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x19",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xe4b7e48fbd47c2f602bacadee76ad33b16542ddb4997cfc0de04c311adcfa8c7",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x1a",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df536",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x1b",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df536",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x1c",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x37e7f0db430edc9dd31bc66f25f8449353aa0818f503b906747dd8f286cd3802",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df536000000000000000000000000000000000000000000000000d47b8a85de1df536",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x1d",
+    "removed": false
+   },
+   {
+    "address": "0x7895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x0000000000000000000000000000000000000000004d095908fc145765b55519",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x1e",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000d47b8a85de1df5360000000000000000000000000000000000000000004d095908fc145765b55519000000000000000000000000000000000000000000000000021ff495d194c7920000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x1f",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x20",
+    "removed": false
+   },
+   {
+    "address": "0xe33e9e479df8802cb0866d5d05258bec4cf62948",
+    "topics": [
+     "0xdcacba5e347ae7abd91cb519eb877af8fa7774e347b85dd3ddcd24a2ba8cdf37",
+     "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb000000000000000000000000000000000000000000000000d47b8a85de1df5360000000000000000000000000000000000000000004d095908fc145765b55519",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x21",
+    "removed": false
+   },
+   {
+    "address": "0x706a6c47e562dca0f84b3771a24efd9d3c3e6f14",
+    "topics": [
+     "0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e",
+     "0x000000000000000000000000a125492aca28449d2291f5415a818697345cfa09"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x22",
+    "removed": false
+   },
+   {
+    "address": "0x706a6c47e562dca0f84b3771a24efd9d3c3e6f14",
+    "topics": [
+     "0xc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x23",
+    "removed": false
+   },
+   {
+    "address": "0x70e95cc5f03db2906081e7a8d16e4c4209291507",
+    "topics": [
+     "0xbefdb281bf53f234496ee0b37711bf32704eb91833f0c05e3020581720dea7be",
+     "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb"
+    ],
+    "data": "0x000000000000000000000000706a6c47e562dca0f84b3771a24efd9d3c3e6f14",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x24",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0x2cc664e1ac1e2d05c0d4637bb63ec8189113b6ac39276be8977e26216a8cdd19",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000706a6c47e562dca0f84b3771a24efd9d3c3e6f14"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x25",
+    "removed": false
+   },
+   {
+    "address": "0x42df2a798f82289e177311362e8f5ccc45c1219c",
+    "topics": [
+     "0x38f9c71383b6e3fe639172c6b3a3d4418fa722b4abf99bfd8e31f92bd5ea23f0",
+     "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+     "0x0000000000000000000000000000000000000000000000000000000000000000",
+     "0x000000000000000000000000706a6c47e562dca0f84b3771a24efd9d3c3e6f14"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x26",
+    "removed": false
+   },
+   {
+    "address": "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    "topics": [
+     "0x308c390ed1ab5873392818e036cabdf408bc8ad042fbaead3108954ff75ba980",
+     "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000706a6c47e562dca0f84b3771a24efd9d3c3e6f14"
+    ],
+    "data": "0x",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x27",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000005888f4ac8b2663c1",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x28",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000005888f4ac8b2663c1",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x29",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x37e7f0db430edc9dd31bc66f25f8449353aa0818f503b906747dd8f286cd3802",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000005888f4ac8b2663c10000000000000000000000000000000000000000000000005888f4ac8b2663c1",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x2a",
+    "removed": false
+   },
+   {
+    "address": "0x7895c9cc3a397799b5ce1aeb68aa6b2116fc40fb",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f",
+     "0x0000000000000000000000002e3f0e3892e37166b4d2c16a2aca809069ed06a7"
+    ],
+    "data": "0x0000000000000000000000000000000000000000001c059f30766f3a04c12f44",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x2b",
+    "removed": false
+   },
+   {
+    "address": "0xf6e4f02c4321061697f7db3a228c3c53e955005f",
+    "topics": [
+     "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x0000000000000000000000002e3f0e3892e37166b4d2c16a2aca809069ed06a7"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000005888f4ac8b2663c10000000000000000000000000000000000000000001c059f30766f3a04c12f4400000000000000000000000000000000000000000000000000e2a64967ca9fb70000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x2c",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000e33e9e479df8802cb0866d5d05258bec4cf62948"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x2d",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000f6e4f02c4321061697f7db3a228c3c53e955005f"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x2e",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x00000000000000000000000000000000000000000000000009085896c32519db",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x2f",
+    "removed": false
+   },
+   {
+    "address": "0x1b0e319c6a659f002271b69db8a7df2f911c153e",
+    "topics": [
+     "0x37e7f0db430edc9dd31bc66f25f8449353aa0818f503b906747dd8f286cd3802",
+     "0x000000000000000000000000a14bf99c4b249c54a0dacd9e6114e815a1dfedeb",
+     "0x000000000000000000000000da1fdca792fc825ff73de773a4967fb93ccd5264"
+    ],
+    "data": "0x00000000000000000000000000000000000000000000000009085896c32519db00000000000000000000000000000000000000000000000009085896c32519db",
+    "blockNumber": "0x342e7bb",
+    "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+    "transactionIndex": "0x3",
+    "blockHash": "0x012d5c0534d5e03ba55031d4a278af5e7bc6ea5550d6f1cecb7cfcdd0b1bbc66",
+    "blockTimestamp": "0x6a9b6b91",
+    "logIndex": "0x30",
+    "removed": false
+   }
+  ],
+  "logsBloom": "0x0000000000000000002001000008800880002008104108000002000000000400000000400000010000000000100404000100000000202120090080000820000001000010004010080000840800710004800004000000800000000020100300000000000002000000040009000100088100000004000040028000005800080000000000000000200040484000000018040000000001008800020800000042000002000400000014000000004080080020011010800002000100000000000000000000000200000002408000800800000000804000200401090080000000202000005020000000008010000080800000000100020005000ca0000000000000010c",
+  "status": "0x1",
+  "to": "0xb2a748f698ae894fddfae9504807daf10f9d7a14",
+  "transactionHash": "0xdce0caebb0579b25bc2609bf5e69e2a70a5e487942b3d63458d87dad14c6865c",
+  "transactionIndex": "0x3",
+  "type": "0x2"
+ },
+ "launchTokenTotalSupply": "0x0000000000000000000000000000000000000000033b2e3c9fd0803ce8000000",
+ "curveReads": {
+  "curve": "0x706a6c47e562dca0f84b3771a24efd9d3c3e6f14",
+  "quoteToken": "0x0000000000000000000000001b0e319c6a659f002271b69db8a7df2f911c153e",
+  "token": "0x0000000000000000000000007895c9cc3a397799b5ce1aeb68aa6b2116fc40fb"
+ },
+ "initializeLogs": {
+  "fromBlock": 54706473,
+  "toBlock": 54716472,
+  "count": 155,
+  "first3": [
+   {
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "topics": [
+     "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438",
+     "0x9ee517d3354bb046a802d26c9ac67677a673ee16be191f805aef3879e2fceed5",
+     "0x000000000000000000000000322f0929c4625ed5bad873c95208d54e1c003b2d",
+     "0x0000000000000000000000009a35461c5cb914cb0c51206a199df6503e681e18"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000004e3468951d49f2eea976ed0d6e75ffcb44a9a544000000000000000000000000000000000000106e7c4be625ab9a3c8c3d0c85ed0000000000000000000000000000000000000000000000000000000000028bf0",
+    "blockNumber": "0x342c18b",
+    "transactionHash": "0x5242544e2d439ef92091aba11506031b3c3cb6a5fde04de915a62c1c28bd23cc",
+    "transactionIndex": "0x7",
+    "blockHash": "0x396fbf94dd8a4a163e2b1dc9720f4b35c8974b37e1e2c168aa46ecfef466966c",
+    "blockTimestamp": "0x0",
+    "logIndex": "0x30",
+    "removed": false
+   },
+   {
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "topics": [
+     "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438",
+     "0xdd3556b2908dca7febc084359d227bd5954d6634219a42fe3b194adfd3f2dfa7",
+     "0x000000000000000000000000385b28ea50276828b6e472537f6b35dae7e75c03",
+     "0x000000000000000000000000507b6f349a80114097a67b8b4677367acc15b220"
+    ],
+    "data": "0x00000000000000000000000000000000000000000000000000000000000061a8000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000076352d3f23bb25186182f2ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeeb02",
+    "blockNumber": "0x342c1be",
+    "transactionHash": "0xb9ce7d663bc4475f1578ef377182bb814aca40887799fddff17ae3bf8d4597f1",
+    "transactionIndex": "0x8",
+    "blockHash": "0x93ee74d3ab51b8a38a9a9cae79565e0cd5a78d786f46518cfcd231f758edb925",
+    "blockTimestamp": "0x0",
+    "logIndex": "0x28",
+    "removed": false
+   },
+   {
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "topics": [
+     "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438",
+     "0xcfb94b2b4cf6728303e226bf2397f553923b72850a9d19b7aa42816f4831795b",
+     "0x00000000000000000000000047f93d52cbec7c6d2cfc080e154002370a60daea",
+     "0x000000000000000000000000af132660dfb4ff5a5fa20631ba6c017964981e18"
+    ],
+    "data": "0x000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000004e3468951d49f2eea976ed0d6e75ffcb44a9a54400000000000000000000000000000000000024255f634f2b8f7f403b9cb0efde000000000000000000000000000000000000000000000000000000000002c988",
+    "blockNumber": "0x342c1d8",
+    "transactionHash": "0x18363736a1105eab6d7f8fb8445a3bf18fe9afd4405bad1329456106b8ff88a4",
+    "transactionIndex": "0x1",
+    "blockHash": "0xd7048cf5a17c5063c924fce82057f9ea9e0213ebc1f29472b1d5b827bf8d3530",
+    "blockTimestamp": "0x0",
+    "logIndex": "0x4",
+    "removed": false
+   }
+  ]
+ }
+}

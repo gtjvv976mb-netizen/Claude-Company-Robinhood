@@ -1,24 +1,26 @@
-import { getJson } from "./lib/http.js";
-import { shapePair } from "./data/dexscreener.js";
+import { shapePair, CHAIN, searchPairs } from "./data/dexscreener.js";
+import { venueOf, launchpadOf } from "./data/pons-live.js";
 import { emit } from "./lib/bus.js";
 
 /**
  * The house market sweep.
  *
  * DexScreener's search returns ~30 pairs per query, so one query is not a market scan —
- * it is a keyhole. Sweeping several angles and deduplicating by mint takes coverage from
- * ~42 promoted tokens to ~120 real ones, including the graduated pump.fun book on
- * pumpswap. Everything here is free: no model call happens until a coin has survived
- * the deterministic floors.
+ * it is a keyhole. Sweeping several angles and deduplicating by token takes coverage
+ * from a handful of promoted tokens to a hundred-odd real ones. Everything here is
+ * free: no model call happens until a coin has survived the deterministic floors.
+ *
+ * RETUNED FOR CHAIN 4663 (2026-09-05, measured, not guessed): q=PONS → 30/30 robinhood
+ * pairs; q=pons median age 27.1h, youngest 1.7h; q=USDG 26/30; q=robinhood 21/30;
+ * q=WETH 0/30 (the symbol is too generic to search). The Solana angles — pumpswap,
+ * bonk, raydium, SOL — returned nothing on this chain by construction. The sweep is
+ * the SLOW lens now: a PONS launch reaches DexScreener hours after GeckoTerminal and
+ * the chain log do (pons-live.js), so this is where the graduated book is found, not
+ * where a minute-old coin is.
  */
-
-// Angles chosen to reach each launchpad's book, not just whatever is trending.
 const ANGLES = [
-  // launchpads
-  "pumpswap", "pumpfun", "pump", "letsbonk", "bonk", "launchlab", "bags", "BAGS",
-  "moonshot", "moon", "boop", "believe", "fomo", "meteoradbc", "daos",
-  // venues the graduates end up on
-  "raydium", "meteora", "orca", "SOL", "USDC",
+  // launchpads and venues on this chain
+  "pons", "PONS", "USDG", "robinhood", "hoodit", "bankr", "pools.trade", "uniswap", "ramses", "giga", "orvex",
   // themes
   "AI", "agent", "cat", "dog", "meme",
 ];
@@ -26,46 +28,37 @@ const ANGLES = [
 /**
  * Which launchpad minted this coin.
  *
- * Measured against the live market rather than assumed: launchpads brand themselves
- * twice over — a vanity suffix on the mint address, and their own dexId while the coin
- * is still on its bonding curve. Either alone is unreliable (a graduate migrates to
- * Raydium and loses the dexId; some pads do not use a vanity suffix), so both are used.
+ * On Solana a launchpad branded its mints with a vanity suffix; a 0x address carries no
+ * such mark, so the ONLY signal is the dex the pool sits on. DexScreener's dexId names
+ * the venue ("pons", "uniswap", "giga", "up", "0swap" — measured on CASHCAT's 30 pairs)
+ * and GeckoTerminal's dex id names the pad ("pons-v2", "pons-dot-family", "hoodit",
+ * "uniswap-pools-trade", "bankr-robinhood"). Both dialects are keyed here.
  */
 const PADS = [
-  { id: "pump.fun",     suffix: /pump$/,  dexes: ["pumpswap", "pumpfun"] },
-  { id: "letsbonk.fun", suffix: /bonk$/,  dexes: ["launchlab"] },
-  { id: "bags.fm",      suffix: /BAGS$/,  dexes: ["bags"] },
-  { id: "moonshot",     suffix: /moon$/,  dexes: ["moonshot"] },
-  { id: "boop.fun",     suffix: /boop$/,  dexes: ["boop"] },
-  { id: "trix",         suffix: /TRiX$/,  dexes: [] },
-  { id: "meteora-dbc",  suffix: null,     dexes: ["meteoradbc"] },
+  { id: "pons",         dexes: ["pons", "pons-v2", "pons-v2-dex", "pons-dot-family", "ponsfamily"] },
+  { id: "hood.fun",     dexes: ["hoodit", "hood-fun", "hoodfun"] },
+  { id: "pools.trade",  dexes: ["uniswap-pools-trade", "pools-trade", "poolstrade"] },
+  { id: "bankr",        dexes: ["bankr", "bankr-robinhood"] },
 ];
 
-export function launchpad(mint, dexId) {
-  for (const p of PADS) {
-    if (p.suffix && p.suffix.test(mint)) return p.id;
-    if (dexId && p.dexes.includes(dexId)) return p.id;
-  }
-  return null;
+export function launchpad(_address, dexId) {
+  for (const p of PADS) if (dexId && p.dexes.includes(dexId)) return p.id;
+  return launchpadOf(dexId);
 }
 
 /** Still on its bonding curve — it has not graduated to an open AMM yet. */
-export const onCurve = (dexId) =>
-  ["pumpfun", "launchlab", "bags", "meteoradbc", "boop", "moonshot"].includes(dexId);
+export const onCurve = (dexId) => venueOf(dexId).curve;
 
 export async function sweep({ angles = ANGLES } = {}) {
   emit("stage", { stage: "scout", note: `sweeping ${angles.length} angles` });
   const best = new Map();
 
-  const results = await Promise.all(
-    angles.map((q) => getJson(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`))
-  );
+  const results = await Promise.all(angles.map((q) => searchPairs(q).catch(() => [])));
 
-  for (const r of results) {
-    if (!r.ok) continue;
-    for (const p of r.data?.pairs || []) {
-      if (p.chainId !== "solana") continue;
-      const mint = p.baseToken?.address;
+  for (const pairs of results) {
+    for (const p of pairs) {
+      if (p.chainId !== CHAIN) continue;
+      const mint = p.baseToken?.address?.toLowerCase();
       if (!mint) continue;
       // keep the deepest pair per mint — the one an exit would actually route through
       const prev = best.get(mint);
@@ -75,6 +68,7 @@ export async function sweep({ angles = ANGLES } = {}) {
 
   const out = [...best.entries()].map(([mint, pair]) => ({
     mint,
+    address: mint,
     pair: shapePair(pair),
     raw: pair,
     launchpad: launchpad(mint, pair.dexId),
@@ -107,6 +101,7 @@ export function classify({ pair, mint }) {
   const liq = pair?.liquidityUsd ?? 0;
   const hasSite = (pair?.websites?.length ?? 0) > 0;
   const socials = pair?.socials?.length ?? 0;
+  // Keyed on the DEX ID: a 0x address carries no launchpad suffix (see launchpad()).
   const pad = launchpad(mint, pair?.dex);
   const pumpLineage = Boolean(pad);
 

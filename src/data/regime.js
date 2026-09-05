@@ -2,10 +2,11 @@
  * MURDOCK — the Regime seat. Reads the weather; flies or doesn't.
  *
  * The one B-grade mechanism the research endorsed that the desk couldn't run:
- * time-series momentum as a MARKET-REGIME VETO. When both SOL and BTC are
+ * time-series momentum as a MARKET-REGIME VETO. When both ETH and BTC are
  * negative over their trailing ~25 days, trend is against every long on the
  * established sleeve — the sleeve whose returns actually correlate with the
- * majors. It is a veto, not an alpha signal: MURDOCK never says "buy",
+ * majors. ETH, not SOL: chain 4663 is ETH-quoted (WETH pairs, ETH gas, PONS
+ * graduation measured in ETH), so its weather is Ethereum's. It is a veto, not an alpha signal: MURDOCK never says "buy",
  * only "not in this weather".
  *
  * Deterministic code, no model cost. CoinGecko's free API, cached an hour —
@@ -32,14 +33,16 @@ async function trailingReturn(coin) {
 /** The current weather. Fails open: unknown weather never grounds the desk. */
 export async function regime() {
   if (cache.value && Date.now() - cache.at < 3600e3) return cache.value;
-  const [sol, btc] = await Promise.all([trailingReturn("solana"), trailingReturn("bitcoin")]);
-  const known = sol != null && btc != null;
+  const [eth, btc] = await Promise.all([trailingReturn("ethereum"), trailingReturn("bitcoin")]);
+  const known = eth != null && btc != null;
   const value = {
-    solRet25d: sol != null ? Number(sol.toFixed(1)) : null,
+    ethRet25d: eth != null ? Number(eth.toFixed(1)) : null,
     btcRet25d: btc != null ? Number(btc.toFixed(1)) : null,
+    // Legacy name some readers still print; same number as ethRet25d.
+    solRet25d: eth != null ? Number(eth.toFixed(1)) : null,
     regime: !known ? "unknown"
-      : sol < 0 && btc < 0 ? "risk_off"
-      : sol > 0 && btc > 0 ? "risk_on"
+      : eth < 0 && btc < 0 ? "risk_off"
+      : eth > 0 && btc > 0 ? "risk_on"
       : "mixed",
     asOf: Date.now(),
   };

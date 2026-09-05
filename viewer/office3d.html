@@ -2444,7 +2444,7 @@ const TASK = {
   },
   Regime: {  // MURDOCK — weather check
     glyph: "\u2601",
-    lines: ["SOL climbing. BTC climbing. Fly.", "Crosswinds. Mixed regime.", "Grounded. Both majors negative."],
+    lines: ["ETH climbing. BTC climbing. Fly.", "Crosswinds. Mixed regime.", "Grounded. Both majors negative."],
     props: [
       [[0.20, 0.03, 0.28], [0.05, 0.815, 0], 0x2a4a6a],
       [[0.02, 0.08, 0.20], [0.05, 0.87, 0], 0xd7f04a],
@@ -2498,7 +2498,7 @@ const SEATQ = {
   Execution:   ["model",  "The unsigned ticket: route, slicing, stop, targets."],
   Compliance:  ["code",   "Does this break a house rule? A veto, not advice."],
   Scribe:      ["code",   "Write it down so the desk can be graded later."],
-  Regime:      ["code",   "Is it flying weather? SOL and BTC decide, not hope."],
+  Regime:      ["code",   "Is it flying weather? ETH and BTC decide, not hope."],
   Review:      ["model",  "What did the last landing teach us?"],
   CEO:         ["claude", "Do I authorise this?"],
   Codex:       ["codex",  "What should the system improve next, and what evidence proves it?"],
@@ -2590,7 +2590,7 @@ const DOSSIER = {
   },
   Regime: {  // MURDOCK
     brief: "Reads the market's weather, and grounds the established sleeve when trend is against it.",
-    detail: "Deterministic code, no model call. Pulls 30 days of SOL and BTC, computes their trailing 25-day returns, and declares the regime: risk-on, mixed, or risk-off. When both majors are negative the established sleeve is grounded — a veto from the time-series momentum literature, not an opinion. Unknown weather never grounds anyone.",
+    detail: "Deterministic code, no model call. Pulls 30 days of ETH and BTC, computes their trailing 25-day returns, and declares the regime: risk-on, mixed, or risk-off. When both majors are negative the established sleeve is grounded — a veto from the time-series momentum literature, not an opinion. Unknown weather never grounds anyone.",
     method: "Deterministic code. Free; checked once per cycle.",
     known: "Howls at the moon. Right about the wind.",
     note: "A veto, not an alpha signal. MURDOCK never says buy — only 'not in this weather.'",
@@ -2967,7 +2967,7 @@ function drawBossBoard() {
       `${st.liveCalls} on the sheet`,
       `${st.taken} held`,
       st.memecoins ? `${st.memecoins} memecoin` : null,
-      st.exposureSol ? `${st.exposureSol.toFixed(2)} SOL out` : null,
+      st.exposureEth ? `${st.exposureEth.toFixed(2)} ETH out` : null,
     ].filter(Boolean).join("  \u00b7  ");
     chalkText(x, bits, W - 32, 372, 30, chalk, "right", 500);
   }
@@ -3981,7 +3981,7 @@ function drawGrokBoard() {
     const bb = window.__botBalance;
     const stale = bb && Date.now() - bb.at > 90_000;
     const text = !bb ? "WALLET \u2014"
-      : bb.ok && bb.sol != null ? "WALLET " + bb.sol.toFixed(3) + " SOL" + (stale ? " (stale)" : "")
+      : bb.ok && bb.sol != null ? "WALLET " + bb.sol.toFixed(3) + " ETH" + (stale ? " (stale)" : "")
         : "WALLET UNREADABLE";
     x.textAlign = "right";
     x.font = '700 22px "JetBrains Mono", ui-monospace, monospace';
@@ -4006,12 +4006,12 @@ function drawGrokBoard() {
       ["OFFERED TO THIS FLOOR", st.open != null ? String(st.open) : "\u2014"],
       ["POSITIONS HELD", st.taken != null ? String(st.taken) : "\u2014"],
       ["OF WHICH MEMECOIN", st.memecoins != null ? String(st.memecoins) : "\u2014"],
-      ["EXPOSURE", st.exposureSol != null ? st.exposureSol.toFixed(3) + " SOL" : "\u2014"],
+      ["EXPOSURE", st.exposureEth != null ? st.exposureEth.toFixed(3) + " ETH" : "\u2014"],
       ["BOT WALLET", (() => {
         const bb = window.__botBalance;
         if (!bb) return "\u2014";
         if (!bb.ok || bb.sol == null) return "unreadable";
-        return bb.sol.toFixed(4) + " SOL" + (bb.sol === 0 ? " \u00b7 cannot trade" : "");
+        return bb.sol.toFixed(4) + " ETH" + (bb.sol === 0 ? " \u00b7 cannot trade" : "");
       })()],
     ];
     x.font = '500 18px "JetBrains Mono", ui-monospace, monospace';
@@ -4132,7 +4132,7 @@ window.__grokBoardUpdate = (feed = []) => {
     const capAtCall = Number(c.mcap_at_call) > 0 ? Number(c.mcap_at_call) : null;
     const capOf = (px) => (capAtCall && entry > 0 && px > 0) ? capAtCall * (px / entry) : null;
     const mark = c.last_mark ?? null;
-    return { symbol: c.symbol, size: c.size_sol ?? null,
+    return { symbol: c.symbol, size: c.size_eth ?? null,
              entryCap: capAtCall, targetCap: capOf(target),
              category: c.category || null, taken: true,
              pnlPct: (entry && mark) ? ((mark - entry) / entry) * 100 : null };
@@ -4144,7 +4144,7 @@ window.__grokBoardUpdate = (feed = []) => {
     open: open.length,
     taken: open.filter((c) => c.taken).length,
     memecoins: open.filter((c) => (c.category || "").toLowerCase() === "memecoin").length,
-    exposureSol: open.reduce((a, c) => a + (c.size_sol || 0), 0),
+    exposureEth: open.reduce((a, c) => a + (c.size_eth || 0), 0),
     closedToday: feed.filter((c) => c.status === "closed").length,
   };
   drawGrokBoard();
@@ -5357,7 +5357,7 @@ function memoNode({ symbol, decision, thesis, conviction, size, stop, gmgn, ts }
   if (gmgn) {
     const a = document.createElement("a");
     a.className = "place"; a.href = gmgn; a.target = "_blank"; a.rel = "noopener noreferrer";
-    a.textContent = "Place it on GMGN →";
+    a.textContent = "See the pool on DexScreener →";
     m.appendChild(a);
   }
   return m;
@@ -5930,13 +5930,13 @@ const HANDLERS = {
 
   "order:slip": (e) => {
     tape("CEO", `${e.ruling} — ${e.symbol} $${e.size} · ${e.file}`, e.ruling === "APPROVE" ? "good" : "warn");
-    if (e.gmgn) tape("Order", `GMGN: ${e.gmgn}`, "hi");
+    if (e.gmgn) tape("Order", `Pool: ${e.gmgn}`, "hi");
     const p = who("CEO");
     p?.run(async () => {
       await p.moveTo(SPOTS.ceoDoor[0], SPOTS.ceoDoor[1] - 1.2);
       puff(p, "↧");
       p.carry(false);
-      p.say(e.ruling === "APPROVE" ? "Signed slip — place it on GMGN." : `${e.ruling}.`, 4600);
+      p.say(e.ruling === "APPROVE" ? "Signed slip — the pool is on DexScreener." : `${e.ruling}.`, 4600);
       await p.goHome();
     });
     lastOrder = e;
@@ -6469,7 +6469,7 @@ async function runDemo() {
 
     for (const t of SYMS) {
       const mint = "So" + Math.random().toString(36).slice(2, 10) + "pump";
-      const gmgn = `https://gmgn.ai/sol/token/${mint}?tab=buy`;
+      const gmgn = `https://dexscreener.com/robinhood/${mint}`;
       handle({ type:"token:start", mint, hook:"unusual volume" }); await W(2200);
       handle({ type:"token:evidence", mint, symbol:t.s, price:t.price, liq:t.liq }); await W(1800);
 
@@ -7067,102 +7067,30 @@ document.getElementById("tab-live").addEventListener("click", () => togglePane("
 
 /* ── buying a call, without ever touching the transaction ──────────────────
    The desk's whole security story is that it cannot sign, so the buy path must
-   not create a place where it could. Jupiter's embeddable swap widget does the
-   quoting, wallet connect and signing entirely inside its own audited code —
-   the page only says WHICH token and HOW MUCH, prefilled from the call sheet.
-   The script loads lazily on the first Buy click: visitors who never trade
-   never run third-party code. If it cannot load (adblock, offline), we fall
-   back to the external GMGN link, which is what the button did before. */
-const SOL_MINT = "So11111111111111111111111111111111111111112";
-let jupLoading = null;
-function loadJupiter() {
-  if (window.Jupiter) return Promise.resolve(true);
-  if (jupLoading) return jupLoading;
-  jupLoading = new Promise((res) => {
-    const sc = document.createElement("script");
-    sc.src = "https://plugin.jup.ag/plugin-v1.js";
-    sc.async = true;
-    sc.onload = () => res(!!window.Jupiter);
-    sc.onerror = () => res(false);
-    document.head.appendChild(sc);
-    setTimeout(() => res(!!window.Jupiter), 8000);
-  });
-  return jupLoading;
+   not create a place where it could. On Solana this was Jupiter's embedded swap
+   widget; Robinhood Chain (4663) has no equivalent that can be dropped into a page,
+   so the Buy button hands the visitor to KyberSwap's own site — the aggregator this
+   desk's executor already quotes through — with the pair prefilled, and to the pool
+   on DexScreener as the second door. No third-party script loads on this page, no
+   token amount is pre-authorised, and the only thing the page names is WHICH token.
+   Nothing here signs, holds a key, or builds a transaction. */
+const KYBER_SWAP = "https://kyberswap.com/swap/robinhood";
+const DEXSCREENER = "https://dexscreener.com/robinhood";
+const EXPLORER = "https://robinhoodchain.blockscout.com";
+function swapLink(mint, side = "buy") {
+  // eth-to-<token> buys with native ETH; a sell is the same pair the other way round.
+  return side === "buy" ? `${KYBER_SWAP}/eth-to-${mint}` : `${KYBER_SWAP}/${mint}-to-eth`;
 }
+function poolLink(mint) { return `${DEXSCREENER}/${mint}`; }
 
-/* THE SWAP BUTTON CAME OUT 134 PIXELS TALL.
- *
- * Measured in the live modal: the select controls are 36px, the header buttons 28px,
- * and the main action button — Connect Wallet, then Swap once a wallet is attached —
- * rendered at 134. Four times the height of everything around it, as a slab of solid
- * green filling a third of the panel.
- *
- * The cause is inside the widget: the button's only child carries `h-full`, so
- * `height: 100%` against a button that has no height of its own, and the percentage
- * resolves against an ancestor sized to the modal rather than against the text. With
- * the child's height set to auto the button falls to 54px, which is 20px of padding
- * either side of a 14px line — the size the widget's own padding was written for.
- *
- * The widget renders into a SHADOW ROOT, so the page's stylesheet cannot reach it and
- * an override here has to be handed to that root directly. Constructable stylesheets
- * where they exist, a <style> element where they do not, and once per root either way.
- *
- * If a future Jupiter build renames the class, this rule stops matching and the button
- * goes back to being too tall. It cannot break the widget: a selector that matches
- * nothing does nothing, and nothing else on this desk is styled from inside that root.
- */
-function trimJupiterSwapButton() {
-  const CSS = "button > div.h-full { height: auto !important; }";
-  const started = Date.now();
-  const apply = () => {
-    // The host is created a tick or two after init(), so look for it rather than
-    // assume it. Scoped to the widget's own container first; the document-wide scan
-    // is the fallback if Jupiter ever renames that container.
-    const scope = document.getElementById("jupiter-plugin-instance") || document;
-    let root = null;
-    for (const el of scope.querySelectorAll("*")) if (el.shadowRoot) { root = el.shadowRoot; break; }
-    if (!root) {
-      if (Date.now() - started < 5000) setTimeout(apply, 50);
-      return;
-    }
-    if (root.__deskButtonTrimmed) return;
-    root.__deskButtonTrimmed = true;
-    try {
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(CSS);
-      root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
-    } catch {
-      const style = document.createElement("style");
-      style.textContent = CSS;
-      root.appendChild(style);
-    }
-  };
-  apply();
-}
-
-async function openSwap({ mint, symbol, sol, side = "buy" }) {
-  const ok = await loadJupiter();
-  if (!ok) {
-    window.open(`https://gmgn.ai/sol/token/${mint}?tab=${side}`, "_blank", "noopener");
+async function openSwap({ mint, symbol, side = "buy" }) {
+  const w = window.open(swapLink(mint, side), "_blank", "noopener");
+  if (!w) {
+    // A blocked popup is a broken button: fall back to navigating this tab's pool view.
+    location.assign(poolLink(mint));
     return;
   }
-  const buying = side === "buy";
-  window.Jupiter.init({
-    displayMode: "modal",
-    formProps: {
-      initialInputMint: buying ? SOL_MINT : mint,
-      initialOutputMint: buying ? mint : SOL_MINT,
-      // Raw units: SOL is 9 decimals. Sells start empty — only the wallet knows
-      // the balance, and guessing a number here would just be wrong.
-      ...(buying && sol ? { initialAmount: String(Math.round(sol * 1e9)) } : {}),
-    },
-    onSuccess: ({ txid }) => {
-      // tape() lives in another module script; reach it via window and shrug if the
-      // tape is not there — the wallet already showed the user their fill.
-      if (txid) window.tape?.("Filled", `${symbol || mint.slice(0, 6)} — ${txid.slice(0, 8)}… (your wallet, your signature)`, "hi");
-    },
-  });
-  trimJupiterSwapButton();
+  window.tape?.("Swap", `${symbol || mint.slice(0, 8)} — opened on KyberSwap (your wallet, your signature)`, "hi");
 }
 
 window.__renderWatchInto = (el) => loadWatchboard(el);
@@ -7207,7 +7135,7 @@ function showBotWallet(after, wallet) {
   const note = document.createElement("p");
   note.className = "dp-note";
   note.style.fontSize = "10.5px";
-  note.textContent = "Send SOL only, and only what you would shrug off losing — this key lives on your machine.";
+  note.textContent = "Send ETH only, and only what you would shrug off losing — this key lives on your machine.";
   box.appendChild(note);
   after.after(box);
   // live balance, through the relay
@@ -7355,16 +7283,16 @@ function renderCalls({ feed = [], settings, record }, { liveOnly = false } = {})
      own counts, so nothing is lost and nothing shouts. */
 
   /* ── THE PHONE HANDOFF ─────────────────────────────────────────────────────
-     The Buy button's two-click path (tap → Jupiter modal pre-filled → approve)
-     assumes a wallet can hear the page. On a phone's plain browser there is no
-     extension, so the modal opens and the approve step has nobody to talk to —
-     the exact user this flow is FOR hits the one dead end. Phantom's in-app
-     browser fixes it: same page, wallet present. So when the page detects a
-     mobile browser with no injected wallet, it offers the one-tap handoff via
-     Phantom's universal link (docs.phantom.com format, verified live 2026-09-01).
-     Inside Phantom — or on desktop — the wallet object exists and this renders
-     nothing. */
-  if (/Android|iPhone|iPad/i.test(navigator.userAgent) && !(window.phantom?.solana || window.solana)) {
+     The Buy button opens KyberSwap, which needs a wallet that can hear the page.
+     On a phone's plain browser there is no extension, so the swap page opens with
+     nobody to sign — the exact user this flow is FOR hits the one dead end.
+     Phantom's in-app browser fixes it: same page, wallet present, and Phantom's EVM
+     provider (window.phantom.ethereum) speaks Robinhood Chain 4663 natively. So when
+     the page detects a mobile browser with no injected EVM wallet, it offers the
+     one-tap handoff via Phantom's universal link (docs.phantom.com format, verified
+     live 2026-09-01). Inside Phantom — or on desktop — the provider exists and this
+     renders nothing. */
+  if (/Android|iPhone|iPad/i.test(navigator.userAgent) && !(window.phantom?.ethereum || window.ethereum)) {
     const hand = document.createElement("button");
     hand.className = "dp-btn"; hand.type = "button";
     hand.textContent = "\u{1F47B} Open this floor in Phantom — one tap, then Buy works";
@@ -7403,7 +7331,7 @@ function renderCalls({ feed = [], settings, record }, { liveOnly = false } = {})
   window.__renderTeamInto?.(teamBox);
 
   // 2 — the rules they hunt by, OPEN, not buried in a drawer
-  step(2, "How much it trades", "The money in your bot, and the SOL that goes into each trade. The team picks the coins.");
+  step(2, "How much it trades", "The money in your bot, and the ETH that goes into each trade. The team picks the coins.");
   if (settings) callsPanel.appendChild(buildControls(settings));
 
   // 3 — the bot
@@ -7550,7 +7478,7 @@ function paintFeedInto(wrap, feed, settings) {
     const why = document.createElement("div");
     why.className = "why";
     why.textContent = c.verdict === "offered"
-      ? `Your floor: take ${c.size_sol} SOL — ${c.reason}`
+      ? `Your floor: take ${c.size_eth} ETH — ${c.reason}`
       : `Your floor passed — ${c.reason}`;
     el.appendChild(why);
 
@@ -7572,7 +7500,7 @@ function paintFeedInto(wrap, feed, settings) {
     } else {
       const held = window.__botHeld?.(c.mint);
       line.textContent = held
-        ? `Desk position (paper) · YOUR BOT IS IN THIS: ${held.sol} SOL`
+        ? `Desk position (paper) · YOUR BOT IS IN THIS: ${held.eth} ETH`
         : `Desk position (paper) · your bot is ${bs.live ? "live" : "on paper"} and not in this one`;
       if (held) line.style.color = "var(--good,#4f8f52)";
     }
@@ -7589,13 +7517,13 @@ function paintFeedInto(wrap, feed, settings) {
       act.className = "act";
       const buy = document.createElement("button");
       buy.className = "dp-btn"; buy.type = "button";
-      buy.textContent = c.taken ? `Buy again (${c.size_sol} SOL)` : `Buy ${c.size_sol} SOL`;
-      buy.onclick = () => openSwap({ mint: c.mint, symbol: c.symbol, sol: c.size_sol, side: "buy" });
+      buy.textContent = c.taken ? `Buy again (${c.size_eth} ETH)` : `Buy ${c.size_eth} ETH`;
+      buy.onclick = () => openSwap({ mint: c.mint, symbol: c.symbol, eth: c.size_eth, side: "buy" });
       const link = document.createElement("a");
       link.className = "dp-btn ghost";
-      link.href = `https://gmgn.ai/sol/token/${c.mint}?tab=buy`;
+      link.href = `https://dexscreener.com/robinhood/${c.mint}`;
       link.target = "_blank"; link.rel = "noopener";
-      link.textContent = "GMGN";
+      link.textContent = "DexScreener";
       const mark = document.createElement("button");
       mark.className = "dp-btn ghost"; mark.type = "button";
       mark.textContent = c.taken ? "Taken ✓" : "Mark as taken";
@@ -7816,7 +7744,7 @@ function buildBudget() {
 
   const warn = mk("p", "bud-warn");
   warn.textContent = "$CLAUDECO is the access token: it pays your lease and your rent, and nothing else. " +
-    "You trade in SOL, from your own wallet. The desk sizes your calls against the bankroll you " +
+    "You trade in ETH, from your own wallet. The desk sizes your calls against the bankroll you " +
     "declare and never holds, moves or signs for your funds.";
   box.appendChild(warn);
   return box;
@@ -7899,7 +7827,7 @@ function buildControls(settings) {
   const mk = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x) e.textContent = x; return e; };
 
   /* WHAT THE TENANT ACTUALLY CHOOSES (owner, 2026-09-03): the money in the bot, and the
-     SOL that goes into each trade. Appetite, categories, a liquidity floor and a
+     ETH that goes into each trade. Appetite, categories, a liquidity floor and a
      launchpad list used to live here, and each of them could silently refuse a call the
      trading team had already researched, sized and published. The team decides what is
      traded; this pane decides how much of the tenant's own money rides on it. */
@@ -7908,15 +7836,15 @@ function buildControls(settings) {
   const row = mk("div", "dp-row");
   const bank = document.createElement("input");
   bank.className = "dp-in"; bank.type = "number"; bank.min = "0"; bank.step = "0.5";
-  bank.value = settings.bankroll_sol;
-  bank.setAttribute("aria-label", "Money in the bot, in SOL");
+  bank.value = settings.bankroll_eth;
+  bank.setAttribute("aria-label", "Money in the bot, in ETH");
   const perTrade = document.createElement("input");
   perTrade.className = "dp-in"; perTrade.type = "number"; perTrade.min = "0"; perTrade.step = "0.01";
-  perTrade.value = settings.fixed_sol || 0;
-  perTrade.setAttribute("aria-label", "SOL per trade, 0 to let the team size it");
+  perTrade.value = settings.fixed_eth || 0;
+  perTrade.setAttribute("aria-label", "ETH per trade, 0 to let the team size it");
   row.append(bank, perTrade);
   box.appendChild(row);
-  box.appendChild(mk("div", "dp-note", "Left: the SOL your bot is allowed to trade. Right: the SOL that goes into each trade, or 0 to let the team size it from your book. A trade under about 0.02 SOL is refused because Solana's fees would eat it."));
+  box.appendChild(mk("div", "dp-note", "Left: the ETH your bot is allowed to trade. Right: the ETH that goes into each trade, or 0 to let the team size it from your book. A trade the round-trip gas would eat (about 0.01 ETH at today's gwei) is refused."));
 
   box.appendChild(mk("div", "dp-h", "What this floor trades"));
   box.appendChild(mk("div", "dp-note", "Whatever the trading team calls. The desk hunts pump.fun coins across six market-cap bands, from $5k up to $10m, and each band is held for as long as that band deserves — minutes at the bottom, up to a day at the top. There is nothing to pick."));
@@ -8046,8 +7974,8 @@ function buildControls(settings) {
     box.appendChild(mk("div", "dp-note",
       "Only after reviewing the dry run: put two private HTTPS Solana RPC URLs from independent providers and the Jupiter API key in separate mode-0600 files. " +
       "The installer shows the new burner address and arms only when you retype that public key in the terminal. " +
-      "The default canary is 0.005 SOL per trade, 0.01 SOL rolling deployment, and a 0.01 SOL rolling realized-loss entry brake. " +
-      "A larger profile is local-only, requires all three values plus a fresh v2 wallet-and-values acknowledgement, and cannot exceed 0.05 / 0.5 / 0.15 SOL."));
+      "The default canary is 0.0004 ETH per trade, 0.0008 ETH rolling deployment, and a 0.0008 ETH rolling realized-loss entry brake. " +
+      "A larger profile is local-only, requires all three values plus a fresh v2 wallet-and-values acknowledgement, and cannot exceed 0.004 / 0.04 / 0.012 ETH."));
     // Same single pinned line as the dry-run install, with the canary flags.
     const liveCmd = hasPinnedExecutorRelease
       ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company.git && cd Claude-Company && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N} --live --expected-commit ${releaseCommit} --max-sol 0.005 --daily-cap 0.01 --daily-loss-cap 0.01 --rpc-file /absolute/path/to/primary-rpc --secondary-rpc-file /absolute/path/to/secondary-rpc --jupiter-key-file /absolute/path/to/jupiter-api-key`
@@ -8223,7 +8151,7 @@ function renderAlerts(unread) {
 const coinImgCache = new Map();
 function coinImg(mint) {
   if (coinImgCache.has(mint)) return coinImgCache.get(mint);
-  const p = fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`)
+  const p = fetch(`https://api.dexscreener.com/tokens/v1/robinhood/${mint}`)
     .then((r) => r.json())
     .then((d) => (d?.pairs ?? []).map((x) => x?.info?.imageUrl).find(Boolean) ?? null)
     .catch(() => null);
@@ -8380,7 +8308,7 @@ async function openCallDossier(callId) {
     for (const f of body.fills) {
       const a = document.createElement("a");
       a.className = "wr-rule"; a.style.display = "block";
-      a.href = `https://solscan.io/tx/${f.signature}`; a.target = "_blank"; a.rel = "noopener";
+      a.href = `https://robinhoodchain.blockscout.com/tx/${f.signature}`; a.target = "_blank"; a.rel = "noopener";
       a.textContent = `floor ${f.floor_no} · ${f.side} · $${f.quote_usd ?? "?"} · tx ${f.signature.slice(0, 10)}… ↗`;
       b.appendChild(a);
     }
@@ -8679,11 +8607,12 @@ const dashNode = (tag, cls, text) => {
 const dashCompact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 const dashMoney = (value) => value == null || !Number.isFinite(Number(value))
   ? "—" : "$" + dashCompact.format(Number(value));
-const dashSol = (value) => {
+const dashEth = (value) => {
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
+  // nine decimals: a 0.0004 ETH canary and a 0.000001 ETH floor both survive
   const rendered = number.toFixed(9).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-  return (rendered === "-0" ? "0" : rendered) + " SOL";
+  return (rendered === "-0" ? "0" : rendered) + " ETH";
 };
 const dashAge = (ms) => {
   if (ms == null || !Number.isFinite(Number(ms))) return "never";
@@ -9264,7 +9193,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
         health?.runtimeCommit ? "runtime " + String(health.runtimeCommit).slice(0, 10) : "reported by the local poller"),
       dashMetric("Open positions", heartbeat ? String(heartbeat.open ?? 0) : "Not reported",
         String(Array.isArray(heartbeat?.held) ? heartbeat.held.length : 0) + " holdings named in heartbeat"),
-      dashMetric("Active trade cap", activeCaps ? dashSol(activeCaps.maxSolPerTrade) : "Not reported",
+      dashMetric("Active trade cap", activeCaps ? dashEth(activeCaps.maxEthPerTrade) : "Not reported",
         capPolicy.activeFresh ? "fresh self-report" : activeCaps ? "last-reported · stale" : "awaiting current executor")
     );
     el.appendChild(statusGrid);
@@ -9274,7 +9203,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
     funding.appendChild(dashNode("h4", "", "5 · Fund the dedicated burner last"));
     if (wallet.address) {
       funding.appendChild(dashNode("div", "bud-bal",
-        wallet.balanceSol == null ? "Balance unavailable" : dashSol(wallet.balanceSol)));
+        wallet.balanceEth == null ? "Balance unavailable" : dashEth(wallet.balanceEth)));
       const addressRow = dashNode("div", "secretbox");
       addressRow.appendChild(dashNode("code", "", String(wallet.address).slice(0, 8) + "…" + String(wallet.address).slice(-8)));
       const copy = dashNode("button", "dp-btn ghost", "Copy address");
@@ -9294,12 +9223,12 @@ async function loadWallsteDashboard({ background = false } = {}) {
         " · state: " + String(wallet.state || "unknown").replace(/-/g, " ") +
         " · source: " + String(wallet.source || "read-only") +
         (wallet.observedAt ? " · observed " + (dashWhen(wallet.observedAt) || dashAge(Date.now() - wallet.observedAt)) : "")));
-      if (wallet.requiredForReadinessSol != null) funding.appendChild(dashNode("p", "dp-note",
-        "Conservative no-sign readiness reserve for the reported active trade cap: " +
-        dashSol(wallet.requiredForReadinessSol) + ". This is not a recommendation to fund more."));
+      if (wallet.requiredForReadinessEth != null) funding.appendChild(dashNode("p", "dp-note",
+        "Conservative no-sign readiness reserve for the reported active trade cap (cap + a gas-headroom placeholder): " +
+        dashEth(wallet.requiredForReadinessEth) + ". This is not a recommendation to fund more."));
       funding.appendChild(dashNode("p", "dp-note",
         connected
-          ? "Fund with SOL from your own wallet only. This page has no transfer control and never receives the burner key."
+          ? "Fund with ETH on Robinhood Chain (4663) from your own wallet only. This page has no transfer control and never receives the burner key."
           : "Wait for a fresh heartbeat and verify the address on the executor host before funding. The last-reported address may no longer be current."));
     } else {
       funding.appendChild(dashNode("p", "locked",
@@ -9331,7 +9260,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
         readiness
           ? (readiness.ready
             ? "ready · " + String(readiness.route || "route unknown") +
-              (readiness.amountLamports ? " · " + dashSol(Number(readiness.amountLamports) / 1e9) + " rehearsal" : "")
+              (readiness.amountWei && readiness.amountWei !== "0" ? " · " + dashEth(Number(readiness.amountWei) / 1e18) + " rehearsal" : "")
             /* WHY, NOT JUST 0/2. An operator with both RPCs green read "0 / 2" and went
                to the source to find out whether the probe existed at all. It does, it
                runs every two minutes, and the commonest reason it fails is an unfunded
@@ -9353,7 +9282,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
         row.append(
           dashNode("span", "", mint ? mint.slice(0, 7) + "…" + mint.slice(-7) : "Unknown mint"),
           ...(dashWhen(position.openedAt) ? [dashNode("small", "", "opened " + dashWhen(position.openedAt))] : []),
-          dashNode("strong", "", Number(position?.sol || 0).toFixed(4) + " SOL")
+          dashNode("strong", "", Number(position?.sol || 0).toFixed(4) + " ETH")
         );
         heldList.appendChild(row);
       }
@@ -9512,7 +9441,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
     copyLive.onclick = () => copyVisibleCommand(copyLive, liveCanaryCommand);
     liveStep.appendChild(copyLive);
     liveStep.appendChild(dashNode("p", "dp-note",
-      "Optional reviewed raised profile: 0.05 SOL/trade, 0.5 SOL rolling deploy, 0.15 SOL rolling realized-loss entry brake. It has materially more real-money risk. The installer accepts it only after you type the exact v2 wallet-and-values sentence locally."));
+      "Optional reviewed raised profile: 0.004 ETH/trade, 0.04 ETH rolling deploy, 0.012 ETH rolling realized-loss entry brake. It has materially more real-money risk. The installer accepts it only after you type the exact v2 wallet-and-values sentence locally."));
     liveStep.appendChild(dashNode("pre", "commandbox", raisedProfileCommand));
     const copyRaised = dashNode("button", "dp-btn ghost commandcopy", "Copy raised-profile command");
     copyRaised.type = "button";
@@ -9525,7 +9454,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
       activation.walletFunded
         ? "The confirmed-chain read reports the burner at or above the conservative reserve for its self-reported active trade cap. Keep the balance deliberately small."
         : wallet.address
-          ? "Only after the local checks above pass, send SOL from your own wallet to the public address in the final read-only card below."
+          ? "Only after the local checks above pass, send ETH from your own wallet to the public address in the final read-only card below."
           : "Wait until the paper heartbeat reports the burner public address. Never enter or upload its private key here.",
       activation.walletFunded === true);
     setupCard.appendChild(setupSteps);
@@ -9573,7 +9502,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
     bankroll.type = "number"; bankroll.min = "0.01"; bankroll.step = "0.1"; bankroll.value = filters.bankrollSol ?? 5;
     const fixed = dashNode("input", "dp-in");
     fixed.type = "number"; fixed.min = "0"; fixed.step = "0.001"; fixed.value = filters.fixedSol ?? 0;
-    form.append(field("Money in the bot · SOL", bankroll), field("SOL per trade · 0 = let the team size it", fixed));
+    form.append(field("Money in the bot · ETH", bankroll), field("ETH per trade · 0 = let the team size it", fixed));
 
     const instantWrap = dashNode("label", "pad" + (filters.instantDelivery ? " on" : ""));
     instantWrap.style.gridColumn = "1/-1";
@@ -9619,26 +9548,26 @@ async function loadWallsteDashboard({ background = false } = {}) {
     capsCard.appendChild(dashNode("p", "dp-note",
       capPolicy.activeFresh
         ? "These are the fresh values enforced by the reporting executor. This page cannot change them."
-        : caps.maxSolPerTrade != null
+        : caps.maxEthPerTrade != null
           ? "These values came from a stale heartbeat. Confirm the current environment on the executor host before relying on them."
           : "No sanitized active-cap report is available yet. The values below are policy defaults and maxima, not current state."));
     const capsGrid = dashNode("div", "dashgrid");
     capsGrid.append(
-      dashMetric("Active per trade", caps.maxSolPerTrade == null ? "—" : String(caps.maxSolPerTrade) + " SOL", "entry input ceiling"),
-      dashMetric("Active 24h deploy", caps.rolling24hDeploySol == null ? "—" : String(caps.rolling24hDeploySol) + " SOL", "rolling entry ceiling"),
-      dashMetric("Active loss brake", caps.rolling24hRealizedLossBrakeSol == null ? "—" : String(caps.rolling24hRealizedLossBrakeSol) + " SOL", "blocks later entries after realized loss"),
+      dashMetric("Active per trade", caps.maxEthPerTrade == null ? "—" : String(caps.maxEthPerTrade) + " ETH", "entry input ceiling"),
+      dashMetric("Active 24h deploy", caps.rolling24hDeployEth == null ? "—" : String(caps.rolling24hDeployEth) + " ETH", "rolling entry ceiling"),
+      dashMetric("Active loss brake", caps.rolling24hRealizedLossBrakeEth == null ? "—" : String(caps.rolling24hRealizedLossBrakeEth) + " ETH", "blocks later entries after realized loss"),
       dashMetric("Max open positions", String(caps.maxOpenPositions ?? "—"), "concurrent recorded maximum")
     );
     capsCard.appendChild(capsGrid);
     capsCard.appendChild(dashNode("p", "boundary-note",
       "The realized-loss value is an entry brake, not a guaranteed loss ceiling: an open position can gap or rug beyond it before an exit lands."));
     capsCard.appendChild(dashNode("p", "dp-note",
-      "Default canary · " + String(defaults.maxSolPerTrade ?? "—") + " SOL/trade · " +
-      String(defaults.rolling24hDeploySol ?? "—") + " SOL/24h deploy · " +
-      String(defaults.rolling24hRealizedLossBrakeSol ?? "—") + " SOL realized-loss brake. " +
-      "Locally acknowledged v2 maxima · " + String(maxima.maxSolPerTrade ?? "—") + " / " +
-      String(maxima.rolling24hDeploySol ?? "—") + " / " +
-      String(maxima.rolling24hRealizedLossBrakeSol ?? "—") + " SOL. Raised caps are never accepted from this browser or the call feed."));
+      "Default canary · " + String(defaults.maxEthPerTrade ?? "—") + " ETH/trade · " +
+      String(defaults.rolling24hDeployEth ?? "—") + " ETH/24h deploy · " +
+      String(defaults.rolling24hRealizedLossBrakeEth ?? "—") + " ETH realized-loss brake. " +
+      "Locally acknowledged v3 maxima · " + String(maxima.maxEthPerTrade ?? "—") + " / " +
+      String(maxima.rolling24hDeployEth ?? "—") + " / " +
+      String(maxima.rolling24hRealizedLossBrakeEth ?? "—") + " ETH. Raised caps are never accepted from this browser or the call feed."));
     el.appendChild(capsCard);
     // Funding is deliberately the final activation surface. It stays read-only and
     // is never placed before the local release, paper-review, and readiness steps.
@@ -9708,7 +9637,7 @@ async function loadCalloutsDashboard() {
         " checked" + (coverage.candidates != null && coverage.candidates > (coverage.attempted ?? 0) ? " of " + coverage.candidates + " candidates" : "") + (coverage.complete === true ? " (complete)" : " (incomplete)") +
         (dashWhen(body.generatedAt) ? " \u00b7 as of " + dashWhen(body.generatedAt) : "") +
         " · Pump.fun verification required: " + String(policy.pumpfunVerifiedRequired === true) +
-        (whaleBar ? " · bar " + dashMoney(whaleBar) + " of wallet SOL" : "") +
+        (whaleBar ? " · bar " + dashMoney(whaleBar) + " of wallet ETH" : "") +
         ((hidden.unverified || hidden.belowWhale)
           ? " · hidden: " + String(hidden.unverified || 0) + " unverified, " + String(hidden.belowWhale || 0) + " below the bar"
           : ""))
@@ -9734,7 +9663,7 @@ async function loadCalloutsDashboard() {
           ? "Pump.fun could not be reached for any coin in this pass. That is unknown, not evidence that no verified caller exists."
           : withCallouts === 0
             ? "None of the " + succeeded + " coins checked carried a callout at all."
-            : "No verified caller has held " + (whaleBar ? dashMoney(whaleBar) : "the bar") + " of SOL in the last " +
+            : "No verified caller has held " + (whaleBar ? dashMoney(whaleBar) : "the bar") + " of ETH in the last " +
               (coverage.boardHours || 12) + " hours. " + withCallouts + " coin" + (withCallouts === 1 ? "" : "s") +
               " carried callouts in this sweep" +
               (failed ? "; " + failed + " coin" + (failed === 1 ? "" : "s") + " could not be checked" : "") + failWhy + ".";
@@ -9784,9 +9713,9 @@ async function loadCalloutsDashboard() {
       if (typeof callout.user === "string" && callout.user) {
         const wallet = dashNode("a", "candidate-link",
           String(callout.user).slice(0, 4) + "\u2026" + String(callout.user).slice(-4) + " \u2197");
-        wallet.href = "https://solscan.io/account/" + callout.user;
+        wallet.href = "https://robinhoodchain.blockscout.com/address/" + callout.user;
         wallet.target = "_blank"; wallet.rel = "noopener";
-        wallet.title = "The caller's wallet on Solscan";
+        wallet.title = "The caller's wallet on Blockscout";
         links.appendChild(wallet);
       }
       links.appendChild(caChip(coin.mint));

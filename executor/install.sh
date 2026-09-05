@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Install WALL-ST-E's outbound-only polling executor on Debian/Ubuntu + systemd.
-# Dry run is the default. --live is an explicit, locally acknowledged mode.
+# Robinhood Chain (4663) edition: one 32-byte hex key file, two independent RPC
+# providers, caps in ETH. Dry run is the default. --live is an explicit, locally
+# acknowledged mode.
 set -euo pipefail
 umask 077
 
 MODE="paper"
 SECRET=""
 SECRET_FILE=""
-JUPITER_KEY=""
-JUPITER_KEY_FILE=""
 FLOOR=""
-MAX_SOL=""
+MAX_ETH=""
 DAILY_CAP=""
 DAILY_LOSS_CAP=""
-MAX_SOL_SET=0
+MAX_ETH_SET=0
 DAILY_CAP_SET=0
 DAILY_LOSS_CAP_SET=0
 RPC=""
@@ -23,8 +23,8 @@ SECONDARY_RPC_FILE=""
 SOURCE_DIR=""
 SOURCE_COMMIT="remote-paper"
 EXPECTED_COMMIT=""
-API="https://claude-company-api.onrender.com"
-STATIC="https://claudedotcompany.com"
+API="https://claude-company-robinhood-api.onrender.com"
+STATIC="https://robinhood.claudedotcompany.com"
 
 # BEGIN SYSTEMD_ENV_WRITER
 # EnvironmentFile is not a shell script. Quote every value using systemd's
@@ -66,9 +66,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --live) MODE="live"; shift;;
     --secret-file) need_value "$@"; SECRET_FILE="$2"; shift 2;;
-    --jupiter-key-file) need_value "$@"; JUPITER_KEY_FILE="$2"; shift 2;;
     --floor) need_value "$@"; FLOOR="$2"; shift 2;;
-    --max-sol) need_value "$@"; MAX_SOL="$2"; MAX_SOL_SET=1; shift 2;;
+    --max-eth) need_value "$@"; MAX_ETH="$2"; MAX_ETH_SET=1; shift 2;;
     --daily-cap) need_value "$@"; DAILY_CAP="$2"; DAILY_CAP_SET=1; shift 2;;
     --daily-loss-cap) need_value "$@"; DAILY_LOSS_CAP="$2"; DAILY_LOSS_CAP_SET=1; shift 2;;
     --rpc) need_value "$@"; RPC="$2"; shift 2;;
@@ -161,7 +160,7 @@ if [ "$MODE" = "live" ]; then
     echo "live --expected-commit must exactly match the published commit $SOURCE_COMMIT" >&2
     exit 1
   fi
-  for source_file in poller.mjs journal.mjs jupiter.mjs token2022.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs sol-usd-oracle.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs package.json package-lock.json; do
+  for source_file in poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs package.json package-lock.json; do
     if [ -n "$(git -C "$source_root" status --porcelain -- "executor/$source_file")" ]; then
       echo "live source file executor/$source_file differs from commit $SOURCE_COMMIT" >&2
       exit 1
@@ -189,19 +188,9 @@ esac
 if [ "${#SECRET}" -lt 32 ]; then echo "floor secret is unexpectedly short" >&2; exit 1; fi
 
 if [ "$MODE" = "live" ]; then
-  if [ -n "$JUPITER_KEY_FILE" ]; then
-    read_private_file "Jupiter API key" "$JUPITER_KEY_FILE"
-    JUPITER_KEY="$REPLY"
-  else
-    if [ ! -r /dev/tty ]; then
-      echo "live mode needs --jupiter-key-file when no terminal is available" >&2
-      exit 1
-    fi
-    printf "Jupiter API key (hidden): " > /dev/tty
-    IFS= read -r -s JUPITER_KEY < /dev/tty
-    printf "\n" > /dev/tty
-  fi
-  if [ -z "$JUPITER_KEY" ]; then echo "Jupiter API key is empty" >&2; exit 1; fi
+  # No aggregator key: KyberSwap's public routes/build endpoints need none, and the
+  # transaction is proven with eth_call before it is signed, so there is nothing a key
+  # would authorise that the chain does not already check.
   if [ -z "$RPC_FILE" ] || [ -z "$SECONDARY_RPC_FILE" ]; then
     echo "--live requires --rpc-file and --secondary-rpc-file so credentials stay out of argv/history" >&2
     exit 1
@@ -217,54 +206,58 @@ if [ "$MODE" = "live" ]; then
 fi
 
 # BEGIN LIVE_CAPS_VALIDATOR
-LIVE_CANARY_MAX_SOL="0.005"
-LIVE_CANARY_DAILY_CAP="0.01"
-LIVE_CANARY_DAILY_LOSS_CAP="0.01"
+# The same numbers as poller.mjs LIVE_LIMITS / OPERATOR_MAX (the ETH translation of the
+# owner's SOL caps at $2,450/ETH, awaiting owner confirmation there).
+LIVE_CANARY_MAX_ETH="0.0004"
+LIVE_CANARY_DAILY_CAP="0.0008"
+LIVE_CANARY_DAILY_LOSS_CAP="0.0008"
 LIVE_MIN_MONEY_CAP="0.000001"
-LIVE_OPERATOR_MAX_SOL="0.05"
-LIVE_OPERATOR_MAX_DAILY_CAP="0.5"
-LIVE_OPERATOR_MAX_DAILY_LOSS_CAP="0.15"
+LIVE_OPERATOR_MAX_ETH="0.004"
+LIVE_OPERATOR_MAX_DAILY_CAP="0.04"
+LIVE_OPERATOR_MAX_DAILY_LOSS_CAP="0.012"
 
-if [ -z "$MAX_SOL" ]; then [ "$MODE" = "live" ] && MAX_SOL="$LIVE_CANARY_MAX_SOL" || MAX_SOL="0.05"; fi
-if [ -z "$DAILY_CAP" ]; then [ "$MODE" = "live" ] && DAILY_CAP="$LIVE_CANARY_DAILY_CAP" || DAILY_CAP="0.5"; fi
+if [ -z "$MAX_ETH" ]; then [ "$MODE" = "live" ] && MAX_ETH="$LIVE_CANARY_MAX_ETH" || MAX_ETH="0.004"; fi
+if [ -z "$DAILY_CAP" ]; then [ "$MODE" = "live" ] && DAILY_CAP="$LIVE_CANARY_DAILY_CAP" || DAILY_CAP="0.04"; fi
 if [ -z "$DAILY_LOSS_CAP" ]; then
-  [ "$MODE" = "live" ] && DAILY_LOSS_CAP="$LIVE_CANARY_DAILY_LOSS_CAP" || DAILY_LOSS_CAP="0.15"
+  [ "$MODE" = "live" ] && DAILY_LOSS_CAP="$LIVE_CANARY_DAILY_LOSS_CAP" || DAILY_LOSS_CAP="0.012"
 fi
-# One SOL has exactly 1e9 lamports. Limiting cap literals to that precision keeps
-# the comparison exact enough for the declared unit and prevents awk's binary
-# floating-point conversion from rounding a mathematically out-of-range literal
-# onto an accepted boundary.
-number_re='^(0|[1-9][0-9]*)([.][0-9]{1,9})?$'
-if ! [[ "$MAX_SOL" =~ $number_re ]] || ! [[ "$DAILY_CAP" =~ $number_re ]] ||
-   ! [[ "$DAILY_LOSS_CAP" =~ $number_re ]] ||
-   ! awk -v m="$MAX_SOL" -v d="$DAILY_CAP" -v l="$DAILY_LOSS_CAP" \
-     -v minimum="$LIVE_MIN_MONEY_CAP" \
-     'BEGIN { exit !(m >= minimum && d >= minimum && l >= minimum) }'; then
-  echo "--max-sol, --daily-cap, and --daily-loss-cap must be plain decimals at least 0.000001 with at most 9 fractional digits" >&2
+# One ETH has exactly 1e18 wei. The literal is bounded to that precision, and the
+# comparisons below are done in Node with BigInt rather than awk, because awk's binary
+# floating point would round a mathematically out-of-range literal onto an accepted
+# boundary at 18 digits (it already could at 9).
+number_re='^(0|[1-9][0-9]*)([.][0-9]{1,18})?$'
+if ! [[ "$MAX_ETH" =~ $number_re ]] || ! [[ "$DAILY_CAP" =~ $number_re ]] ||
+   ! [[ "$DAILY_LOSS_CAP" =~ $number_re ]]; then
+  echo "--max-eth, --daily-cap, and --daily-loss-cap must be plain decimals at least 0.000001 with at most 18 fractional digits" >&2
   exit 1
 fi
+# Exact wei comparison: prints "raised" when any cap sits above the canary, "ok"
+# otherwise; exits non-zero with the reason on stderr for any violation.
+cap_verdict="$(M="$MAX_ETH" D="$DAILY_CAP" L="$DAILY_LOSS_CAP" MODE_VALUE="$MODE" \
+  CM="$LIVE_CANARY_MAX_ETH" CD="$LIVE_CANARY_DAILY_CAP" CL="$LIVE_CANARY_DAILY_LOSS_CAP" \
+  MM="$LIVE_OPERATOR_MAX_ETH" DM="$LIVE_OPERATOR_MAX_DAILY_CAP" LM="$LIVE_OPERATOR_MAX_DAILY_LOSS_CAP" \
+  MIN="$LIVE_MIN_MONEY_CAP" node - <<'NODE'
+const wei = (v) => { const m = /^(0|[1-9][0-9]*)(?:\.([0-9]{1,18}))?$/.exec(String(v)); if (!m) return null;
+  return BigInt(m[1]) * 10n ** 18n + BigInt((m[2] || "").padEnd(18, "0") || "0"); };
+const e = process.env, m = wei(e.M), d = wei(e.D), l = wei(e.L), min = wei(e.MIN);
+if (m === null || d === null || l === null) { console.error("cap literal is not a plain decimal"); process.exit(1); }
+if (m < min || d < min || l < min) { console.error("--max-eth, --daily-cap, and --daily-loss-cap must each be at least 0.000001"); process.exit(1); }
+if (e.MODE_VALUE === "live" && (m > wei(e.MM) || d > wei(e.DM) || l > wei(e.LM))) {
+  console.error(`live caps cannot exceed ${e.MM} ETH per trade, ${e.DM} ETH daily deploy, or a ${e.LM} ETH daily realized-loss entry brake`); process.exit(1); }
+const raised = e.MODE_VALUE === "live" && (m > wei(e.CM) || d > wei(e.CD) || l > wei(e.CL));
+process.stdout.write(`${raised ? "raised" : "ok"}|${d >= m ? "coherent" : "incoherent"}`);
+NODE
+)" || exit 1
 CAPS_RAISED=0
-if [ "$MODE" = "live" ]; then
-  if ! awk -v m="$MAX_SOL" -v d="$DAILY_CAP" -v l="$DAILY_LOSS_CAP" \
-      -v mm="$LIVE_OPERATOR_MAX_SOL" -v dm="$LIVE_OPERATOR_MAX_DAILY_CAP" \
-      -v lm="$LIVE_OPERATOR_MAX_DAILY_LOSS_CAP" \
-      'BEGIN { exit !(m <= mm && d <= dm && l <= lm) }'; then
-    echo "live caps cannot exceed 0.05 SOL per trade, 0.5 SOL daily deploy, or a 0.15 SOL daily realized-loss entry brake" >&2
+if [ "${cap_verdict%%|*}" = "raised" ]; then
+  CAPS_RAISED=1
+  if [ "$MAX_ETH_SET" -ne 1 ] || [ "$DAILY_CAP_SET" -ne 1 ] || [ "$DAILY_LOSS_CAP_SET" -ne 1 ]; then
+    echo "raising any live cap requires --max-eth, --daily-cap, and --daily-loss-cap together" >&2
     exit 1
   fi
-  if awk -v m="$MAX_SOL" -v d="$DAILY_CAP" -v l="$DAILY_LOSS_CAP" \
-      -v cm="$LIVE_CANARY_MAX_SOL" -v cd="$LIVE_CANARY_DAILY_CAP" \
-      -v cl="$LIVE_CANARY_DAILY_LOSS_CAP" \
-      'BEGIN { exit !(m > cm || d > cd || l > cl) }'; then
-    CAPS_RAISED=1
-    if [ "$MAX_SOL_SET" -ne 1 ] || [ "$DAILY_CAP_SET" -ne 1 ] || [ "$DAILY_LOSS_CAP_SET" -ne 1 ]; then
-      echo "raising any live cap requires --max-sol, --daily-cap, and --daily-loss-cap together" >&2
-      exit 1
-    fi
-  fi
 fi
-if ! awk -v m="$MAX_SOL" -v d="$DAILY_CAP" 'BEGIN { exit !(m <= d) }'; then
-  echo "--daily-cap must be greater than or equal to --max-sol" >&2
+if [ "${cap_verdict##*|}" != "coherent" ]; then
+  echo "--daily-cap must be greater than or equal to --max-eth" >&2
   exit 1
 fi
 # END LIVE_CAPS_VALIDATOR
@@ -283,9 +276,11 @@ if [ -n "$SECONDARY_RPC" ]; then validate_https_endpoint "secondary RPC" "$SECON
 if [ "$MODE" = "live" ]; then
   rpc_lower="${RPC,,}"
   secondary_lower="${SECONDARY_RPC,,}"
-  if [[ "$rpc_lower" =~ api\.mainnet-beta\.solana\.com ]] ||
-     [[ "$secondary_lower" =~ api\.mainnet-beta\.solana\.com ]]; then
-    echo "public Solana RPC is not accepted for either live endpoint; use two private providers" >&2
+  # The public endpoint 429s on batches above ~10 and is shared with every bot on the
+  # chain; an absence proof built on it is built on a coin toss (poller.mjs).
+  if [[ "$rpc_lower" =~ rpc\.mainnet\.chain\.robinhood\.com ]] ||
+     [[ "$secondary_lower" =~ rpc\.mainnet\.chain\.robinhood\.com ]]; then
+    echo "the rate-limited public Robinhood Chain RPC is not accepted for either live endpoint; use two private providers" >&2
     exit 1
   fi
 fi
@@ -423,7 +418,7 @@ rollback_install() {
 trap rollback_install EXIT
 
 echo "▶ fetching the executor and shared policy…"
-RUNTIME_FILES=(poller.mjs journal.mjs jupiter.mjs token2022.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs sol-usd-oracle.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs)
+RUNTIME_FILES=(poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs)
 SOURCE_FILES=("${RUNTIME_FILES[@]}" package.json package-lock.json)
 if [ "$MODE" = "live" ]; then
   echo "▶ staging immutable runtime blobs from commit $SOURCE_COMMIT"
@@ -459,12 +454,14 @@ RELEASE_DIR="$RELEASES_DIR/$(date -u +%Y%m%dT%H%M%SZ)-${SOURCE_COMMIT:0:12}-$$"
 mv "$STAGE_DIR" "$RELEASE_DIR"
 STAGE_DIR=""
 
-if [ ! -f "$INSTALL_DIR/burner.json" ]; then
-  echo "▶ generating a dedicated, unfunded burner wallet locally…"
-  (cd "$RELEASE_DIR" && BURNER_FILE="$INSTALL_DIR/burner.json" node -e 'const{Keypair}=require("@solana/web3.js");const fs=require("fs");const k=Keypair.generate();fs.writeFileSync(process.env.BURNER_FILE,JSON.stringify(Array.from(k.secretKey)),{mode:0o600})')
+# One key file: 32 bytes of hex, mode 0600, generated here from the OS's randomness
+# and never printed. Only its checksummed ADDRESS is derived and shown.
+if [ ! -f "$INSTALL_DIR/burner.key" ]; then
+  echo "▶ generating a dedicated, unfunded burner key locally…"
+  (cd "$RELEASE_DIR" && BURNER_FILE="$INSTALL_DIR/burner.key" node -e 'const fs=require("fs");const {randomBytes}=require("crypto");fs.writeFileSync(process.env.BURNER_FILE,"0x"+randomBytes(32).toString("hex")+"\n",{mode:0o600})')
 fi
-chmod 600 "$INSTALL_DIR/burner.json"
-PUBKEY="$(cd "$RELEASE_DIR" && BURNER_FILE="$INSTALL_DIR/burner.json" node -e 'const{Keypair}=require("@solana/web3.js");const fs=require("fs");console.log(Keypair.fromSecretKey(new Uint8Array(JSON.parse(fs.readFileSync(process.env.BURNER_FILE)))).publicKey.toBase58())')"
+chmod 600 "$INSTALL_DIR/burner.key"
+PUBKEY="$(cd "$RELEASE_DIR" && BURNER_FILE="$INSTALL_DIR/burner.key" node -e 'const fs=require("fs");const {Wallet,getAddress}=require("ethers");console.log(getAddress(new Wallet(fs.readFileSync(process.env.BURNER_FILE,"utf8").trim()).address))')"
 
 LIVE_ACK=""
 LIVE_CAPS_ACK=""
@@ -473,23 +470,23 @@ if [ "$MODE" = "live" ]; then
   if [ ! -r /dev/tty ]; then echo "live mode requires a terminal acknowledgement" >&2; exit 1; fi
   cat > /dev/tty <<NOTICE
 
-WALL-ST-E LIVE CANARY
+WALL-ST-E LIVE CANARY — Robinhood Chain (4663)
   Wallet:       $PUBKEY
-  Max/trade:    $MAX_SOL SOL
-  Rolling deploy: $DAILY_CAP SOL / 24h
-  Realized-loss entry brake: $DAILY_LOSS_CAP SOL / rolling 24h
+  Max/trade:    $MAX_ETH ETH
+  Rolling deploy: $DAILY_CAP ETH / 24h
+  Realized-loss entry brake: $DAILY_LOSS_CAP ETH / rolling 24h
 
 This is real mainnet trading from a dedicated wallet. The site cannot stop it.
-Retype the public wallet above to arm this local service:
+Retype the checksummed wallet address above, byte for byte, to arm this local service:
 NOTICE
   IFS= read -r LIVE_ACK < /dev/tty
   if [ "$LIVE_ACK" != "$PUBKEY" ]; then echo "public-key acknowledgement did not match; live mode not armed" >&2; exit 1; fi
   if [ "$CAPS_RAISED" -eq 1 ]; then
-    CAPS_ACK_EXPECTED="I acknowledge WALL-ST-E caps v2 for $PUBKEY: $MAX_SOL SOL per trade, $DAILY_CAP SOL per day, $DAILY_LOSS_CAP SOL rolling realized-loss entry brake"
+    CAPS_ACK_EXPECTED="I acknowledge WALL-ST-E caps v3 for $PUBKEY: $MAX_ETH ETH per trade, $DAILY_CAP ETH per day, $DAILY_LOSS_CAP ETH rolling realized-loss entry brake"
     cat > /dev/tty <<NOTICE
 
 RAISED LIVE CAPS
-The canary defaults are 0.005 SOL/trade, 0.01 SOL/day deploy, and a 0.01 SOL rolling realized-loss entry brake.
+The canary defaults are $LIVE_CANARY_MAX_ETH ETH/trade, $LIVE_CANARY_DAILY_CAP ETH/day deploy, and a $LIVE_CANARY_DAILY_LOSS_CAP ETH rolling realized-loss entry brake.
 To accept the higher limits above, type this entire sentence exactly:
 
 $CAPS_ACK_EXPECTED
@@ -507,25 +504,24 @@ fi
   write_env_line CC_SECRET "$SECRET"
   write_env_line CC_FLOOR "$FLOOR"
   write_env_line CC_API "$API"
-  write_env_line KEYPAIR "$INSTALL_DIR/burner.json"
+  write_env_line KEY_FILE "$INSTALL_DIR/burner.key"
   write_env_line STATE_DB "$STATE_DB"
   write_env_line LOCK_FILE "$LOCK_FILE"
   write_env_line PAUSE_ENTRIES_FILE "$PAUSE_FILE"
   write_env_line HARD_STOP_FILE "$HARD_STOP_FILE"
-  write_env_line MAX_SOL_PER_TRADE "$MAX_SOL"
-  write_env_line DAILY_SOL_CAP "$DAILY_CAP"
-  write_env_line DAILY_LOSS_LIMIT_SOL "$DAILY_LOSS_CAP"
+  write_env_line MAX_ETH_PER_TRADE "$MAX_ETH"
+  write_env_line DAILY_ETH_CAP "$DAILY_CAP"
+  write_env_line DAILY_LOSS_LIMIT_ETH "$DAILY_LOSS_CAP"
   write_env_line EXECUTE "$EXECUTE_VALUE"
   write_env_line EXECUTOR_SOURCE_COMMIT "$SOURCE_COMMIT"
   if [ "$MODE" = "live" ]; then
     write_env_line LIVE_TRADING_ACK "$LIVE_ACK"
     write_env_line LIVE_CAPS_ACK "$LIVE_CAPS_ACK"
-    write_env_line JUPITER_API_KEY "$JUPITER_KEY"
-    write_env_line SOLANA_RPC "$RPC"
-    write_env_line SOLANA_RPC_SECONDARY "$SECONDARY_RPC"
+    write_env_line RH_RPC "$RPC"
+    write_env_line RH_RPC_SECONDARY "$SECONDARY_RPC"
   elif [ -n "$RPC" ]; then
-    write_env_line SOLANA_RPC "$RPC"
-    if [ -n "$SECONDARY_RPC" ]; then write_env_line SOLANA_RPC_SECONDARY "$SECONDARY_RPC"; fi
+    write_env_line RH_RPC "$RPC"
+    if [ -n "$SECONDARY_RPC" ]; then write_env_line RH_RPC_SECONDARY "$SECONDARY_RPC"; fi
   fi
 } > "$ENV_NEXT"
 chmod 600 "$ENV_NEXT"
@@ -571,20 +567,19 @@ STATE_PREPARED=1
 CC_SECRET="$SECRET" \
 CC_FLOOR="$FLOOR" \
 CC_API="$API" \
-KEYPAIR="$INSTALL_DIR/burner.json" \
+KEY_FILE="$INSTALL_DIR/burner.key" \
 STATE_DB="$STATE_DB" \
 LOCK_FILE="$LOCK_FILE" \
 PAUSE_ENTRIES_FILE="$PAUSE_FILE" \
 HARD_STOP_FILE="$HARD_STOP_FILE" \
-MAX_SOL_PER_TRADE="$MAX_SOL" \
-DAILY_SOL_CAP="$DAILY_CAP" \
-DAILY_LOSS_LIMIT_SOL="$DAILY_LOSS_CAP" \
+MAX_ETH_PER_TRADE="$MAX_ETH" \
+DAILY_ETH_CAP="$DAILY_CAP" \
+DAILY_LOSS_LIMIT_ETH="$DAILY_LOSS_CAP" \
 EXECUTE="$EXECUTE_VALUE" \
 LIVE_TRADING_ACK="$LIVE_ACK" \
 LIVE_CAPS_ACK="$LIVE_CAPS_ACK" \
-JUPITER_API_KEY="$JUPITER_KEY" \
-SOLANA_RPC="$RPC" \
-SOLANA_RPC_SECONDARY="$SECONDARY_RPC" \
+RH_RPC="$RPC" \
+RH_RPC_SECONDARY="$SECONDARY_RPC" \
 LIVE_STATE_INIT_ACK="$PUBKEY" \
 INIT_ONLY=1 \
 node "$RELEASE_DIR/poller.mjs"
@@ -645,20 +640,20 @@ SERVICE_ENABLE_CHANGED=1
 # supervision; it is never made to forget what may already have happened on chain.
 ACTIVATION_COMMITTED=1
 sudo systemctl restart cc-executor
-SECRET=""; JUPITER_KEY=""; LIVE_ACK=""; LIVE_CAPS_ACK=""; CAPS_ACK_EXPECTED=""; REPLY=""
-unset SECRET JUPITER_KEY LIVE_ACK LIVE_CAPS_ACK CAPS_ACK_EXPECTED REPLY
+SECRET=""; LIVE_ACK=""; LIVE_CAPS_ACK=""; CAPS_ACK_EXPECTED=""; REPLY=""
+unset SECRET LIVE_ACK LIVE_CAPS_ACK CAPS_ACK_EXPECTED REPLY
 
 cat <<DONE
 
 ════════════════════════════════════════════════════════════════
   ✓ WALL-ST-E installed for floor $FLOOR in ${MODE^^} mode.
 
-  DEDICATED WALLET (PUBLIC ADDRESS):
+  DEDICATED WALLET (PUBLIC ADDRESS, chain 4663):
       $PUBKEY
 
   Runtime commit: $SOURCE_COMMIT
-  Max $MAX_SOL SOL/trade · $DAILY_CAP SOL/rolling 24h deploy
-  Realized-loss entry brake $DAILY_LOSS_CAP SOL/rolling 24h
+  Max $MAX_ETH ETH/trade · $DAILY_CAP ETH/rolling 24h deploy
+  Realized-loss entry brake $DAILY_LOSS_CAP ETH/rolling 24h
   Watch:          sudo journalctl -u cc-executor -f
   Pause entries:  touch $PAUSE_FILE
   Hard stop:      touch $HARD_STOP_FILE
@@ -667,7 +662,9 @@ cat <<DONE
   Durable state:  $STATE_DB
 
   No wallet was funded by this installer. The private key stays at
-  $INSTALL_DIR/burner.json and must never be uploaded or pasted.
+  $INSTALL_DIR/burner.key and must never be uploaded or pasted.
+  Live mode will not arm until every live-path threshold in live-thresholds.mjs
+  is measured on this chain (assertLiveReady); the journal is created regardless.
   First feed connection skips historic calls and waits for the next one.
 ════════════════════════════════════════════════════════════════
 DONE

@@ -95,9 +95,11 @@ GIT_BIN="/usr/bin/git"
 if [ ! -x "$GIT_BIN" ]; then fail "the system Git client is required"; fi
 
 RUNTIME_PATHS=(
-  executor/poller.mjs executor/journal.mjs executor/jupiter.mjs executor/token2022.mjs
+  executor/poller.mjs executor/journal.mjs executor/evm-executor.mjs executor/evm-rpc.mjs
+  executor/evm-swap.mjs executor/approvals.mjs executor/scope-guard.mjs executor/erc20-hazards.mjs
+  executor/thresholds.mjs executor/live-thresholds.mjs executor/eth-usd-oracle.mjs
   executor/balance-verification.mjs executor/entry-quote-guard.mjs
-  executor/exit-trigger.mjs executor/feed-drain.mjs executor/sol-usd-oracle.mjs
+  executor/exit-trigger.mjs executor/feed-drain.mjs
   executor/heartbeat-health.mjs executor/sleep-assertion.mjs
   executor/strategy.mjs executor/trade-policy.mjs
   executor/monitor.mjs executor/launchd-runner.mjs executor/macos-launchagent.sh
@@ -172,7 +174,7 @@ case "$COMMAND" in
     "$NODE_BIN" "$STAGED_REPO/executor/test-heartbeat-health.mjs"
     "$NODE_BIN" "$STAGED_REPO/executor/test-live-gates.mjs"
     "$NODE_BIN" "$STAGED_REPO/executor/test-journal.mjs"
-    "$NODE_BIN" "$STAGED_REPO/executor/test-live-execution.mjs"
+    "$NODE_BIN" "$STAGED_REPO/executor/test-evm-execution.mjs"
     verify_git_release "$STAGED_REPO"
     mv "$STAGED_REPO" "$FINAL_RELEASE"
     rmdir "$STAGE_PARENT"
@@ -225,7 +227,7 @@ case "$COMMAND" in
     trap - EXIT
     echo "Installed disabled versioned release $EXPECTED_COMMIT."
     echo "Entry pause, hard stop, wallet, journal, and secrets were preserved; core exposure caps were never raised."
-    echo "This release defaults gross ATA rent to 4,200,000 lamports while retaining any explicit lower value."
+    echo "This release carries no rent rail: there is no ATA rent on Robinhood Chain, and the network-fee ceiling lives in the thresholds registry, not the environment."
     echo "Owner-only rollback environment: $ENV_BACKUP"
     echo "Next, explicitly load only after reviewing the pause and monitor plan:"
     printf '  bash %q load --executor-dir %q --env-file %q\n' \

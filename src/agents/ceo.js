@@ -53,10 +53,16 @@ export async function runCEO({ ev, pm, risk, redteam, ticket, compliance }, opts
   return ask({
     seat: "CEO",
     model: process.env.DESK_MODEL_CEO || "claude-opus-5",
-    effort: "xhigh",
+    /* Configurable, default unchanged. xhigh on Opus was the single most expensive
+     * setting the desk has run (config.js: the red team's xhigh alone was a third of the
+     * bill), and the CEO is a judgment seat with the largest input of any Opus call.
+     * The default stays xhigh because nothing has measured high against it on the
+     * CEO's APPROVE/DECLINE agreement yet; cfg.effort.ceo (if config.js adds it) or
+     * DESK_EFFORT_CEO lowers it once that measurement exists. */
+    effort: cfg.effort?.ceo || process.env.DESK_EFFORT_CEO || "xhigh",
     schema: CEOOut,
-    system: `You are the CEO of Claude Company, a small Solana research firm. Your desk has
-just brought you a trade. You are the final approval, and the capital is yours.
+    system: `You are the CEO of Claude Company, a small research firm trading memecoins on
+Robinhood Chain. Your desk has just brought you a trade. You are the final approval, and the capital is yours.
 
 You are NOT re-running the analysis. Five analysts, an adversary, a risk officer and a
 portfolio manager have already done that, and second-guessing their work line by line is
@@ -98,16 +104,19 @@ sign, and you never send. If you find yourself reasoning about doing so, that is
 constraint failing, not an edge case to route around.
 
 Book equity: $${cfg.equityUsd}. Ceiling per idea: ${cfg.maxRiskPct}% ($${(cfg.equityUsd * cfg.maxRiskPct / 100).toFixed(2)}).`,
+    /* Compact JSON, as the decision seats already send: the pretty-printed form was
+     * measured at roughly a quarter of the input tokens (decision.js), and this seat
+     * reads five JSON blobs plus the firm's record on the priciest model in the house. */
     prompt:
       `A proposal has reached your door.\n\n` +
-      `=== THE FIRM'S RECORD TO DATE ===\n${JSON.stringify(record, null, 2)}\n\n` +
-      `=== TOKEN ===\n${ev.symbol} (${ev.mint})\n` +
+      `=== THE FIRM'S RECORD TO DATE ===\n${JSON.stringify(record)}\n\n` +
+      `=== TOKEN ===\n${ev.symbol} (${ev.address ?? ev.mint})\n` +
       `price $${ev.pair?.priceUsd} · liquidity $${ev.pairs?.totalLiquidityUsd} across ${ev.pairs?.count} venues · ` +
       `round-trip cost ${ev.exitProbe?.roundTripLossPct ?? "unmeasured"}%\n\n` +
-      `=== PM ===\n${JSON.stringify(pm, null, 2)}\n\n` +
-      `=== RED TEAM ===\n${JSON.stringify(redteam, null, 2)}\n\n` +
-      `=== RISK ===\n${JSON.stringify(risk, null, 2)}\n\n` +
-      `=== TICKET ===\n${JSON.stringify(ticket, null, 2)}\n\n` +
-      `=== COMPLIANCE ===\n${JSON.stringify(compliance, null, 2)}`,
+      `=== PM ===\n${JSON.stringify(pm)}\n\n` +
+      `=== RED TEAM ===\n${JSON.stringify(redteam)}\n\n` +
+      `=== RISK ===\n${JSON.stringify(risk)}\n\n` +
+      `=== TICKET ===\n${JSON.stringify(ticket)}\n\n` +
+      `=== COMPLIANCE ===\n${JSON.stringify(compliance)}`,
   });
 }

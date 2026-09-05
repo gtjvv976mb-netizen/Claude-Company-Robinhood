@@ -45,9 +45,21 @@ export function writeReport(cycle, r) {
   L.push(`| Avg trade size | $${n(ev.derived?.avgTradeSizeUsd)} |`);
   L.push(`| Pair age | ${n(ev.pair?.ageHours, 1)} h |`);
   L.push(`| Round-trip cost @ $${ev.exitProbe?.targetSizeUsd} | ${ev.exitProbe?.roundTripLossPct != null ? ev.exitProbe.roundTripLossPct + "%" : "unmeasured — " + (ev.exitProbe?.error ?? "")} |`);
-  L.push(`| Token program | ${ev.mintAccount?.program ?? "—"} |`);
-  L.push(`| Mint authority | ${ev.mintAccount?.mintAuthority ?? "revoked"} |`);
-  L.push(`| Freeze authority | ${ev.mintAccount?.freezeAuthority ?? "revoked"} |`);
+  /* The chain facts, per docs/EVIDENCE-CONTRACT.md `contract.*`. Gas is a FLAT toll on
+     this chain, so it is reported in dollars beside the proportional round trip, never
+     folded into it. "unread" is printed where the bundle carries no field — an absent
+     fact is not a clean one. */
+  const c = ev.contract ?? {};
+  const unread = (v, f = (x) => x) => (v == null ? "unread" : f(v));
+  L.push(`| Gas, round trip | ${unread(ev.exitProbe?.gasUsdRoundTrip, (g) => `$${Number(g).toFixed(2)} (flat)`)} |`);
+  L.push(`| ETH/USD | ${unread(ev.ethUsd?.value, (p) => `$${Number(p).toFixed(2)}${ev.ethUsd?.stalenessSec != null ? ` · ${ev.ethUsd.stalenessSec}s old` : ""}`)} |`);
+  L.push(`| Launch | ${unread(ev.launch?.phase)}${ev.launchpad?.venue ? ` · ${ev.launchpad.venue}` : ""}${ev.launch?.curveProgressPct != null ? ` · curve ${ev.launch.curveProgressPct}%` : ""} |`);
+  L.push(`| Contract | ${unread(c.proxyKind)}${c.isProxy ? ` · impl ${c.implementation ?? "?"} · upgraded ${c.upgradeCount ?? "?"}x` : ""} |`);
+  L.push(`| Ownership renounced | ${unread(c.ownershipRenounced, (b) => (b ? "yes" : "NO"))} |`);
+  L.push(`| Privileged roles | ${Array.isArray(c.privilegedRoles) ? (c.privilegedRoles.length ? c.privilegedRoles.map((r) => `${r.role}→${r.holder}`).join(", ") : "none") : "unread"} |`);
+  L.push(`| Flags | ${Array.isArray(c.flags) ? (c.flags.length ? c.flags.map((f) => f.flag ?? f).join(", ") : "none") : "unread"} |`);
+  L.push(`| Verified source | ${unread(c.verifiedSource, (b) => (b ? "yes" : "no — roles UNVERIFIED"))} |`);
+  L.push(`| Sell simulation | ${ev.sellSim ? (ev.sellSim.ok ? `ok · effective tax ${ev.sellSim.effectiveTaxBps ?? "?"} bps` : `REVERTED · ${ev.sellSim.revertReason ?? "?"}`) : "unread"} |`);
 
   if (r.outcome === "killed") {
     L.push(`\n## Killed by ${r.killedBy}\n`);

@@ -58,13 +58,24 @@ ok("an unreadable pool with a real tape is not killed on depth",
 /* This assertion used to be ok(..., true, ...) — a tautology dressed as a test, and the
  * single most important claim in the file. It is the PAID screen that has to hold the
  * line once the free one steps aside, so it is the paid screen that must be asserted. */
+/* THE CHAIN FACTS A CLEAN 4663 BUNDLE CARRIES (docs/EVIDENCE-CONTRACT.md). screen() now
+   reads contract.*, sellSim, lp, launch and ethUsd, and refuses what it cannot read —
+   so a fixture that omits them is not "clean", it is unverified on every axis, and the
+   assertions below are about liquidity, not about missing fields. */
+const cleanChain = () => ({
+  contract: { flags: [], ownershipRenounced: true, proxyKind: "none", verifiedSource: true, privilegedRoles: [] },
+  sellSim: { ok: true, effectiveTaxBps: 0 },
+  lp: { kind: "v4_position", pullableSharePct: 0, burnedPct: 0, lockedPct: 100 },
+  launch: { phase: "graduated", onCurve: false },
+  ethUsd: { ok: true, value: 2_450, stalenessSec: 5 },
+});
 const paidEv = ({ liq, probe }) => ({
   ok: true, mint: "M", symbol: "M",
   pair: { marketCap: 40_000, volume: { h24: 239_000 }, priceChange: {}, pairCreatedAt: Date.now() - 6 * 3.6e6 },
   pairs: { count: 1, totalLiquidityUsd: liq },
   derived: { txns24h: 6_184, ageHours: 6 },
   exitProbe: probe,
-  mintAccount: { mintAuthority: null, freezeAuthority: null },
+  ...cleanChain(),
   holders: { ok: true, top10Pct: 20, holderCount: 400 },
 });
 const codes = (ev) => (screen(ev)?.fails ?? []).map((f) => f.code);
@@ -188,7 +199,7 @@ console.log("\nTHE PAID SCREEN READS THE BAND'S FLOORS, NOT A FLAT ONE");
     pairs: { count: totalLiq === null ? 0 : 1, totalLiquidityUsd: totalLiq },
     derived: { txns24h: tx, ageHours: ageH, volToLiqRatio: liq > 0 ? vol / liq : null },
     exitProbe: { ok: true, roundTripLossPct: 4.5 },
-    mintAccount: { mintAuthority: null, freezeAuthority: null },
+    ...cleanChain(),
     holders: { ok: true, top10Pct: 20, holderCount: 300 },
   });
   const paidCodes = (o) => (screen(liveEv(o)) ?.fails ?? []).map((f) => f.code);

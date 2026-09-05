@@ -1,9 +1,9 @@
 {
-  "name": "claude-co",
+  "name": "claude-company-robinhood",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "An automated, proposal-only Solana research desk with an optional user-operated local execution canary.",
+  "description": "Claude Company for Robinhood: an automated, proposal-only Robinhood Chain (4663) memecoin research desk with an optional user-operated local execution canary.",
   "engines": {
     "node": ">=22.13.0 <25"
   },
@@ -23,6 +23,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0",
     "three": "^0.180.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "ethers": "6.17.0"
   }
 }

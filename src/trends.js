@@ -1,4 +1,4 @@
-import { getJson } from "./lib/http.js";
+import { searchPairs } from "./data/dexscreener.js";
 import { emit } from "./lib/bus.js";
 import { cfg } from "./config.js";
 import { grokTrendScan, hasGrok } from "./lib/grok.js";
@@ -34,8 +34,6 @@ import { liveCallFor } from "./calls.js";
  *     re-checking, not worth inventing a coin for.
  */
 
-const DEX = "https://api.dexscreener.com";
-
 /** Themes we have already hunted recently, so a scan is not re-bought every cycle. */
 const recentlyHunted = new Map();      // theme -> ts
 const HUNT_TTL_MS = Number(process.env.TREND_HUNT_TTL_MINS || 90) * 60000;
@@ -48,43 +46,42 @@ const REACH_SCORE = { niche: 6, notable: 14, mainstream: 8 };   // mainstream is
  * Search the chain for coins wearing a theme's words.
  *
  * Free — DexScreener's search endpoint — so a theme that turns up nothing costs only a
- * request. Solana only, and old coins are dropped: a token that predates the event
+ * request. This chain only, and old coins are dropped: a token that predates the event
  * cannot be a coin launched FOR it, however well its name happens to match.
  */
 /**
- * The coins pump.fun is listing for this theme, by name and symbol.
+ * The coins the launchpad feed is listing for this theme, by pool name.
  *
  * DexScreener indexes a coin once it has a pool worth indexing, which is minutes to
  * hours after birth — and this lane's entire purpose is to be there before the crowd.
- * A theme Grok reports as "just broke" is answered on pump.fun by launches that are
- * three minutes old and invisible to a search engine. Free, and additive: a failure
- * here leaves the DexScreener search below exactly as it was.
+ * A theme Grok reports as "just broke" is answered on PONS by launches that are
+ * three minutes old and invisible to a search engine; GeckoTerminal lists them at
+ * birth (pons-live.js). Free, and additive: a failure here leaves the DexScreener
+ * search below exactly as it was.
  */
 async function padCoinsForTheme(terms, { maxAgeHours }) {
-  const { newLaunches, recentlyTraded, asCandidate } = await import("./data/pumpfun-live.js");
-  const [fresh, traded] = await Promise.all([
-    newLaunches({ pages: 2 }).catch(() => []), recentlyTraded({ pages: 3 }).catch(() => []),
+  const { newLaunches, padPools, asCandidate } = await import("./data/pons-live.js");
+  const [fresh, pad] = await Promise.all([
+    newLaunches({ pages: 2 }).catch(() => []), padPools({ pages: 2 }).catch(() => []),
   ]);
   const needles = terms.map((t) => t.trim().toLowerCase()).filter((t) => t.length >= 3);
   const out = [];
-  for (const row of [...fresh, ...traded]) {
-    const hay = `${row.name ?? ""} ${row.symbol ?? ""}`.toLowerCase();
+  for (const row of [...fresh, ...pad]) {
+    const hay = String(row?.attributes?.name ?? "").toLowerCase();
     const matchedTerm = needles.find((n) => hay.includes(n));
     if (!matchedTerm) continue;
     const c = asCandidate(row, {});
     if (!c || c.live.banned) continue;
     /* Only coins the desk could actually trade. Without this the race is won by
-       whatever is biggest — a $24m coin took a "dogs" race in testing, which is the
-       coin the money already found, and off the desk's board besides. */
+       whatever is biggest — the coin the money already found, and off the desk's
+       board besides. */
     if (!c.live.band) continue;
     if (c.pair.ageHours != null && c.pair.ageHours > maxAgeHours) continue;
     out.push({
-      mint: c.mint, symbol: c.pair.baseSymbol, name: c.pair.baseName,
-      // A curve's reserve is unpriced here (no SOL rate in this lane), so rank the
-      // race on the market cap, which is the number this feed states directly.
-      liquidityUsd: c.pair.marketCap ?? 0,
+      mint: c.mint, address: c.mint, symbol: c.pair.baseSymbol, name: c.pair.baseName,
+      liquidityUsd: c.pair.liquidityUsd ?? c.pair.marketCap ?? 0,
       marketCap: c.pair.marketCap, ageHours: c.pair.ageHours,
-      buysH1: c.live.replyCount ?? 0, matchedTerm, launchpad: "pump.fun",
+      buysH1: c.pair.txns?.h1?.buys ?? 0, matchedTerm, launchpad: c.launchpad ?? "pons",
     });
   }
   return out;
@@ -97,21 +94,17 @@ export async function coinsForTheme(theme, { maxAgeHours = 72 } = {}) {
   for (const c of await padCoinsForTheme(terms, { maxAgeHours }).catch(() => []))
     if (!seen.has(c.mint)) seen.set(c.mint, c);
   for (const term of terms) {
-    const r = await getJson(`${DEX}/latest/dex/search?q=${encodeURIComponent(term.trim())}`,
-      { label: "dexscreener/search" }).catch(() => null);
-    // getJson wraps the body: {ok, data}. Reading r.pairs directly yields undefined,
-    // which would make every theme silently find nothing and the whole lane look like
-    // a market with no trends in it.
-    for (const p of r?.data?.pairs ?? []) {
-      if (p.chainId !== "solana") continue;
-      const mint = p.baseToken?.address;
+    // searchPairs is already filtered to this chain and returns a bare array.
+    const pairs = await searchPairs(term.trim()).catch(() => []);
+    for (const p of pairs) {
+      const mint = p.baseToken?.address?.toLowerCase();
       if (!mint || seen.has(mint)) continue;
       const ageH = p.pairCreatedAt ? (Date.now() - p.pairCreatedAt) / 3.6e6 : null;
       // A coin older than the event it supposedly claims is a name collision, not a
       // launch for this theme. Unknown age is kept — unreadable is not disqualifying.
       if (ageH != null && ageH > maxAgeHours) continue;
       seen.set(mint, {
-        mint, symbol: p.baseToken?.symbol, name: p.baseToken?.name,
+        mint, address: mint, symbol: p.baseToken?.symbol, name: p.baseToken?.name,
         ageHours: ageH, liquidityUsd: p.liquidity?.usd ?? 0,
         marketCap: p.marketCap ?? p.fdv ?? null,
         volume24: p.volume?.h24 ?? 0,

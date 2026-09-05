@@ -11,18 +11,28 @@ import path from "node:path";
 import process from "node:process";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { Keypair } from "@solana/web3.js";
+import { Wallet, getAddress } from "ethers";
 
 const MIN_NODE = Object.freeze({ major: 22, minor: 13 });
+/* The trading runtime, exactly: poller.mjs and every module it imports, plus the
+   dependency pin. Must equal heartbeat-health.mjs TRADING_RUNTIME_FILES, install.sh's
+   RUNTIME_FILES and test-install.mjs's need list; test-launchd holds them together. */
 const RUNTIME_FILES = Object.freeze([
   "poller.mjs",
   "journal.mjs",
-  "jupiter.mjs",
+  "evm-executor.mjs",
+  "evm-rpc.mjs",
+  "evm-swap.mjs",
+  "approvals.mjs",
+  "scope-guard.mjs",
+  "erc20-hazards.mjs",
+  "thresholds.mjs",
+  "live-thresholds.mjs",
+  "eth-usd-oracle.mjs",
   "balance-verification.mjs",
   "entry-quote-guard.mjs",
   "exit-trigger.mjs",
   "feed-drain.mjs",
-  "sol-usd-oracle.mjs",
   "heartbeat-health.mjs",
   "sleep-assertion.mjs",
   "strategy.mjs",
@@ -30,30 +40,33 @@ const RUNTIME_FILES = Object.freeze([
   "package.json",
   "package-lock.json",
 ]);
+/* Exactly the names poller.mjs and its runtime read. No SLIPPAGE_BPS, no
+   MAX_PRICE_IMPACT_PCT, no network-fee ceiling: those come from the thresholds registry
+   with provenance, and an allowlist that admitted them would be a way to supply a
+   number around a VOID threshold. test-launchd derives the expected set from the
+   runtime's own process.env reads, so a name added there must be added here. */
 const ALLOWED_ENV = new Set([
-  "BLOCK_HEIGHT_WINDOW", "BOOK_HEAT_MAX", "CC_API", "CC_FLOOR", "CC_SECRET",
-  "DAILY_LOSS_LIMIT_SOL",
-  /* What a healthy transaction is expected to cost, as opposed to the fee above which
-     an entry is REFUSED. See LIVE_LIMITS in poller.mjs. */
-  "EXPECTED_NETWORK_FEE_LAMPORTS", "DAILY_SOL_CAP", "EXECUTE", "EXECUTOR_SOURCE_COMMIT",
-  "FEE_RESERVE_SOL", "FINALITY_TIMEOUT_MS", "F_DEFAULT", "F_NAME_MAX", "HARD_STOP_FILE",
-  "INIT_ONLY", "JUPITER_API_BASE", "JUPITER_API_KEY", "KEYPAIR", "LIVE_CAPS_ACK",
+  "BOOK_HEAT_MAX", "CC_API", "CC_FLOOR", "CC_SECRET",
+  "DAILY_ETH_CAP", "DAILY_LOSS_LIMIT_ETH",
+  /* How many blocks past the proving block a submitted transaction may go without a
+     receipt before it is treated as dropped and cancelled. Bounded in poller.mjs. */
+  "DEADLINE_BLOCKS", "ETH_USD_CACHE_MAX_AGE_MS", "EXECUTE", "EXECUTOR_SOURCE_COMMIT",
+  "FEE_RESERVE_ETH", "F_DEFAULT", "F_NAME_MAX", "HARD_STOP_FILE",
+  "INIT_ONLY", "KEY_FILE", "LIVE_CAPS_ACK",
   "LIVE_STATE_INIT_ACK", "LIVE_TRADING_ACK", "LOCK_FILE", "MAX_AGE_HOURS",
   "MAX_CALL_AGE_MIN", "MAX_ENTRY_DEVIATION_PCT", "MAX_ENTRY_MARK_AGE_MIN",
   "MAX_ENTRY_PREFLIGHT_AGE_MS", "MAX_ENTRY_QUOTE_DRIFT_PCT",
-  "MAX_ENTRY_ROUND_TRIP_LOSS_PCT", "MAX_EXIT_PRICE_IMPACT_PCT",
+  "MAX_ENTRY_ROUND_TRIP_LOSS_PCT", "MAX_ETH_PER_TRADE", "MAX_EXIT_PRICE_IMPACT_PCT",
   "MAX_EXIT_TRIGGER_AGE_MS", "MAX_EXIT_TX_ATTEMPTS", "MAX_FUTURE_SKEW_MIN",
-  "MAX_JUPITER_FEE_BPS", "MAX_NETWORK_FEE_LAMPORTS", "MAX_NETWORK_FEE_PCT",
-  "MAX_OPEN_POSITIONS", "MAX_PRICE_IMPACT_PCT", "MAX_QUOTE_SHORTFALL_PCT",
-  "MAX_RENT_LAMPORTS", "MAX_SOL_PER_TRADE", "MAX_TX_ATTEMPTS", "PAUSE_ENTRIES_FILE",
+  "MAX_OPEN_POSITIONS", "MAX_TX_ATTEMPTS", "PAUSE_ENTRIES_FILE",
   "POLL_MS",
   /* How long the no-sign readiness rehearsal may run before it is abandoned. It gates
      nothing — the rehearsal signs nothing and is not consulted before an entry — but a
      probe that never settles used to latch the in-flight flag and silently end all
      rehearsals, so the deadline is what releases it. Floored at 30s in the poller. */
-  "READINESS_TIMEOUT_MS",
-  "SLIPPAGE_BPS", "SOLANA_RPC", "SOLANA_RPC_SECONDARY",
-  "SOL_USD_CACHE_MAX_AGE_MS", "STATE_DB", "STATE_FILE", "TRAIL_PCT",
+  "READINESS_TIMEOUT_MS", "RECEIPT_TIMEOUT_MS",
+  "RH_RPC", "RH_RPC_SECONDARY",
+  "STATE_DB", "STATE_FILE", "TRAIL_PCT",
   // Keeps entries armed while the host is on battery. Everything else about the power
   // gate is unchanged: the idle-sleep assertion is still required and still verified.
   "WALLSTE_ALLOW_BATTERY_ENTRIES",
@@ -270,37 +283,32 @@ function ownerControlFile(file, label, { required = false } = {}) {
   return absolute;
 }
 
-function nonNegativeNumber(values, name, fallback) {
-  const raw = values[name] === undefined ? String(fallback) : values[name];
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0) abort(`${name} must be a non-negative finite number`);
-  return value;
-}
-
-const SOL_SCALE = 1_000_000_000n;
-function plainSolUnits(value) {
+/* ETH → wei, exactly, or null. Mirrors evm-rpc.mjs plainEthUnits, which the runner
+   does not import so that validating an environment never loads the trading graph. */
+const WEI_SCALE = 10n ** 18n;
+function plainEthUnits(value) {
   const raw = String(value);
-  const match = /^(0|[1-9][0-9]*)(?:\.([0-9]{1,9}))?$/.exec(raw);
+  const match = /^(0|[1-9][0-9]*)(?:\.([0-9]{1,18}))?$/.exec(raw);
   if (!match) return null;
-  return BigInt(match[1]) * SOL_SCALE + BigInt((match[2] || "").padEnd(9, "0") || "0");
+  return BigInt(match[1]) * WEI_SCALE + BigInt((match[2] || "").padEnd(18, "0") || "0");
 }
 
 function exactMoneyCap(name, value, { min = 0.000001, max = null, fail = abort } = {}) {
   const raw = String(value);
-  const units = plainSolUnits(raw);
+  const units = plainEthUnits(raw);
   if (units === null) {
-    fail(`${name} must be a plain decimal with at most 9 fractional digits`);
+    fail(`${name} must be a plain decimal with at most 18 fractional digits`);
     return null;
   }
-  const minUnits = plainSolUnits(min);
-  const maxUnits = max === null ? null : plainSolUnits(max);
+  const minUnits = plainEthUnits(min);
+  const maxUnits = max === null ? null : plainEthUnits(max);
   if (units < minUnits || (maxUnits !== null && units > maxUnits)) {
     fail(max === null
       ? `${name} must be at least ${min}`
       : `${name} must be between ${min} and ${max}`);
     return null;
   }
-  return Object.freeze({ raw, units, value: Number(units) / 1_000_000_000 });
+  return Object.freeze({ raw, units, value: Number(units) / 1e18 });
 }
 
 function liveMoneyCap(values, name, fallback) {
@@ -317,46 +325,54 @@ function liveOpenPositions(values, fail = abort) {
   return Number(raw);
 }
 
+/* The same numbers as poller.mjs LIVE_LIMITS / OPERATOR_MAX: the ETH translation of
+   the owner's SOL caps at $2,450/ETH, MARKED AS AWAITING OWNER CONFIRMATION there. */
 const CANARY_MONEY_CAPS = Object.freeze({
-  MAX_SOL_PER_TRADE: 0.005,
-  DAILY_SOL_CAP: 0.01,
-  DAILY_LOSS_LIMIT_SOL: 0.01,
+  MAX_ETH_PER_TRADE: 0.0004,
+  DAILY_ETH_CAP: 0.0008,
+  DAILY_LOSS_LIMIT_ETH: 0.0008,
 });
-// DAILY_LOSS_LIMIT_SOL is a rolling realized-loss entry brake threshold. It limits
+// DAILY_LOSS_LIMIT_ETH is a rolling realized-loss entry brake threshold. It limits
 // later entry authority; it cannot guarantee a fill/slippage loss ceiling.
 const OPERATOR_MONEY_MAX = Object.freeze({
-  MAX_SOL_PER_TRADE: 0.05,
-  DAILY_SOL_CAP: 0.5,
-  DAILY_LOSS_LIMIT_SOL: 0.15,
+  MAX_ETH_PER_TRADE: 0.004,
+  DAILY_ETH_CAP: 0.04,
+  DAILY_LOSS_LIMIT_ETH: 0.012,
 });
 const MONEY_CAP_NAMES = Object.freeze(Object.keys(CANARY_MONEY_CAPS));
+/* v3: ETH, and the CHECKSUMMED address. Revokes every SOL-era (v2) acknowledgement, so
+   a retained Solana environment cannot regain authority over an ETH wallet. */
 const capsAckSentence = (wallet, trade, daily, loss) =>
-  `I acknowledge WALL-ST-E caps v2 for ${wallet}: ${trade} SOL per trade, ${daily} SOL per day, ${loss} SOL rolling realized-loss entry brake`;
+  `I acknowledge WALL-ST-E caps v3 for ${wallet}: ${trade} ETH per trade, ${daily} ETH per day, ${loss} ETH rolling realized-loss entry brake`;
 
 function requestedOperatorCaps(options) {
-  const names = ["--max-sol", "--daily-sol-cap", "--daily-loss-cap"];
+  const names = ["--max-eth", "--daily-eth-cap", "--daily-loss-cap"];
   requireOptions(options, ["--env", "--workdir", ...names]);
   const raw = Object.freeze({
-    MAX_SOL_PER_TRADE: options["--max-sol"],
-    DAILY_SOL_CAP: options["--daily-sol-cap"],
-    DAILY_LOSS_LIMIT_SOL: options["--daily-loss-cap"],
+    MAX_ETH_PER_TRADE: options["--max-eth"],
+    DAILY_ETH_CAP: options["--daily-eth-cap"],
+    DAILY_LOSS_LIMIT_ETH: options["--daily-loss-cap"],
   });
   const parsed = Object.fromEntries(Object.entries(raw).map(([name, value]) => [name,
     exactMoneyCap(name, value, { max: OPERATOR_MONEY_MAX[name],
       fail: (message) => { throw new Error(message); } }),
   ]));
-  if (parsed.DAILY_SOL_CAP.units < parsed.MAX_SOL_PER_TRADE.units)
-    throw new Error("DAILY_SOL_CAP must be at least MAX_SOL_PER_TRADE");
+  if (parsed.DAILY_ETH_CAP.units < parsed.MAX_ETH_PER_TRADE.units)
+    throw new Error("DAILY_ETH_CAP must be at least MAX_ETH_PER_TRADE");
   return raw;
 }
 
-function loadProtectedKeypair(file) {
-  const absolute = protectedRegularFile(file, "live keypair");
-  let bytes;
-  try { bytes = JSON.parse(fs.readFileSync(absolute, "utf8")); }
-  catch { throw new Error("KEYPAIR is not a readable Solana JSON keypair"); }
-  try { return Keypair.fromSecretKey(new Uint8Array(bytes)); }
-  catch { throw new Error("KEYPAIR does not contain a valid Solana secret key"); }
+/** The checksummed address of the 0600 32-byte hex key file. The key itself never
+ *  leaves this function; only the address does. */
+function loadProtectedKeyAddress(file) {
+  const absolute = protectedRegularFile(file, "live key file");
+  let text;
+  try { text = fs.readFileSync(absolute, "utf8").trim(); }
+  catch { throw new Error("KEY_FILE is not a readable key file"); }
+  if (!/^(0x)?[0-9a-fA-F]{64}$/.test(text))
+    throw new Error("KEY_FILE does not contain a 32-byte hex private key");
+  try { return getAddress(new Wallet(text.startsWith("0x") ? text : "0x" + text).address); }
+  catch { throw new Error("KEY_FILE does not contain a valid secp256k1 private key"); }
 }
 
 async function terminalConfirmation(expected, { input, output }) {
@@ -390,10 +406,10 @@ export async function armOperatorCaps(options, {
       values.LIVE_TRADING_ACK !== values.LIVE_TRADING_ACK.trim())
     throw new Error("live environment is missing an exact LIVE_TRADING_ACK wallet");
 
-  const keypairPath = path.resolve(workdir, values.KEYPAIR || "burner.json");
-  const wallet = loadProtectedKeypair(keypairPath).publicKey.toBase58();
+  const keyPath = path.resolve(workdir, values.KEY_FILE || "burner.key");
+  const wallet = loadProtectedKeyAddress(keyPath);
   if (wallet !== values.LIVE_TRADING_ACK)
-    throw new Error("LIVE_TRADING_ACK does not match the public key derived from KEYPAIR");
+    throw new Error("LIVE_TRADING_ACK does not match the checksummed address derived from KEY_FILE");
 
   const pause = resolvePauseEntries(values, workdir);
   ownerControlFile(pause, "entry-pause sentinel", { required: true });
@@ -403,8 +419,8 @@ export async function armOperatorCaps(options, {
     throw Object.assign(new Error(`an active executor (pid ${active}) owns the process lock; stop it explicitly`),
       { exitCode: 3 });
 
-  const acknowledgement = capsAckSentence(wallet, raw.MAX_SOL_PER_TRADE,
-    raw.DAILY_SOL_CAP, raw.DAILY_LOSS_LIMIT_SOL);
+  const acknowledgement = capsAckSentence(wallet, raw.MAX_ETH_PER_TRADE,
+    raw.DAILY_ETH_CAP, raw.DAILY_LOSS_LIMIT_ETH);
   const typed = await readConfirmation(acknowledgement, { input, output });
   if (typed !== acknowledgement)
     throw new Error("cap acknowledgement did not match exactly; environment was not changed");
@@ -461,22 +477,22 @@ export async function armOperatorCaps(options, {
  * acknowledgement already stored in the protected environment. */
 function acknowledgedOperatorCaps(values, configured) {
   const wantsRaise = MONEY_CAP_NAMES.some((name) =>
-    configured[name].units > plainSolUnits(CANARY_MONEY_CAPS[name]));
+    configured[name].units > plainEthUnits(CANARY_MONEY_CAPS[name]));
   if (!wantsRaise) return { wantsRaise: false, accepted: false };
   const raw = Object.fromEntries(MONEY_CAP_NAMES.map((name) =>
     [name, typeof values[name] === "string" ? values[name] : ""]));
   if (MONEY_CAP_NAMES.some((name) => !raw[name]))
     return { wantsRaise: true, accepted: false };
   if (MONEY_CAP_NAMES.some((name) =>
-      configured[name].units > plainSolUnits(OPERATOR_MONEY_MAX[name])))
+      configured[name].units > plainEthUnits(OPERATOR_MONEY_MAX[name])))
     return { wantsRaise: true, accepted: false };
-  if (configured.DAILY_SOL_CAP.units < configured.MAX_SOL_PER_TRADE.units)
+  if (configured.DAILY_ETH_CAP.units < configured.MAX_ETH_PER_TRADE.units)
     return { wantsRaise: true, accepted: false };
   const wallet = values.LIVE_TRADING_ACK;
   if (typeof wallet !== "string" || !wallet || wallet !== wallet.trim())
     return { wantsRaise: true, accepted: false };
-  const expected = capsAckSentence(wallet, raw.MAX_SOL_PER_TRADE,
-    raw.DAILY_SOL_CAP, raw.DAILY_LOSS_LIMIT_SOL);
+  const expected = capsAckSentence(wallet, raw.MAX_ETH_PER_TRADE,
+    raw.DAILY_ETH_CAP, raw.DAILY_LOSS_LIMIT_ETH);
   return {
     wantsRaise: true,
     accepted: typeof values.LIVE_CAPS_ACK === "string" &&
@@ -540,8 +556,8 @@ function upgradeEnvironment(options, { requirePaused = false, requireStopped = f
   const values = environment.values;
   if (values.EXECUTE !== "1") abort("versioned live adoption requires EXECUTE=1");
   if (values.INIT_ONLY === "1") abort("INIT_ONLY must not be persisted in the live environment");
-  for (const name of ["CC_SECRET", "CC_FLOOR", "LIVE_TRADING_ACK", "JUPITER_API_KEY",
-    "SOLANA_RPC", "SOLANA_RPC_SECONDARY"]) {
+  for (const name of ["CC_SECRET", "CC_FLOOR", "LIVE_TRADING_ACK",
+    "RH_RPC", "RH_RPC_SECONDARY"]) {
     if (!values[name]) abort(`live environment is missing ${name}`);
   }
   liveOpenPositions(values);
@@ -561,7 +577,7 @@ function upgradeEnvironment(options, { requirePaused = false, requireStopped = f
     if (values[name] === undefined) {
       capReplacements[name] = String(ceiling);
       capDefaultsApplied.push(name);
-    } else if (configured.units > plainSolUnits(ceiling)) {
+    } else if (configured.units > plainEthUnits(ceiling)) {
       capReplacements[name] = String(ceiling);
       capsLowered.push(name);
     }
@@ -570,21 +586,12 @@ function upgradeEnvironment(options, { requirePaused = false, requireStopped = f
     capReplacements[name] === undefined
       ? configuredExposure[name] : exactMoneyCap(name, capReplacements[name]),
   ]));
-  if (adoptedExposure.DAILY_SOL_CAP.units < adoptedExposure.MAX_SOL_PER_TRADE.units)
-    abort(`DAILY_SOL_CAP (${adoptedExposure.DAILY_SOL_CAP.value}) is below ` +
-      `MAX_SOL_PER_TRADE (${adoptedExposure.MAX_SOL_PER_TRADE.value}) after safe normalization`);
-  // Gross ATA creation rent is a transaction-compatibility rail, not market
-  // exposure. A missing value adopts the reviewed two-ATA ceiling; an explicitly
-  // lower operator value remains untouched by the migration.
-  const rentCeiling = 4_200_000;
-  const configuredRent = nonNegativeNumber(values, "MAX_RENT_LAMPORTS", rentCeiling);
-  if (values.MAX_RENT_LAMPORTS === undefined) {
-    capReplacements.MAX_RENT_LAMPORTS = String(rentCeiling);
-    capDefaultsApplied.push("MAX_RENT_LAMPORTS");
-  } else if (configuredRent > rentCeiling) {
-    capReplacements.MAX_RENT_LAMPORTS = String(rentCeiling);
-    capsLowered.push("MAX_RENT_LAMPORTS");
-  }
+  if (adoptedExposure.DAILY_ETH_CAP.units < adoptedExposure.MAX_ETH_PER_TRADE.units)
+    abort(`DAILY_ETH_CAP (${adoptedExposure.DAILY_ETH_CAP.value}) is below ` +
+      `MAX_ETH_PER_TRADE (${adoptedExposure.MAX_ETH_PER_TRADE.value}) after safe normalization`);
+  /* The Solana build also normalised MAX_RENT_LAMPORTS here. There is no rent on this
+     chain and no other transaction-compatibility rail the migration owns: the network
+     fee ceiling lives in the thresholds registry, not in the environment. */
 
   const resolveLegacy = (value, fallback, label) => {
     const configured = value || fallback;
@@ -594,7 +601,7 @@ function upgradeEnvironment(options, { requirePaused = false, requireStopped = f
       abort(`${label} relative path escapes --legacy-workdir; use an explicit absolute path`);
     return resolved;
   };
-  const keypair = resolveLegacy(values.KEYPAIR, "burner.json", "KEYPAIR");
+  const keyFile = resolveLegacy(values.KEY_FILE, "burner.key", "KEY_FILE");
   const state = resolveLegacy(values.STATE_DB, ".cc-executor.sqlite", "STATE_DB");
   const originalLock = resolveLegacy(values.LOCK_FILE, `${state}.lock`, "LOCK_FILE");
   const canonicalLock = `${state}.lock`;
@@ -602,7 +609,7 @@ function upgradeEnvironment(options, { requirePaused = false, requireStopped = f
   const hardStop = resolveLegacy(values.HARD_STOP_FILE, `${state}.hard-stop`, "HARD_STOP_FILE");
   const legacyState = resolveLegacy(values.STATE_FILE, ".cc-state.json", "STATE_FILE");
 
-  protectedRegularFile(keypair, "live keypair");
+  protectedRegularFile(keyFile, "live key file");
   protectedRegularFile(state, "durable state database");
   ownerControlFile(pause, "entry-pause sentinel", { required: requirePaused });
   ownerControlFile(hardStop, "hard-stop sentinel");
@@ -618,7 +625,7 @@ function upgradeEnvironment(options, { requirePaused = false, requireStopped = f
   }
 
   const replacements = Object.freeze({
-    KEYPAIR: keypair,
+    KEY_FILE: keyFile,
     STATE_DB: state,
     LOCK_FILE: canonicalLock,
     PAUSE_ENTRIES_FILE: pause,
@@ -738,7 +745,7 @@ function usage() {
   node launchd-runner.mjs ready --env FILE --poller FILE --pid PID
   node launchd-runner.mjs run --env FILE --poller FILE --label LABEL
   node launchd-runner.mjs arm-caps --env FILE --workdir DIR \\
-    --max-sol SOL --daily-sol-cap SOL --daily-loss-cap SOL
+    --max-eth ETH --daily-eth-cap ETH --daily-loss-cap ETH
   node launchd-runner.mjs validate-upgrade-env --env FILE --legacy-workdir DIR --commit SHA
   node launchd-runner.mjs update-upgrade-env --env FILE --legacy-workdir DIR --commit SHA --backup FILE
   node launchd-runner.mjs restore-upgrade-env --env FILE --backup FILE --commit SHA

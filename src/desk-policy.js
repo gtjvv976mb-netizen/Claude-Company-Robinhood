@@ -72,12 +72,25 @@ export const POLICY_INVARIANTS = [
     why: "the desk never holds a key; nothing in a seat's technique may reference custody" },
   { id: "caps", test: /\b(raise|increase|lift|remove|ignore|bypass)\b[^.]{0,40}\b(cap|limit|ceiling|max ?sol|daily loss)\b/i,
     why: "position, daily and loss caps belong to the operator, not to the coach" },
-  { id: "screen", test: /\b(skip|ignore|bypass|disable|relax)\b[^.]{0,40}\b(screen|mint authority|freeze authority|honeypot|rug check)\b/i,
+  /* The screen's gates in BOTH chains' vocabulary. The Solana names stay because a
+     coach that has read the old scorecards may still use them; the EVM names are the
+     gates this chain actually has — a note saying "ignore the proxy admin" or "relax
+     the LP lock threshold" passed this matcher before 2026-09-05 and would have been
+     installed automatically. */
+  { id: "screen", test: /\b(skip|ignore|bypass|disable|relax|loosen|waive)\b[^.]{0,40}\b(screen|mint authority|freeze authority|mint role|pause|blacklist|proxy|upgrade key|proxy admin|timelock|lp lock|locker|position nft|pair ?token|sell ?sim|honeypot|rug check|scope guard|beacon|graduation|exempt list|insider (?:float|ceiling)|clone)\b/i,
     why: "the free screen's kill gates are facts, not opinions" },
   { id: "redteam", test: /\b(ignore|overrule|disable|retire|skip)\b[^.]{0,30}\b(red ?team|refutation|compliance)\b/i,
     why: "the adversary and the compliance check are structural, not tunable" },
   { id: "gate", test: /\b(lower|reduce|ignore|waive)\b[^.]{0,30}\b(sample gate|minimum sample|evidence bar|significance)\b/i,
     why: "a coach may not lower the bar that judges the coach" },
+  /* The owner's line on this chain (executor/scope-guard.mjs): an equity may be a pair
+     asset, never a position. A note steering a seat toward holding, buying or longing a
+     stock token — however it is phrased — is refused before any seat reads it. */
+  { id: "scope",
+    /* "equity" alone is the desk's word for its own capital (cfg.equityUsd, book equity);
+       only the security senses are refused (review, 2026-09-05). */
+    test: /\b(buy|long|accumulate|own|hold)\b(?:\s+[A-Za-z$]+){0,4}?\s+(stock tokens?|equity tokens?|share tokens?|tokeni[sz]ed (?:stocks?|shares?|equit(?:y|ies))|robinhood tokens?|the equit(?:y|ies)\b(?!\s+(?:curve|at risk|usd|\$|budget|of the book)))|\b(stock tokens?|equity tokens?|share tokens?|robinhood tokens?)\b[^.]{0,40}\bas (?:a |the )?(?:position|long|directional)\b/i,
+    why: "an equity may be a pair asset, never a position" },
 ];
 
 /** Null when the guidance is safe to install; otherwise the invariant it broke. */

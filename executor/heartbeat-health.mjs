@@ -5,9 +5,13 @@ import path from "node:path";
 const POSITION_FLAGS = ["callIdentityIncomplete", "accountingIncomplete", "balanceReconciliationRequired",
   "riskDataUnavailable", "exitExecutionRequired", "manualExitRequired"];
 
+/* Exactly the modules the trading process imports (poller.mjs and its graph), in a
+   fixed order. launchd-runner.mjs RUNTIME_FILES, install.sh and test-install.mjs name
+   the same set; test-launchd holds them together. */
 const TRADING_RUNTIME_FILES = Object.freeze([
-  "poller.mjs", "journal.mjs", "jupiter.mjs", "balance-verification.mjs",
-  "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs", "sol-usd-oracle.mjs",
+  "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs",
+  "scope-guard.mjs", "erc20-hazards.mjs", "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs",
+  "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
   "heartbeat-health.mjs", "sleep-assertion.mjs", "strategy.mjs", "trade-policy.mjs",
 ]);
 

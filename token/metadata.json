@@ -1,11 +1,11 @@
 {
   "name": "Claude Company",
   "symbol": "CLAUDECO",
-  "description": "Lease a floor in Claude Tower and get your own AI trading team. Fourteen agents research every Solana trade end to end, and a CEO refuses the bad ones. You stay in control.",
-  "image": "https://claudedotcompany.com/assets/claudeco-512.png",
-  "external_url": "https://claudedotcompany.com",
+  "description": "Lease a floor in Claude Tower and get your own AI trading team. Fourteen agents research every Robinhood Chain memecoin trade end to end, and a CEO refuses the bad ones. You stay in control.",
+  "image": "https://robinhood.claudedotcompany.com/assets/claudeco-512.png",
+  "external_url": "https://robinhood.claudedotcompany.com",
   "extensions": {
-    "website": "https://claudedotcompany.com"
+    "website": "https://robinhood.claudedotcompany.com"
   },
   "attributes": [
     {
@@ -19,8 +19,32 @@
     {
       "trait_type": "Agents per floor",
       "value": "14"
+    },
+    {
+      "trait_type": "Edition",
+      "value": "Robinhood Chain"
     }
   ],
-  "disclaimer": "An independent project. Not affiliated with, endorsed by, or connected to Anthropic.",
-  "mint": "HRkkxgaFDDmZ3qZX8xP5SiMRBNvFNVUUv4FJUjPCpump"
+  "disclaimer": "An independent project. Not affiliated with, endorsed by, or connected to Anthropic or Robinhood.",
+  "chain": "robinhood-4663",
+  "chainId": 4663,
+  "standard": "ERC-20",
+  "decimals": 18,
+  "address": "0x7039986CaC6C7885b53f10c7492E653055470ab9",
+  "addressStatus": "LIVE — launched 2026-09-04 22:56 UTC on PONS V2, paired to NVDA (pool 0x595aa54d2a32d9c6ced42e88355dae507aaf6fa5); read from the chain 2026-09-05",
+  "solanaEdition": {
+    "chain": "solana-mainnet-beta",
+    "mint": "HRkkxgaFDDmZ3qZX8xP5SiMRBNvFNVUUv4FJUjPCpump"
+  },
+  "pool": "0x595aa54d2a32d9c6ced42e88355dae507aaf6fa5",
+  "pairToken": {
+    "symbol": "NVDA",
+    "address": "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec"
+  },
+  "launchpad": "pons-v2",
+  "links": {
+    "pons": "https://www.ponsfamily.com/launchpad/0x7039986CaC6C7885b53f10c7492E653055470ab9",
+    "geckoterminal": "https://www.geckoterminal.com/robinhood/pools/0x595aa54d2a32d9c6ced42e88355dae507aaf6fa5",
+    "explorer": "https://robinhoodchain.blockscout.com/token/0x7039986CaC6C7885b53f10c7492E653055470ab9"
+  }
 }

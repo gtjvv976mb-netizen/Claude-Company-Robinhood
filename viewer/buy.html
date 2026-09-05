@@ -53,9 +53,10 @@ ol b{color:var(--ink)}
 
   <div class="notice">
     <h2>Purchase isn't open yet</h2>
-    <p>The floor is reserved in the directory, but the payment path is not live. It is being
-      built deliberately slowly, because taking 50 USDC from someone is the one part of this
-      that cannot be fixed with a redeploy.</p>
+    <p>The floor is reserved in the directory, but the payment path is not live: the
+      Robinhood-edition access token has not launched. It is being built deliberately
+      slowly, because taking money from someone is the one part of this that cannot be
+      fixed with a redeploy.</p>
     <p>Three failures found in review are shaping it: a payment claim that anyone can trigger
       cheaply can exhaust the chain lookups and block <em>everyone</em> from buying; one
       millionth of a dollar sent at the right moment can lock a floor as "reserved" forever;
@@ -66,10 +67,13 @@ ol b{color:var(--ink)}
   <h2 style="font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:26px;margin:34px 0 0">
     How it will work</h2>
   <ol>
-    <li>You pick a vacant floor and connect a wallet. Nothing is held or escrowed.</li>
-    <li><b>Your wallet</b> signs one USDC transfer, straight to the building's treasury.
-      The transaction is one you can read: a transfer, to a published address, for 50 USDC.</li>
-    <li>The building watches the chain <b>read-only</b> and matches your payment.</li>
+    <li>You pick a vacant floor and connect an EVM wallet on <b>Robinhood Chain</b>
+      (chain 4663). Nothing is held or escrowed.</li>
+    <li><b>Your wallet</b> sends one ERC-20 transfer of the access token, straight to the
+      building's published treasury. The call is one you can read: <code>transfer(treasury,
+      amount)</code>, nothing else, built by your own wallet.</li>
+    <li>The building watches the chain <b>read-only</b> — the token's Transfer logs — and
+      matches your payment to the wallet that paid.</li>
     <li>The floor binds to the wallet that signed, at the database level, so one payment
       can only ever buy one floor.</li>
   </ol>

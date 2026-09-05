@@ -1,7 +1,22 @@
 import db, { ensureColumn } from "./lib/store.js";
 import { holdWindowFor } from "./categories.js";
 import { emit } from "./lib/bus.js";
+import { canonicalAddress, canonicalLaunchpad } from "./canonical.js";
 import { POLICY_DEFAULTS, POLICY_VERSION, pricePolicy } from "../executor/trade-policy.mjs";
+
+/* THE PADS WITH A CREATOR AND A CURVE, keyed by launchpad id rather than by a vanity
+ * suffix on the address. On Solana every pump.fun mint ended in "pump", so one string
+ * test identified the pad; an EVM address carries no such mark, and the launchpad is a
+ * fact the sweep already knows (market.js launchpad(), from the dex id / factory). The
+ * ids are the copy-trading LAUNCHPADS vocabulary, minus the two that have no creator
+ * to watch: a plain Uniswap listing and `other`. Owned here, below copy.js in the
+ * import graph, so copy.js can build its list from it without a cycle. */
+export const CURVE_LAUNCHPADS = Object.freeze(["pons-v2", "pons", "hoodit", "pools.trade", "bankr"]);
+// Through the alias table (canonical.js): the sweep says "pons" and "hood.fun" for what
+// this list calls "pons-v2" and "hoodit", and a tripwire keyed on the raw label would
+// have fired for neither. Re-exported so the pad's consumers read one name.
+export { canonicalLaunchpad };
+export const isCurveLaunchpad = (pad) => CURVE_LAUNCHPADS.includes(canonicalLaunchpad(pad));
 
 /**
  * THE CALL SHEET — what the house team is actually doing.
@@ -85,6 +100,14 @@ ensureColumn("calls", "policy_version", "TEXT");
 ensureColumn("calls", "hold_min_ms", "INTEGER");
 ensureColumn("calls", "hold_max_ms", "INTEGER");
 ensureColumn("calls", "hold_band", "TEXT");
+/* THE GAS TERM AT THE MOMENT OF THE CALL. On this chain gas is a flat toll that does not
+ * scale with the clip (660,996 gas a round trip, live-thresholds.mjs), so the smallest
+ * executable size is a function of the gas price at the time — and a tenant's size is
+ * decided in copy.js from the CALL ROW, hours after the bundle that measured it is gone.
+ * Both numbers ride on the row; copy.js minExecutableEth() reads them and falls back to
+ * its constant when they are null (a call published before these columns existed). */
+ensureColumn("calls", "gas_usd_at_call", "REAL");
+ensureColumn("calls", "eth_usd_at_call", "REAL");
 // Historical calls were not stamped at publication, so NULL cannot safely be called
 // house evidence. Only new, explicitly attributed rows enter improvement scorecards.
 ensureColumn("calls", "source_floor", "INTEGER");
@@ -96,20 +119,25 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_calls_closed_provenance
          ON calls(source_attributed,source_scope,closed_at)`);
 
 export function openCall(c) {
+  /* The `mint` column keeps its name for schema stability — every index, feed field,
+   * viewer and executor reads it — but it now holds a lowercase 0x address. Canonical
+   * on the way in, so the live-call UNIQUE index means one coin, not one spelling. */
+  c = { ...c, mint: canonicalAddress(c.mint), launchpad: canonicalLaunchpad(c.launchpad) };
   const hold = holdWindowFor(c.mcapUsd ?? null);
-  // Every pump.fun-origin call carries the one invalidation the research pass
-  // found casually decisive: the observed profitable snipers' exit rule was
-  // "the creator sold". Tenants deserve the same tripwire in writing.
-  if (c.mint?.endsWith("pump") && c.invalidation && !/deployer|creator/i.test(c.invalidation)) {
-    c = { ...c, invalidation: c.invalidation.replace(/\.?\s*$/, "") + ". Thesis void if the deployer wallet sells." };
+  // Every launchpad-origin call carries the one invalidation the research pass found
+  // casually decisive: the observed profitable snipers' exit rule was "the creator
+  // sold". Keyed on the launchpad the sweep identified, not on an address suffix — an
+  // EVM address has none. Tenants deserve the same tripwire in writing.
+  if (isCurveLaunchpad(c.launchpad) && c.invalidation && !/deployer|creator/i.test(c.invalidation)) {
+    c = { ...c, invalidation: c.invalidation.replace(/\.?\s*$/, "") + ". Thesis void if the creator wallet sells." };
   }
   try {
     const info = db.prepare(`
       INSERT INTO calls (mint,symbol,category,launchpad,source_floor,source_scope,source_attributed,image_url,conviction,entry_ref,entry_lo,entry_hi,stop,target,
                          thesis,invalidation,flags_at_call,liq_at_call,rt_loss_at_call,mcap_at_call,
                          desk_size_usd,desk_risk_usd,desk_equity_usd,policy_version,opened_at,report_file,last_verified_at,
-                         hold_band,hold_min_ms,hold_max_ms)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+                         hold_band,hold_min_ms,hold_max_ms,gas_usd_at_call,eth_usd_at_call)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       c.mint, c.symbol ?? null, c.category ?? null, c.launchpad ?? null,
       c.sourceFloor ?? null, c.sourceScope ?? "unattributed", c.sourceAttributed === true ? 1 : 0,
       c.imageUrl ?? null, c.conviction ?? null,
@@ -119,7 +147,9 @@ export function openCall(c) {
       c.deskSizeUsd ?? null, c.deskRiskUsd ?? null, c.deskEquityUsd ?? null, c.policyVersion ?? POLICY_VERSION,
       Date.now(), c.reportFile ?? null,
       Date.now(),           // last_verified_at — clearing the gauntlet IS the first verification
-      hold?.band ?? null, hold?.holdMinMs ?? null, hold?.holdMaxMs ?? null);
+      hold?.band ?? null, hold?.holdMinMs ?? null, hold?.holdMaxMs ?? null,
+      Number(c.gasUsdRoundTrip) > 0 ? Number(c.gasUsdRoundTrip) : null,
+      Number(c.ethUsd) > 0 ? Number(c.ethUsd) : null);
     const call = getCall(info.lastInsertRowid);
     emit("call:open", { callId: call.id, mint: call.mint, symbol: call.symbol, category: call.category, launchpad: call.launchpad });
     return call;
@@ -133,7 +163,8 @@ export function openCall(c) {
 export const getCall = (id) => db.prepare("SELECT * FROM calls WHERE id=?").get(id) || null;
 export const liveCalls = () => db.prepare("SELECT * FROM calls WHERE status='live' ORDER BY id DESC").all();
 export const recentCalls = (n = 30) => db.prepare("SELECT * FROM calls ORDER BY id DESC LIMIT ?").all(n);
-export const liveCallFor = (mint) => db.prepare("SELECT * FROM calls WHERE mint=? AND status='live'").get(mint) || null;
+export const liveCallFor = (mint) =>
+  db.prepare("SELECT * FROM calls WHERE mint=? AND status='live'").get(canonicalAddress(mint)) || null;
 
 export function noteEvent(callId, kind, detail, mark) {
   db.prepare("INSERT INTO call_events (call_id,kind,detail,mark,ts) VALUES (?,?,?,?,?)")

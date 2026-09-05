@@ -18,8 +18,25 @@ const num = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
 
 export const CHARTER = fs.readFileSync(path.join(ROOT, "DESK.md"), "utf8");
 
+/* THE CHAIN. Robinhood Chain, an Arbitrum Nitro L2: chainId 4663 (0x1237), ~100ms
+ * blocks, first-come-first-served ordering with no priority auction. Measured
+ * 2026-09-05: eth_chainId on the public RPC returned 0x1237; eth_gasPrice 0x18fd5e90
+ * (0.42 gwei) at 20:5x UTC and 0x17a77350 forty minutes later — it moved 0.02 → 0.7 gwei
+ * over the two weeks before, and spikes past 5 gwei, so it is read per ticket and never
+ * cached anywhere in src/. */
+export const CHAIN_ID = 4663;
+export const CHAIN_HEX = "0x1237";
+
 export const cfg = {
-  rpc: process.env.SOLANA_RPC || "https://api.mainnet-beta.solana.com",
+  /* RH_RPC is the desk's read endpoint; RH_RPC_SECONDARY an optional second provider the
+     evidence reads fall back to on a 429. `rpc` stays as an alias so the files not yet
+     ported off Solana names (index.js doctor, perf.js, passes.js, leasing.js) keep
+     resolving a URL rather than `undefined` — they get a method-not-found through the
+     ordinary {ok:false} path. See docs/HANDOFF-data-sources.md. */
+  rhRpc: process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com",
+  rhRpcSecondary: process.env.RH_RPC_SECONDARY || "",
+  get rpc() { return this.rhRpc; },
+  chainId: CHAIN_ID,
   birdeyeKey: process.env.BIRDEYE_API_KEY || "",
 
   equityUsd: num("DESK_EQUITY_USD", 10000),
@@ -88,7 +105,24 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),
   },
 
   // Slippage the desk refuses to accept on a round trip at target size.
+  /* INHERITED FROM SOLANA AND DECLARED VOID FOR 4663 by executor/live-thresholds.mjs
+   * (screen.minLiquidityUsd, screen.minStopDistancePct, bands.floors, bands.holdWindows,
+   * exec.*). The numbers below are kept AS THEY WERE so the screen keeps a shape and the
+   * tests that assert their internal consistency keep passing; they are not a
+   * measurement of this chain. Measured here so far, 2026-09-04/05: a deep pool
+   * round-trips at 0.015-0.018% and a thin one at 8.92%; CASHCAT at 0.01 ETH came back
+   * 0.63% AHEAD through two different pools. Re-measurement is the executor lane's
+   * campaign; until it lands, assertLiveReady refuses to arm on these. */
   maxRoundTripSlippagePct: num("DESK_MAX_RT_SLIPPAGE", 8),
+  /* Mirrors of the executor's own stop-floor inputs, read by risk-rails.js
+     stopFloorDetail() so the Risk seat is told the number the bot will check a stop
+     against. Verbatim from MAIN config.js:118-122 (HANDOFF-agents item 2); the fee
+     share is a policy fraction, not a measurement of this chain. */
+  /* The desk's own access token is never a position: it opens a floor. Read once so the
+     screen (evidence.js) and the executor's scope guard refuse it by address. */
+  accessToken: (process.env.CLAUDECO_RH_TOKEN || "0x7039986CaC6C7885b53f10c7492E653055470ab9").toLowerCase(),
+  executorSlippageBps: num("EXECUTOR_SLIPPAGE_BPS", 300),
+  executorMaxFeeShareOfStop: Number(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP || 0.25),
 
     /* THE STOP THAT COSTS ALONE WOULD TRIGGER.
      *
@@ -282,12 +316,21 @@ export function floorsFor(mcap) {
   return band ? BAND_FLOORS[band] : flat;
 }
 
-/** The RPC URL embeds an API key. Never print it raw — mask it wherever it is shown. */
+/** The RPC URL may embed an API key. Never print it raw — mask it wherever it is shown. */
 export const maskRpc = (u = cfg.rpc) =>
   String(u).replace(/([?&]api-key=)[^&]+/i, "$1***").replace(/\/\/([^@/]+:)[^@]+@/, "//$1***@");
 
-// Well-known mints used as quote assets / routing anchors.
-export const MINTS = {
-  SOL: "So11111111111111111111111111111111111111112",
-  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+/* Well-known tokens on chain 4663, used as quote assets / routing anchors. Lower-case
+ * for comparison; the aggregator accepts either case for real tokens but is strict
+ * about the NATIVE sentinel — the wrong-case sentinel answered 400 'tokenIn invalid'
+ * on 2026-09-04, so it is stored exactly as Kyber wants it. USDG is six-decimal. */
+export const TOKENS = {
+  NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  WETH: "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+  USDG: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+  PONS: "0x39dbed3a2bd333467115de45665cc57f813c4571",
 };
+export const TOKEN_DECIMALS = { [TOKENS.WETH]: 18, [TOKENS.USDG]: 6, [TOKENS.PONS]: 18 };
+/** Legacy alias. The two names some untouched files still import; both now point at
+ *  the chain's quote assets so a stale import resolves to a real address, not undefined. */
+export const MINTS = { SOL: TOKENS.WETH, USDC: TOKENS.USDG };

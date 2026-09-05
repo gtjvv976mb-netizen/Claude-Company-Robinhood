@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { CAP_BANDS } from "./src/categories.js";
-import { asCandidate, bandOf, momentumFrom } from "./src/data/pumpfun-live.js";
+import { asCandidate, bandOf, momentumFrom } from "./src/data/pons-live.js";
 import { ignitionScore, shortlist } from "./src/ignition.js";
 
 let pass = 0, fail = 0;
@@ -113,68 +113,81 @@ ok("an unreadable cap is not a band", bandOf(null) === null && bandOf(0) === nul
 
 console.log("\nONE COIN, READ THE WAY THE REST OF THE DESK READS COINS");
 {
-  const coin = (over = {}) => ({
-    mint: "M1", symbol: "TEST", name: "Test Coin", creator: "C1",
-    created_timestamp: NOW - 6 * MIN, last_trade_timestamp: NOW - MIN,
-    usd_market_cap: 30_000, total_supply: 1_000_000_000_000_000,
-    real_sol_reserves: 30 * 1e9, complete: false, reply_count: 12,
-    ath_market_cap: 45_000, image_uri: "http://i", ...over,
+  /* A GeckoTerminal pool row, in the exact shape /networks/robinhood/new_pools returned
+     on 2026-09-05 (PANE / WETH, pons-v2, reserve $11,731, fdv $14,661). The desk reads
+     the pad's own listing, so the fixture is the listing's own dialect. */
+  const gtPool = (over = {}, attrs = {}) => ({
+    id: "robinhood_" + (over.pool ?? "0x7816e7aa1fb0c32073ba45111eda46802cf6dde8"), type: "pool",
+    attributes: {
+      base_token_price_usd: "0.0000148663321815765", address: over.pool ?? "0x7816e7aa1fb0c32073ba45111eda46802cf6dde8",
+      name: over.name ?? "PANE / WETH", pool_created_at: new Date(NOW - (over.ageMin ?? 6) * MIN).toISOString(),
+      fdv_usd: String(over.mcap ?? 30_000), market_cap_usd: over.mcapUsd ?? null,
+      price_change_percentage: { m5: "18.783", h1: "18.783" },
+      transactions: { m5: { buys: over.buys5m ?? 2, sells: 0, buyers: over.buyers5m ?? 2, sellers: 0 }, h1: { buys: 2, sells: 0, buyers: 2, sellers: 0 } },
+      volume_usd: { m5: "483.24888", h24: "483.24888" }, reserve_in_usd: String(over.reserve ?? 11_731.14), ...attrs,
+    },
+    relationships: {
+      base_token: { data: { id: "robinhood_" + (over.mint ?? "0x809f251c342d96ccbc4a13dc4168501f13caa67b"), type: "token" } },
+      quote_token: { data: { id: "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", type: "token" } },
+      dex: { data: { id: over.dex ?? "pons-v2", type: "dex" } },
+    },
   });
-  const c = asCandidate(coin(), { solUsd: 100, now: NOW });
-  ok("the launchpad is not inferred, it is known", c.launchpad === "pump.fun");
+  const c = asCandidate(gtPool(), { now: NOW });
+  ok("the launchpad is not inferred, it is known from the dex id", c.launchpad === "pons", c.launchpad);
   ok("the band is the micro sleeve", c.live.band === "micro", `${c.live.band} at $30,000`);
-  ok("the curve's SOL is priced as both sides of the book", c.pair.liquidityUsd === 6_000,
-    `$${c.pair.liquidityUsd.toLocaleString()} from 30 SOL`);
+  ok("the curve's reserve is the liquidity", c.pair.liquidityUsd === 11_731.14, `$${c.pair.liquidityUsd}`);
   ok("age is in hours, from the creation stamp", Math.abs(c.pair.ageHours - 0.1) < 0.01, `${c.pair.ageHours}h`);
-  // $30,000 of cap over a billion circulating tokens is three hundredths of a cent.
-  ok("price comes from cap over supply", Math.abs(c.pair.priceUsd - 0.00003) < 1e-12, `$${c.pair.priceUsd}`);
-
-  /* A GRADUATED COIN HAS AN EMPTY CURVE, NOT AN EMPTY BOOK. Reporting the drained
-     reserve as $0 would describe every graduated coin as unsellable, which is the one
-     condition the screen treats as fatal. */
-  const grad = asCandidate(coin({ complete: true, real_sol_reserves: 0 }), { solUsd: 100, now: NOW });
-  ok("a graduated coin reports unknown liquidity, never zero", grad.pair.liquidityUsd === null);
-  ok("...and is marked graduated", grad.live.graduated === true && grad.onCurve === false);
-
-  // A seconds epoch read as milliseconds makes a coin born today look 1.6 years old.
-  const secs = asCandidate(coin({ created_timestamp: Math.floor((NOW - 6 * MIN) / 1000) }), { solUsd: 100, now: NOW });
-  ok("a seconds timestamp is not read as 1970", Math.abs(secs.pair.ageHours - 0.1) < 0.01, `${secs.pair.ageHours}h`);
+  ok("the price is the indexer's own mark", Math.abs(c.pair.priceUsd - 0.0000148663321815765) < 1e-18, `$${c.pair.priceUsd}`);
+  ok("the symbol comes off the pool name", c.pair.baseSymbol === "PANE" && c.pair.quoteSymbol === "ETH");
+  ok("the token is the base token id, lower-cased", c.mint === "0x809f251c342d96ccbc4a13dc4168501f13caa67b" && c.address === c.mint);
+  ok("the tape is keyed by pool", c.pool === "0x7816e7aa1fb0c32073ba45111eda46802cf6dde8");
+  ok("a pons-v2 pool is on the curve", c.onCurve === true && c.live.graduated === false);
+  ok("a pons-v2-dex pool has graduated", asCandidate(gtPool({ dex: "pons-v2-dex" }), { now: NOW }).onCurve === false);
+  ok("market_cap_usd wins over fdv when present", asCandidate(gtPool({ mcapUsd: "45000" }), { now: NOW }).pair.marketCap === 45_000);
   ok("no market cap means no band, and no invented one",
-    asCandidate(coin({ usd_market_cap: null }), { solUsd: 100, now: NOW }).live.band === null);
-  ok("no SOL price means unknown liquidity, not zero",
-    asCandidate(coin(), { now: NOW }).pair.liquidityUsd === null);
+    asCandidate(gtPool({}, { fdv_usd: null, market_cap_usd: null }), { now: NOW }).live.band === null);
+  ok("no reserve means unknown liquidity, not zero",
+    asCandidate(gtPool({}, { reserve_in_usd: null }), { now: NOW }).pair.liquidityUsd === null);
+  ok("a row without a base token is not a candidate",
+    asCandidate({ attributes: { address: "0x1" }, relationships: {} }) === null);
 }
 
 console.log("\nTHE SHORTLIST SPENDS ATTENTION, AND ONLY ATTENTION");
 {
   const make = (over = {}) => asCandidate({
-    mint: over.mint || "M" + Math.random(), symbol: over.symbol || "S", name: "n", creator: "c",
-    created_timestamp: NOW - (over.ageMin ?? 5) * MIN,
-    last_trade_timestamp: NOW - (over.lastTradeMin ?? 1) * MIN,
-    usd_market_cap: over.mcap ?? 30_000, total_supply: 1e15,
-    real_sol_reserves: 30 * 1e9, complete: false, reply_count: over.replies ?? 0,
-    ath_market_cap: over.ath ?? 30_000, is_banned: over.banned ?? false,
-  }, { solUsd: 100, now: NOW });
+    id: "x", type: "pool",
+    attributes: {
+      address: "0xp" + (over.mint || Math.random()), name: (over.symbol || "S") + " / WETH",
+      pool_created_at: new Date(NOW - (over.ageMin ?? 5) * MIN).toISOString(),
+      fdv_usd: String(over.mcap ?? 30_000), market_cap_usd: null, reserve_in_usd: "3000",
+      transactions: { m5: { buys: over.buys5m ?? 3, sells: 0, buyers: over.buyers5m ?? 3, sellers: 0 } },
+      volume_usd: {}, price_change_percentage: {},
+    },
+    relationships: {
+      base_token: { data: { id: "robinhood_" + (over.mint || "M" + Math.random()) } },
+      quote_token: { data: { id: "robinhood_0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" } },
+      dex: { data: { id: "pons-v2" } },
+    },
+  }, { now: NOW });
 
-  const live = make({ mint: "LIVE" });
+  // Token ids are addresses and come back lower-cased, so the fixture names are too.
+  const live = make({ mint: "live" });
   const picked = shortlist([
     live,
-    make({ mint: "BANNED", banned: true }),
-    make({ mint: "OFFBOARD", mcap: 2_000 }),
-    make({ mint: "STALE", lastTradeMin: 45 }),
-    make({ mint: "ANCIENT", mcap: 8_000, ageMin: 60 * 24 * 30 }),
+    make({ mint: "offboard", mcap: 2_000 }),
+    make({ mint: "stale", buys5m: 0 }),
+    make({ mint: "ancient", mcap: 8_000, ageMin: 60 * 24 * 30 }),
   ], { now: NOW, limit: 10 });
   const mints = picked.map((p) => p.mint);
-  ok("a live in-band coin is shortlisted", mints.includes("LIVE"));
-  ok("a banned coin is not", !mints.includes("BANNED"));
-  ok("a coin off the board is not", !mints.includes("OFFBOARD"));
-  ok("a coin nobody has traded in 45 minutes is not", !mints.includes("STALE"));
-  ok("a month-old nano coin is not — that move is long over", !mints.includes("ANCIENT"));
+  ok("a live in-band coin is shortlisted", mints.includes("live"));
+  ok("a coin off the board is not", !mints.includes("offboard"));
+  ok("a coin with no trades in five minutes is not", !mints.includes("stale"));
+  ok("a month-old nano coin is not — that move is long over", !mints.includes("ancient"));
 
   // Youth is the whole point of the lane, so it must actually win the ordering.
-  const order = shortlist([make({ mint: "OLD", ageMin: 300 }), make({ mint: "YOUNG", ageMin: 2 })],
+  const order = shortlist([make({ mint: "old", ageMin: 300 }), make({ mint: "young", ageMin: 2 })],
     { now: NOW, limit: 10 }).map((p) => p.mint);
-  ok("the younger coin is looked at first", order[0] === "YOUNG", order.join(" > "));
+  ok("the younger coin is looked at first", order[0] === "young", order.join(" > "));
   ok("the shortlist honours its limit", shortlist(Array.from({ length: 50 }, (_, i) =>
     make({ mint: "X" + i })), { now: NOW, limit: 7 }).length === 7);
 }

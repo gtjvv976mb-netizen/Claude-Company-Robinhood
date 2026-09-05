@@ -1,11 +1,18 @@
 # Render Blueprint. In Render: New → Blueprint → connect this repo → Apply.
 #
+# THIS IS THE ROBINHOOD EDITION'S OWN SERVICE. The Solana desk's service and disk carry
+# different names; this blueprint names its own service AND its own disk, and the disk
+# is the database (CLAUDE_CO_DB lives on it), so applying this file can never attach to,
+# or overwrite, the Solana desk's SQLite. test-deploy-names.mjs refuses the old names.
+# The two files were byte-identical when the fork was cut (diff exit 0, 2026-09-05);
+# applying that copy would have targeted the live Solana service by name.
+#
 # The API needs a persistent disk because ownership lives in SQLite: floors, leases and
 # credits. On an ephemeral filesystem a redeploy would erase who owns what, for money
 # that is irreversibly on chain. That is why this is not on the free tier.
 services:
   - type: web
-    name: claude-company-api
+    name: claude-company-robinhood-api
     runtime: node
     plan: starter               # required for a persistent disk
     region: oregon
@@ -15,16 +22,28 @@ services:
     startCommand: node src/index.js office
     healthCheckPath: /api/lease/config
     disk:
-      name: claude-company-data
+      name: claude-company-robinhood-data
       mountPath: /var/data
       sizeGB: 1
     envVars:
       - key: CLAUDE_CO_DB
         value: /var/data/claude-co.db      # on the disk, not the ephemeral filesystem
-      - key: CLAUDECO_MINT
-        value: HRkkxgaFDDmZ3qZX8xP5SiMRBNvFNVUUv4FJUjPCpump
-      - key: CLAUDECO_DECIMALS
-        value: "6"
+      # Robinhood Chain (chainId 4663, Arbitrum Nitro). The public RPC answered
+      # eth_chainId 0x1237 on 2026-09-05; it 429s on batches over ~10, so a paid
+      # provider goes in RH_RPC_SECONDARY below and the public one stays as the default.
+      - key: RH_RPC
+        value: https://rpc.mainnet.chain.robinhood.com
+      - key: RH_RPC_SECONDARY
+        sync: false             # optional second provider; set in the dashboard
+      # The access token. The Robinhood edition of $CLAUDECO is NOT launched yet — this
+      # is the all-zero placeholder, and leasing stays closed until the real ERC-20
+      # address from docs/LAUNCH-CHECKLIST.md is pasted here.
+      - key: CLAUDECO_RH_TOKEN
+        value: "0x7039986CaC6C7885b53f10c7492E653055470ab9"
+      - key: CLAUDECO_RH_DECIMALS
+        value: "18"
+      # Prices stay in whole token units, never dollars: a USD peg read off a thin
+      # market is trivially manipulated.
       - key: FLOOR_PRICE_CLAUDECO
         value: "1000000"
       - key: RUN_PRICE_CLAUDECO
@@ -39,15 +58,14 @@ services:
       - key: DESK_PREPARE_TX
         value: "0"
       # Set these in the dashboard, not here — they are secrets or account-specific.
-      - key: TREASURY_OWNER
-        sync: false             # your PUBLIC address; leasing stays closed until set
+      - key: TREASURY_OWNER_RH
+        sync: false             # your PUBLIC EVM address; leasing stays closed until set
       - key: ANTHROPIC_API_KEY
-        sync: false
+        sync: false             # a SEPARATE key from the Solana desk's, for cost attribution
       - key: XAI_API_KEY
         sync: false             # optional; enables the alternate Grok PM brain
-      - key: SOLANA_RPC
-        sync: false             # a Helius/Triton URL; the public RPC is rate-limited
-      # Dedicated read-only credential for the aggregate Codex review bundle. Do not
+      # Dedicated read-only credential for the aggregate Codex review bundle. It MUST
+      # differ from the Solana desk's: it is a bearer for this fork's own bundle. Do not
       # reuse a wallet/session/executor secret.
       - key: CODEX_REVIEW_TOKEN
         sync: false

@@ -1,0 +1,1489 @@
+{
+ "ok": true,
+ "address": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
+ "mint": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
+ "token": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
+ "chainId": 4663,
+ "hook": "probe",
+ "symbol": "CASHCAT",
+ "name": "Cash Cat",
+ "fetchedAt": "2026-09-05T01:19:08.352Z",
+ "band": null,
+ "hold": {
+  "band": null,
+  "holdMinMs": null,
+  "holdMaxMs": null
+ },
+ "pair": {
+  "dex": "uniswap",
+  "version": "v3",
+  "pairAddress": "0xA70fc67C9F69da90B63a0e4C05D229954574E313",
+  "url": "https://dexscreener.com/robinhood/0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+  "baseSymbol": "CASHCAT",
+  "baseName": "Cash Cat",
+  "baseAddress": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
+  "quoteSymbol": "WETH",
+  "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+  "priceUsd": 0.2248,
+  "priceNative": 0.00009176,
+  "liquidityUsd": 5059672.14,
+  "liquidityBase": 13338596,
+  "liquidityQuote": 836.1797,
+  "fdv": 222687880,
+  "marketCap": 222687880,
+  "pairCreatedAt": 1781812885000,
+  "ageHours": 1877.3,
+  "volume": {
+   "h24": 7643443.75,
+   "h6": 1310044.49,
+   "h1": 690061.31,
+   "m5": 18139.9
+  },
+  "txns": {
+   "m5": {
+    "buys": 4,
+    "sells": 4
+   },
+   "h1": {
+    "buys": 195,
+    "sells": 732
+   },
+   "h6": {
+    "buys": 727,
+    "sells": 1118
+   },
+   "h24": {
+    "buys": 4157,
+    "sells": 4013
+   }
+  },
+  "priceChange": {
+   "m5": -0.25,
+   "h1": -7.5,
+   "h6": -10.75,
+   "h24": -16.65
+  },
+  "imageUrl": "https://cdn.dexscreener.com/cms/images/Lq7a3pS9Wn8EuGp0?width=800&height=800&quality=95&format=auto",
+  "socials": [
+   {
+    "url": "https://x.com/cashcat_token",
+    "type": "twitter"
+   },
+   {
+    "url": "https://t.me/cashcat_robinhood",
+    "type": "telegram"
+   },
+   {
+    "url": "https://www.reddit.com/r/cashcattoken/s/L8GOOuy9Ch",
+    "type": "reddit"
+   }
+  ],
+  "websites": [
+   {
+    "url": "https://cashcat.cc/",
+    "label": "Website"
+   },
+   {
+    "url": "https://letscash.fun/",
+    "label": "Letscash"
+   }
+  ]
+ },
+ "pairs": {
+  "count": 30,
+  "totalLiquidityUsd": 12586027.43,
+  "venues": [
+   "uniswap",
+   "up",
+   "giga",
+   "sushiswap",
+   "ramses",
+   "alandale",
+   "0x2f171c6997FC98970efc0Ff3E3AEB6ef4025E939",
+   "0x70Fb47DB7Ca14a04CAE64DD4bDC2e86C8656943d",
+   "0swap",
+   "robinswap"
+  ],
+  "pools": [
+   {
+    "dex": "uniswap",
+    "version": "v3",
+    "address": "0xA70fc67C9F69da90B63a0e4C05D229954574E313",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 5059672.14,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v3",
+    "address": "0xd42A491087a15E5afd51FEb3606066Cc152d2b09",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 3094956.34,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xa92a3df27a00a276183ff7265fd8affa11df1fe8bb23ddfaf13f6c879a3f818b",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 2177678.99,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x7bbdf0dfe88b325edf2059be7aa9411d42fb25c3dbbcfcd6800b549b63a3b112",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 652001.54,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xf7dc0af99fce7169eb76854c0b39beb9915526894d42229946e5cb469cab50b1",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 405218.75,
+    "feeTierBps": null
+   },
+   {
+    "dex": "up",
+    "version": "v3",
+    "address": "0x4E8649Be40aE67EBbcff99C291B92eE03015917b",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 264601.59,
+    "feeTierBps": null
+   },
+   {
+    "dex": "up",
+    "version": "v3",
+    "address": "0x1B619a121D6c5bFd10D149e7246Da3c838A66B48",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 205299.16,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xdaf72ad25a49219177665853a41c10020d63252a3d5bf782cc61373fcc9b6557",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 164012.81,
+    "feeTierBps": null
+   },
+   {
+    "dex": "giga",
+    "version": "v3",
+    "address": "0x43781f7Ae77D99df3A52095c0b7d162828467A6e",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 122327.57,
+    "feeTierBps": null
+   },
+   {
+    "dex": "up",
+    "version": "v3",
+    "address": "0x3986840e83E64C113B4EbEEEd6B3223528e06Ed9",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 117572.41,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v3",
+    "address": "0x4B0c312fFbB068F6a0bEa128759E35d94B94D0E1",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 71870.26,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x1ceb0611b95db35c2385f827681eeb250dcc4fd0f3070d264255bd5c1db029ab",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 44860.09,
+    "feeTierBps": null
+   },
+   {
+    "dex": "sushiswap",
+    "version": "v3",
+    "address": "0xCd3B02f383e8E311fc26bc8845A6D52B38Cb8dFd",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 38534.7,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x74739c7ee5dda3695d01575c32371eff16e7b831e37517d1a99b568749143e7a",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 25197.1,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x78b4d755c5bfa404969f6f52a88b283c38a9d78e1c895f9cf89222b113920562",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 18214.65,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xa2a8b872de9a817eb3ebee0706693143b687c25606a15ec12ec0b859f8b90036",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 17568.42,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x404c8eb258ece3c428a6ac879854488b103f4fd33058df3af17cd5d641fa3be1",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 15575.16,
+    "feeTierBps": null
+   },
+   {
+    "dex": "ramses",
+    "version": "v2",
+    "address": "0xBc2f6Fed647E917FD60c8990F2C6B91F0c426F12",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 15318.78,
+    "feeTierBps": null
+   },
+   {
+    "dex": "alandale",
+    "version": null,
+    "address": "0x8df767cbef77Ee0997A400f11A8902Aa1728E179",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 12555.27,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xbb5c8db782b70c4a39da7b51693bbaca13d50c4baa2aced1b6c0f911375cc655",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 12401.71,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x23a983bb3d0711aae0a5614dd37e9dc9086a44e838c9a331fb9e787bca18dace",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 8190.38,
+    "feeTierBps": null
+   },
+   {
+    "dex": "0x2f171c6997FC98970efc0Ff3E3AEB6ef4025E939",
+    "version": null,
+    "address": "0x5dA1Aa1ad4a357C9D1Ed4f78F8b0503C5b9d02E8",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 6577.63,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x20377e5320735960aba00b82bf61bfdd050f799b9464aecf3e36d4905cc138e2",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 6419.9,
+    "feeTierBps": null
+   },
+   {
+    "dex": "0x70Fb47DB7Ca14a04CAE64DD4bDC2e86C8656943d",
+    "version": null,
+    "address": "0x0c5E8fC1974bFAA18574f4d152F7D9A611f604DD",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 5838.55,
+    "feeTierBps": null
+   },
+   {
+    "dex": "0swap",
+    "version": null,
+    "address": "0xf043803FaC16b1b839B9bd53DA01815d89150864",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 4554.07,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x7b924e2e50a323c8fb5f8f5b551725ef2ff0034b22c2ad0df0d72c2e00b4b1e6",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 4429.89,
+    "feeTierBps": null
+   },
+   {
+    "dex": "ramses",
+    "version": "v2",
+    "address": "0xDC5BAa131c844D0CA548f4e0AA7CE9f50c742eC5",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 4144.99,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x9735e9cce68febcdc695d3c195cda10d02d4f8cd3f930d8240b812c606e0f131",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 3951.55,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x27d571bc11c2c59ea7c913b2f845ab5afb99149f93c32841775325bac4b2d2df",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 3780.71,
+    "feeTierBps": null
+   },
+   {
+    "dex": "robinswap",
+    "version": "v3",
+    "address": "0x1e4238E85B8C76c3a81d8E65544367ebb9A61b78",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 2702.32,
+    "feeTierBps": null
+   }
+  ]
+ },
+ "promotion": {
+  "boosted": true,
+  "paidOrders": 2,
+  "boosts": 1,
+  "lastPaidAt": 1783987664482
+ },
+ "callouts": [],
+ "marketRegime": {
+  "ethRet25d": 30.6,
+  "btcRet25d": 25.4,
+  "solRet25d": 30.6,
+  "regime": "risk_on",
+  "asOf": 1788571145268
+ },
+ "crosscheck": {
+  "verdicts": [
+   {
+    "check": "price",
+    "verdict": "VERIFIED",
+    "detail": "two independent sources agree within 0.1%"
+   }
+  ],
+  "killed": false
+ },
+ "ethUsd": {
+  "value": 2454.99,
+  "stalenessSec": 2,
+  "source": "coingecko+kyber",
+  "divergencePct": 0.003,
+  "error": null,
+  "btcUsd": 79660
+ },
+ "gasPriceWei": "411432000",
+ "contract": {
+  "ok": true,
+  "address": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
+  "codeSize": 4830,
+  "cloneOf": null,
+  "cloneVariant": null,
+  "isProxy": false,
+  "proxyKind": "none",
+  "implementation": null,
+  "beacon": null,
+  "proxyAdmin": {
+   "address": null,
+   "kind": "none",
+   "delaySec": null
+  },
+  "name": "Cash Cat",
+  "symbol": "CASHCAT",
+  "decimals": 18,
+  "totalSupply": "1000000000000000000000000000",
+  "totalSupplyUnits": 1000000000,
+  "owner": null,
+  "hasOwnable": false,
+  "ownershipRenounced": null,
+  "hasPausable": false,
+  "paused": null,
+  "isEquity": false,
+  "equityReason": null,
+  "unknownBeacon": false,
+  "upgradeCount": 0,
+  "lastUpgradeAt": null,
+  "upgradeScan": {
+   "method": "not_a_proxy",
+   "complete": true
+  },
+  "verifiedSource": null,
+  "transferFeeBps": 0,
+  "feeSettable": null,
+  "maxFeeBps": null,
+  "privilegedRoles": [],
+  "flags": [],
+  "errors": [],
+  "tax": {
+   "transferFeeBps": 0,
+   "buyFeeBps": 0,
+   "sellFeeBps": 0,
+   "buyRouteGapBps": 0,
+   "sellRouteGapBps": 0,
+   "simulated": true,
+   "basis": "buy/sellFeeBps = balanceOf delta on a simulated transfer (token-level); *RouteGapBps = chain-returned amountOut of the aggregator's calldata vs its quote, which includes the quote's own error"
+  },
+  "taxbuyFeeBps": 0,
+  "taxsellFeeBps": 0,
+  "taxsimulated": true
+ },
+ "buySim": {
+  "ok": true,
+  "simulatedOut": "335790636117869469878",
+  "quotedOut": "335798000601202884608",
+  "effectiveTaxBps": 0,
+  "router": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+ },
+ "mintAccount": {
+  "flags": [],
+  "error": null
+ },
+ "sellSim": {
+  "ok": true,
+  "revertReason": null,
+  "effectiveTaxBps": 0,
+  "routeGapBps": 0,
+  "transferFeeBps": 0,
+  "simulatedOut": "31390400095204172",
+  "quotedOut": "31391224916567088",
+  "router": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+  "slot": 0,
+  "status": "simulated",
+  "basis": "effectiveTaxBps is the chain-vs-quote gap on the aggregator's sell calldata (quote error included); transferFeeBps is the token's own take on a plain transfer"
+ },
+ "transferSim": {
+  "ok": true,
+  "sent": "335798000601202884608",
+  "received": "335798000601202884608",
+  "transferFeeBps": 0,
+  "revertReason": null,
+  "basis": "balanceOf(recipient) delta around token.transfer() from a helper placed by state override; no aggregator in the path"
+ },
+ "holders": {
+  "ok": false,
+  "error": "no launch block — ledger has no start (token older than the scan budget)",
+  "top1Pct": null,
+  "top10Pct": null,
+  "clusteredHolders": null,
+  "bundleSuspect": null,
+  "midToHead": null,
+  "count": null,
+  "poolShareOfSupplyPct": 3.67,
+  "excluded": [
+   {
+    "address": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+    "label": "pool:uniswap-v3",
+    "pctOfSupply": 1.33
+   },
+   {
+    "address": "0xd42a491087a15e5afd51feb3606066cc152d2b09",
+    "label": "pool:uniswap-v3",
+    "pctOfSupply": 0.67
+   },
+   {
+    "address": "0x4e8649be40ae67ebbcff99c291b92ee03015917b",
+    "label": "pool:up-v3",
+    "pctOfSupply": 0.08
+   },
+   {
+    "address": "0x1b619a121d6c5bfd10d149e7246da3c838a66b48",
+    "label": "pool:up-v3",
+    "pctOfSupply": 0.05
+   },
+   {
+    "address": "0x43781f7ae77d99df3a52095c0b7d162828467a6e",
+    "label": "pool:giga-v3",
+    "pctOfSupply": 0.03
+   },
+   {
+    "address": "0x3986840e83e64c113b4ebeeed6b3223528e06ed9",
+    "label": "pool:up-v3",
+    "pctOfSupply": 0.04
+   },
+   {
+    "address": "0x4b0c312ffbb068f6a0bea128759e35d94b94d0e1",
+    "label": "pool:uniswap-v3",
+    "pctOfSupply": 0.02
+   },
+   {
+    "address": "0xcd3b02f383e8e311fc26bc8845a6d52b38cb8dfd",
+    "label": "pool:sushiswap-v3",
+    "pctOfSupply": 0.01
+   },
+   {
+    "address": "0xbc2f6fed647e917fd60c8990f2c6b91f0c426f12",
+    "label": "pool:ramses-v2",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0x8df767cbef77ee0997a400f11a8902aa1728e179",
+    "label": "pool:alandale",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0x5da1aa1ad4a357c9d1ed4f78f8b0503c5b9d02e8",
+    "label": "pool:0x2f171c6997FC98970efc0Ff3E3AEB6ef4025E939",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0x0c5e8fc1974bfaa18574f4d152f7d9a611f604dd",
+    "label": "pool:0x70Fb47DB7Ca14a04CAE64DD4bDC2e86C8656943d",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0xf043803fac16b1b839b9bd53da01815d89150864",
+    "label": "pool:0swap",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0xdc5baa131c844d0ca548f4e0aa7ce9f50c742ec5",
+    "label": "pool:ramses-v2",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0x1e4238e85b8c76c3a81d8e65544367ebb9a61b78",
+    "label": "pool:robinswap-v3",
+    "pctOfSupply": 0
+   },
+   {
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "label": "pool:uniswap-v4-manager",
+    "pctOfSupply": 1.44
+   }
+  ]
+ },
+ "exitProbe": {
+  "targetSizeUsd": 75,
+  "targetSizeWei": "30550022607016732",
+  "ok": true,
+  "buy": {
+   "ok": true,
+   "inAmount": "30550022607016732",
+   "outAmount": "335798000601202884608",
+   "amountInUsd": 74.99784397278341,
+   "amountOutUsd": 75.42219833849703,
+   "gas": 655171,
+   "gasPriceWei": "413840000",
+   "gasUsdQuoted": 0.6656169516812754,
+   "hops": 2,
+   "amms": [
+    "uniswap-v4-fee",
+    "giga-v3"
+   ],
+   "pools": [
+    "0x4fcd93aba7b4671dd3bfedeaf45970b8833320ae48b6c72a6588533b6a85e300",
+    "0x43781f7ae77d99df3a52095c0b7d162828467a6e"
+   ],
+   "impliedEthUsd": 2454.9194263299137
+  },
+  "sell": {
+   "ok": true,
+   "inAmount": "335798000601202884608",
+   "outAmount": "31391224916567088",
+   "amountInUsd": 75.42219833849703,
+   "amountOutUsd": 77.06292786397216,
+   "gas": 817507,
+   "gasPriceWei": "413840000",
+   "gasUsdQuoted": 0.8305412133902514,
+   "hops": 2,
+   "amms": [
+    "uniswap-v4-fee",
+    "uniswap-v4-fee"
+   ],
+   "pools": [
+    "0x085339f051c564357c49de6ad5051518f52d308e5be08dbb3dc315b8c04d439d",
+    "0x2f457325fd72db9c4c4f27213a72ca9c745c58144f178bca48ccf07664fd1811"
+   ],
+   "impliedEthUsd": null
+  },
+  "quoteToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  "quoteAmountWei": "30550022607016732",
+  "tokensOut": "335798000601202884608",
+  "weiBack": "31391224916567088",
+  "roundTripLossPct": -2.7535,
+  "buyImpactPct": -0.566,
+  "sellImpactPct": -2.175,
+  "gasUnitsRoundTrip": 1472678,
+  "hops": 4,
+  "impliedEthUsd": 2454.9194263299137,
+  "gasUsdRoundTrip": 1.4875,
+  "error": null
+ },
+ "launch": {
+  "venue": "unknown",
+  "phase": "graduated",
+  "onCurve": false,
+  "name": null,
+  "launchpad": null,
+  "curveProgressPct": null,
+  "curveProgressReason": null,
+  "graduatedAt": null,
+  "graduationPool": null,
+  "graduationScanComplete": null,
+  "block": null,
+  "tx": null,
+  "curve": null,
+  "vault": null,
+  "quoteToken": null,
+  "quoteTokenClass": null,
+  "exemptShareOfSupplyPct": null,
+  "exemptReason": "not a PONS V2 launch within the scan window",
+  "firstBlockBuyers": [],
+  "curveViews": null,
+  "creatorTaxBps": null,
+  "maxCreatorTaxBps": null,
+  "feeClaimCount": null,
+  "feeClaimedEth": null,
+  "creatorFeeReason": "no public ABI for the PONS V2 creator-fee views or claim events; unread, not zero"
+ },
+ "launchpad": {
+  "venue": "unknown",
+  "creatorHandle": null,
+  "creator": null
+ },
+ "deployer": {
+  "ok": false,
+  "address": null,
+  "isContract": null,
+  "kind": "unknown",
+  "txSender": null,
+  "priorLaunches": null,
+  "priorLaunchesWindowBlocks": null,
+  "graduated": null,
+  "dead": null,
+  "sameImplementation": null,
+  "fundedBy": null,
+  "note": "deployer unknown — no PONS V2 launch log inside the scan window"
+ },
+ "equityPair": {
+  "paired": false,
+  "ticker": null,
+  "shareOfLiquidityPct": 0
+ },
+ "identity": {
+  "symbolCollisions": false,
+  "collidingContracts": [],
+  "resolvedBy": "address"
+ },
+ "lp": {
+  "kind": "v3_position",
+  "burnedPct": null,
+  "lockedPct": null,
+  "locker": null,
+  "lockerAddress": null,
+  "positionNftOwner": null,
+  "pullableSharePct": null,
+  "unlockAt": null,
+  "basis": "v3 positions are NFTs on the position manager; owner not read (no free index)"
+ },
+ "depth": {
+  "sellSideUsdWithin1Pct": null,
+  "sellSideUsdWithin5Pct": null,
+  "inRangeLiquidityPct": null,
+  "basis": "lower bound: the $75 probe's sell leg moved the price -2.175%; larger sizes are NOT extrapolated (v3/v4 depth is range-dependent)"
+ },
+ "candles": {
+  "bars": [
+   {
+    "t": 1788565800000,
+    "o": 0.244307867254698,
+    "h": 0.249865750653108,
+    "l": 0.244307780158711,
+    "c": 0.249713733786091,
+    "volUsd": 9629.752410611269
+   },
+   {
+    "t": 1788565860000,
+    "o": 0.249713733786091,
+    "h": 0.250186974284904,
+    "l": 0.249713733786091,
+    "c": 0.250002231838089,
+    "volUsd": 4525.879997188788
+   },
+   {
+    "t": 1788565920000,
+    "o": 0.250002231838089,
+    "h": 0.250684828305428,
+    "l": 0.250002231838089,
+    "c": 0.250576539264538,
+    "volUsd": 7437.56904778152
+   },
+   {
+    "t": 1788565980000,
+    "o": 0.250576539264538,
+    "h": 0.250726922614273,
+    "l": 0.245677036751863,
+    "c": 0.245677036751863,
+    "volUsd": 676.6589475774825
+   },
+   {
+    "t": 1788566220000,
+    "o": 0.245677036751863,
+    "h": 0.250758802056834,
+    "l": 0.245677036751863,
+    "c": 0.250758802056834,
+    "volUsd": 4.8625434
+   },
+   {
+    "t": 1788566340000,
+    "o": 0.250758802056834,
+    "h": 0.250758802056834,
+    "l": 0.245398031619941,
+    "c": 0.245398031619941,
+    "volUsd": 11437.621336613
+   },
+   {
+    "t": 1788566580000,
+    "o": 0.245398031619941,
+    "h": 0.245398031619941,
+    "l": 0.244997871147374,
+    "c": 0.244997871147374,
+    "volUsd": 116.258839795563
+   },
+   {
+    "t": 1788566700000,
+    "o": 0.244997871147374,
+    "h": 0.250105657911547,
+    "l": 0.244997871147374,
+    "c": 0.245063715341744,
+    "volUsd": 30.18596698781427
+   },
+   {
+    "t": 1788566760000,
+    "o": 0.245063715341744,
+    "h": 0.24949413907349,
+    "l": 0.241217763820692,
+    "c": 0.241217763820692,
+    "volUsd": 59206.403968142244
+   },
+   {
+    "t": 1788566820000,
+    "o": 0.241217763820692,
+    "h": 0.245945984935645,
+    "l": 0.24109848607813,
+    "c": 0.245945984935645,
+    "volUsd": 1470.0610398673875
+   },
+   {
+    "t": 1788567000000,
+    "o": 0.245945984935645,
+    "h": 0.245945984935645,
+    "l": 0.245862519575099,
+    "c": 0.245862519575099,
+    "volUsd": 243.18459
+   },
+   {
+    "t": 1788567060000,
+    "o": 0.245862519575099,
+    "h": 0.245862519575099,
+    "l": 0.240987039175567,
+    "c": 0.240987039175567,
+    "volUsd": 21.6936532665846
+   },
+   {
+    "t": 1788567120000,
+    "o": 0.240987039175567,
+    "h": 0.245912817139676,
+    "l": 0.240987039175567,
+    "c": 0.245912817139676,
+    "volUsd": 72.967554
+   },
+   {
+    "t": 1788567180000,
+    "o": 0.245912817139676,
+    "h": 0.246124951646554,
+    "l": 0.241160719021647,
+    "c": 0.246124951646554,
+    "volUsd": 3005.314733355604
+   },
+   {
+    "t": 1788567420000,
+    "o": 0.246124951646554,
+    "h": 0.246124951646554,
+    "l": 0.245951385417592,
+    "c": 0.246009620449503,
+    "volUsd": 2065.335778880379
+   },
+   {
+    "t": 1788567480000,
+    "o": 0.246009620449503,
+    "h": 0.246009620449503,
+    "l": 0.241056036256653,
+    "c": 0.241056036256653,
+    "volUsd": 296.385605549653
+   },
+   {
+    "t": 1788567600000,
+    "o": 0.241056036256653,
+    "h": 0.245980203980915,
+    "l": 0.241056036256653,
+    "c": 0.245980203980915,
+    "volUsd": 497.2348717702659
+   },
+   {
+    "t": 1788567660000,
+    "o": 0.245980203980915,
+    "h": 0.246298871210751,
+    "l": 0.245980203980915,
+    "c": 0.246080239425908,
+    "volUsd": 5120.189646824298
+   },
+   {
+    "t": 1788567720000,
+    "o": 0.246080239425908,
+    "h": 0.246468247755189,
+    "l": 0.246080239425908,
+    "c": 0.246468247755189,
+    "volUsd": 243.09648
+   },
+   {
+    "t": 1788567780000,
+    "o": 0.246468247755189,
+    "h": 0.246557028432645,
+    "l": 0.246376342798743,
+    "c": 0.246376342798743,
+    "volUsd": 649.250171277436
+   },
+   {
+    "t": 1788567840000,
+    "o": 0.246376342798743,
+    "h": 0.246376342798743,
+    "l": 0.241628696378343,
+    "c": 0.241628696378343,
+    "volUsd": 1.508808628772
+   },
+   {
+    "t": 1788567900000,
+    "o": 0.241628696378343,
+    "h": 0.241628696378343,
+    "l": 0.241343917135974,
+    "c": 0.241343917135974,
+    "volUsd": 10.7415124834525
+   },
+   {
+    "t": 1788568020000,
+    "o": 0.241343917135974,
+    "h": 0.246678602917379,
+    "l": 0.241343917135974,
+    "c": 0.246537752636423,
+    "volUsd": 4521.3364235618465
+   },
+   {
+    "t": 1788568080000,
+    "o": 0.246537752636423,
+    "h": 0.246627378641685,
+    "l": 0.246537752636423,
+    "c": 0.246549581792347,
+    "volUsd": 1640.2749934747094
+   },
+   {
+    "t": 1788568140000,
+    "o": 0.246549581792347,
+    "h": 0.247438832115075,
+    "l": 0.246549581792347,
+    "c": 0.247292738207148,
+    "volUsd": 9607.755046431692
+   },
+   {
+    "t": 1788568620000,
+    "o": 0.247292738207148,
+    "h": 0.247292738207148,
+    "l": 0.241902896830105,
+    "c": 0.241902896830105,
+    "volUsd": 9916.522679494312
+   },
+   {
+    "t": 1788568740000,
+    "o": 0.241902896830105,
+    "h": 0.245142709440327,
+    "l": 0.240264195918579,
+    "c": 0.240264195918579,
+    "volUsd": 20836.837277744522
+   },
+   {
+    "t": 1788568800000,
+    "o": 0.240264195918579,
+    "h": 0.240359609788694,
+    "l": 0.23976573897009,
+    "c": 0.240070888564517,
+    "volUsd": 9049.778916236875
+   },
+   {
+    "t": 1788568860000,
+    "o": 0.240070888564517,
+    "h": 0.240070888564517,
+    "l": 0.239416419821633,
+    "c": 0.239416419821633,
+    "volUsd": 7760.806305446887
+   },
+   {
+    "t": 1788568920000,
+    "o": 0.239416419821633,
+    "h": 0.239416419821633,
+    "l": 0.238116930607465,
+    "c": 0.238135909451843,
+    "volUsd": 20693.881296395455
+   },
+   {
+    "t": 1788568980000,
+    "o": 0.238135909451843,
+    "h": 0.241732250075492,
+    "l": 0.236664406381983,
+    "c": 0.236818319192046,
+    "volUsd": 26008.02620131622
+   },
+   {
+    "t": 1788569040000,
+    "o": 0.236818319192046,
+    "h": 0.236818319192046,
+    "l": 0.234407699053599,
+    "c": 0.235117781871348,
+    "volUsd": 28631.291179394633
+   },
+   {
+    "t": 1788569100000,
+    "o": 0.235117781871348,
+    "h": 0.238612414716585,
+    "l": 0.225248612843848,
+    "c": 0.229953537853827,
+    "volUsd": 129672.15436779112
+   },
+   {
+    "t": 1788569160000,
+    "o": 0.229953537853827,
+    "h": 0.229971768652407,
+    "l": 0.224752276115167,
+    "c": 0.224752276115167,
+    "volUsd": 9891.13933492654
+   },
+   {
+    "t": 1788569220000,
+    "o": 0.224752276115167,
+    "h": 0.229315165753474,
+    "l": 0.22231262238653,
+    "c": 0.226313921015352,
+    "volUsd": 42413.54680843669
+   },
+   {
+    "t": 1788569280000,
+    "o": 0.226313921015352,
+    "h": 0.228466046625764,
+    "l": 0.223474405288377,
+    "c": 0.223502835583926,
+    "volUsd": 57423.15471968014
+   },
+   {
+    "t": 1788569340000,
+    "o": 0.223502835583926,
+    "h": 0.228838610022737,
+    "l": 0.223502835583926,
+    "c": 0.228838610022737,
+    "volUsd": 12491.1282317102
+   },
+   {
+    "t": 1788569400000,
+    "o": 0.228838610022737,
+    "h": 0.231101635844149,
+    "l": 0.228838610022737,
+    "c": 0.231101635844149,
+    "volUsd": 50247.177427660936
+   },
+   {
+    "t": 1788569460000,
+    "o": 0.231101635844149,
+    "h": 0.232545022760236,
+    "l": 0.227839021100678,
+    "c": 0.232369568387412,
+    "volUsd": 3854.02182321325
+   },
+   {
+    "t": 1788569520000,
+    "o": 0.232369568387412,
+    "h": 0.23726675548439,
+    "l": 0.232369568387412,
+    "c": 0.23725976080854,
+    "volUsd": 67952.0581128345
+   },
+   {
+    "t": 1788569580000,
+    "o": 0.23725976080854,
+    "h": 0.237281713121767,
+    "l": 0.23725976080854,
+    "c": 0.237281713121767,
+    "volUsd": 307.0596892780467
+   },
+   {
+    "t": 1788569700000,
+    "o": 0.237281713121767,
+    "h": 0.237425141324181,
+    "l": 0.237281713121767,
+    "c": 0.237425141324181,
+    "volUsd": 488.7271366272753
+   },
+   {
+    "t": 1788569760000,
+    "o": 0.237425141324181,
+    "h": 0.237425141324181,
+    "l": 0.237371135682587,
+    "c": 0.237371135682587,
+    "volUsd": 0.989351166190052
+   },
+   {
+    "t": 1788569820000,
+    "o": 0.237371135682587,
+    "h": 0.237371135682587,
+    "l": 0.232641970257921,
+    "c": 0.232641970257921,
+    "volUsd": 154.830210465754
+   },
+   {
+    "t": 1788569940000,
+    "o": 0.232641970257921,
+    "h": 0.232641970257921,
+    "l": 0.232624014738703,
+    "c": 0.232624014738703,
+    "volUsd": 3.50559038401972
+   },
+   {
+    "t": 1788570000000,
+    "o": 0.232624014738703,
+    "h": 0.237263854402575,
+    "l": 0.232624014738703,
+    "c": 0.237263854402575,
+    "volUsd": 24.300045
+   },
+   {
+    "t": 1788570120000,
+    "o": 0.237263854402575,
+    "h": 0.237263854402575,
+    "l": 0.232521551875953,
+    "c": 0.232521551875953,
+    "volUsd": 393.883383662281
+   },
+   {
+    "t": 1788570180000,
+    "o": 0.232521551875953,
+    "h": 0.232521551875953,
+    "l": 0.231492282584864,
+    "c": 0.231949153348632,
+    "volUsd": 13681.613424673871
+   },
+   {
+    "t": 1788570300000,
+    "o": 0.231949153348632,
+    "h": 0.236351110841673,
+    "l": 0.231559961239077,
+    "c": 0.23157782095679,
+    "volUsd": 1071.0839995750428
+   },
+   {
+    "t": 1788570360000,
+    "o": 0.23157782095679,
+    "h": 0.23157782095679,
+    "l": 0.228249306134145,
+    "c": 0.228421754518761,
+    "volUsd": 47075.380577458614
+   },
+   {
+    "t": 1788570420000,
+    "o": 0.228421754518761,
+    "h": 0.228421754518761,
+    "l": 0.227439016601689,
+    "c": 0.227856314066835,
+    "volUsd": 15518.809772359007
+   },
+   {
+    "t": 1788570480000,
+    "o": 0.227856314066835,
+    "h": 0.227856314066835,
+    "l": 0.225872405593697,
+    "c": 0.225872405593697,
+    "volUsd": 24257.75131707493
+   },
+   {
+    "t": 1788570540000,
+    "o": 0.225872405593697,
+    "h": 0.225872405593697,
+    "l": 0.222857950867804,
+    "c": 0.223004429842844,
+    "volUsd": 36470.50743411868
+   },
+   {
+    "t": 1788570600000,
+    "o": 0.223004429842844,
+    "h": 0.227609327371819,
+    "l": 0.223004429842844,
+    "c": 0.227567366209945,
+    "volUsd": 3815.889324274352
+   },
+   {
+    "t": 1788570660000,
+    "o": 0.227567366209945,
+    "h": 0.227846358613073,
+    "l": 0.227567366209945,
+    "c": 0.227846358613073,
+    "volUsd": 2997.6157991101836
+   },
+   {
+    "t": 1788570720000,
+    "o": 0.227846358613073,
+    "h": 0.228063044917467,
+    "l": 0.227846358613073,
+    "c": 0.228063044917467,
+    "volUsd": 6108.5575355112
+   },
+   {
+    "t": 1788570840000,
+    "o": 0.228063044917467,
+    "h": 0.228063044917467,
+    "l": 0.223107213096261,
+    "c": 0.223107213096261,
+    "volUsd": 8219.70445441067
+   },
+   {
+    "t": 1788570900000,
+    "o": 0.223107213096261,
+    "h": 0.227708695969926,
+    "l": 0.223107213096261,
+    "c": 0.223135469267323,
+    "volUsd": 2448.210379157082
+   },
+   {
+    "t": 1788570960000,
+    "o": 0.223135469267323,
+    "h": 0.227866811495992,
+    "l": 0.223135469267323,
+    "c": 0.223190708118782,
+    "volUsd": 6479.17492227677
+   },
+   {
+    "t": 1788571020000,
+    "o": 0.223190708118782,
+    "h": 0.227573705203112,
+    "l": 0.223190708118782,
+    "c": 0.227573705203112,
+    "volUsd": 988.876471241826
+   }
+  ],
+  "barsCovered": 60,
+  "interval": "1m",
+  "pool": "0xA70fc67C9F69da90B63a0e4C05D229954574E313",
+  "error": null
+ },
+ "whales": {
+  "ok": true,
+  "trades": [
+   {
+    "wallet": "0xc2881e3e671a57c96f63cc0473f5df2e58df5d47",
+    "side": "buy",
+    "usd": 39280.32,
+    "tokens": 169969.891630234,
+    "signature": "0xaa7c2a2c1675563a36e41948e46b56851e4ffac3faaba8a8c1cffe920d0d0d84",
+    "block": 54705887,
+    "at": 1788569458000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xc2881e3e671a57c96f63cc0473f5df2e58df5d47",
+    "side": "buy",
+    "usd": 34371.54,
+    "tokens": 147060.635209316,
+    "signature": "0x2bbb40cac55739a785dc78bb581679fb6117899d420be1be060bdce7ae9590d6",
+    "block": 54706762,
+    "at": 1788569548000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x15ab8ec4d9e7c3efd57a9571e601a43e99e9553f",
+    "side": "sell",
+    "usd": 33997.8545276269,
+    "tokens": 151736.807290477,
+    "signature": "0xb29cc60542a4a7393bfc18eb8fe6969eca5907b750d09337e139f2578f893b1a",
+    "block": 54716714,
+    "at": 1788570550000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xa8a57dc6adfaed37349cb8a20b3dc83f37e9643b",
+    "side": "buy",
+    "usd": 30688.625,
+    "tokens": 130000.264606078,
+    "signature": "0x5274bc1f3b364249c286c6d644235ca9af4781d8c2fcb1085762a74c0c826bf1",
+    "block": 54707015,
+    "at": 1788569574000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xb5b87fc92e35d8bd32541363ad0f0e1f829fa89c",
+    "side": "sell",
+    "usd": 10579.9634976758,
+    "tokens": 46517.8035666779,
+    "signature": "0x23614571914f9c0151f65e3e5c5e62908d036a892e2119bdef3e499c5d641083",
+    "block": 54715814,
+    "at": 1788570461000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x97c013779b7b895689c00d270c81ee0621e91495",
+    "side": "sell",
+    "usd": 9284.02211115443,
+    "tokens": 41102.9496354445,
+    "signature": "0x654c5b2e476f07dc678fc23e91bfb250f218bfc93f6eb54c70fe0355490770f2",
+    "block": 54716497,
+    "at": 1788570528000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x4337fa4d86d4b6a2634900effb713bf6fb685835",
+    "side": "sell",
+    "usd": 8693.82658486082,
+    "tokens": 38414.2593730793,
+    "signature": "0xe6cc648ee0e7bf4497207e74b8fbedd27de5c7d9a59bd3a0b6550cb536427d04",
+    "block": 54716329,
+    "at": 1788570511000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x4337005db25dbad41da5692ba1188751ee5d98b6",
+    "side": "sell",
+    "usd": 6658.05421658059,
+    "tokens": 29803.1536490818,
+    "signature": "0x255f57da9042363ff7d3f6ff88805e3a12f2b3c5e072c45540ab109efe607854",
+    "block": 54719867,
+    "at": 1788570868000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x195fcb61b9e1d73ca3456f6106dba087cee542d8",
+    "side": "buy",
+    "usd": 6108.5575355112,
+    "tokens": 26784.5127548911,
+    "signature": "0xf9a4fda550bc0c1e3ff8927624cb28804533c8914b431371de3f9a5683d91aeb",
+    "block": 54718668,
+    "at": 1788570748000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x2afaede2cc20f05766a42efaea85680afe81f6dc",
+    "side": "sell",
+    "usd": 5755.9863352892,
+    "tokens": 25373.3474000062,
+    "signature": "0xe0b7cb7a0d44c837f11e8d5a1a1da36e1a17afc4f9ecd6f1fc4e903d11b5e3c5",
+    "block": 54716315,
+    "at": 1788570510000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x655bf2f3c5528d8fd14694113c4a240a67e3ce05",
+    "side": "sell",
+    "usd": 5263.70242227677,
+    "tokens": 23583.8779608846,
+    "signature": "0x7adf01ba22fa795e1fbc1ee09ecdc742e2f649549f3307f9190d82bbfe0e8f43",
+    "block": 54721061,
+    "at": 1788570989000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x027328fe9c07255f0b84bcfb0863a79074369679",
+    "side": "sell",
+    "usd": 4102.50130963199,
+    "tokens": 17994,
+    "signature": "0x0629dfe933ebeccc98be0882396d8d2375bd42efdf2ef65a057d552918b24182",
+    "block": 54715497,
+    "at": 1788570429000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   }
+  ],
+  "sample": 300
+ },
+ "derived": {
+  "totalLiquidityUsd": 12586027.43,
+  "volToLiqRatio": 0.61,
+  "fdvToLiqRatio": 17.7,
+  "buySellRatio24h": 1.04,
+  "txns24h": 8170,
+  "avgTradeSizeUsd": 935.55,
+  "gasRoundTripPct": 1.983,
+  "markAgeMs": 3840,
+  "uniqueTraders24h": 119,
+  "roundTripWalletPct": 23.2,
+  "sameBlockTradePct": 52.3,
+  "interArrivalCv": 3.24,
+  "commonFunderPct": null,
+  "customRouterPct": null,
+  "flowSample": 300,
+  "flowNote": "computed on the indexer's most recent 300 trades, not the full 24h tape",
+  "exemptShareOfSupplyPct": null,
+  "voidedTxPct": null
+ },
+ "xRead": null
+}

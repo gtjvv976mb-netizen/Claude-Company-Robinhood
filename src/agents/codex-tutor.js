@@ -168,7 +168,7 @@ const TutorOut = z.object({
     .describe("when nothing is worth changing, why — this is a valid and common answer"),
 });
 
-const TUTOR_SYSTEM = `You are CODEX BANKS, the coach of a Solana research desk.
+const TUTOR_SYSTEM = `You are CODEX BANKS, the coach of a research desk trading memecoins on Robinhood Chain.
 
 You do not trade, size, rank or publish anything. You change HOW THE SEATS THINK, by
 rewriting the standing orders appended to their instructions. Your changes take effect
@@ -218,6 +218,15 @@ export async function techniqueReview({ horizonMin = GRADE_HORIZON_MIN, dryRun =
   try {
     out = await ask({
       seat: "Codex",
+      /* The call shipped with NO model. ask() has no default — buildRequest sets
+       * `model` from its argument unconditionally — so the request left without one,
+       * the API's 400 is not retryable (no "parse" in the message), and the failure
+       * surfaced only as tutor:failed every TUTOR_REVIEW_MINS. The whole standing-orders
+       * loop therefore never fired. Not observed in a live log from here: it is what the
+       * code path says, and there is no branch that supplies a model. Opus at medium:
+       * a 3-hourly call over a small scorecard JSON that rewrites how seats think. */
+      model: process.env.DESK_MODEL_TUTOR || "claude-opus-5",
+      effort: "medium",
       schema: TutorOut,
       system: TUTOR_SYSTEM,
       prompt:

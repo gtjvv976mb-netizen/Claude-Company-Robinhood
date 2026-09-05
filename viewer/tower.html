@@ -140,7 +140,7 @@ button.home.on{background:var(--good,#4f8f52);color:#fff;border-color:transparen
   <aside class="rail">
     <div class="railhead">
       <h2>The Directory</h2>
-      <p>Every floor is one desk: sixteen agents researching Solana, and a boss who signs off.</p>
+      <p>Every floor is one desk: sixteen agents researching Robinhood Chain, and a boss who signs off.</p>
     </div>
     <div class="wallet" id="wallet"></div>
     <div class="sel" id="sel"></div>
@@ -848,12 +848,21 @@ window.select = select;
 
 <script type="module">
 /* ═══════════════════════════════════════════════════════════════════════════
-   WALLET — connect, prove, lease.
+   WALLET — connect, prove, lease. Robinhood Chain edition (eip155:4663).
 
    The only thing a visitor ever signs here is a plain text message. It is not a
    transaction, it moves no funds, and it cannot be replayed: the nonce behind it is
-   single-use and expires in five minutes. Paying for a floor is a transfer the visitor
-   builds in their own wallet, to a published address — never a blob this site composed.
+   single-use and expires in five minutes. Paying for a floor is an ERC-20 transfer the
+   visitor's OWN wallet builds and sends, to a published treasury — this page hands it
+   four bytes of selector and two padded words, never a key.
+
+   What changed from the Solana module this replaces: discovery is EIP-6963 (the only
+   thing that tells Phantom, Rabby, MetaMask, Coinbase and Trust apart when they all
+   fight over window.ethereum); connect is eth_requestAccounts; the chain is checked and
+   switched-or-added before any nonce is asked for; the signature is personal_sign with
+   params [hexMessage, address] (eth_sign is the reverse order — a classic footgun) and
+   goes to the server as 0x-hex, so the base58 encoder is gone; and there is no web3
+   bundle from a CDN, because an ERC-20 transfer needs no library at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 // The static site is served from one origin and the API from another, so every call
 // is prefixed. Empty string keeps local dev (one server, both roles) working unchanged.
@@ -866,11 +875,29 @@ const api = (p, opts = {}) => fetch(API_BASE + p, {
 const token = () => { try { return localStorage.getItem("cc_token"); } catch { return null; } };
 const setToken = (t) => { try { t ? localStorage.setItem("cc_token", t) : localStorage.removeItem("cc_token"); } catch {} };
 
+/* The exact EIP-3085 object Robinhood's own docs and every wallet registry (Rabby, LiFi,
+   Relay) agree on, measured 2026-09-05. chainId MUST be the unpadded lowercase hex
+   STRING: MetaMask fetches eth_chainId from rpcUrls[0] and string-compares it to this
+   request before it will show the prompt. decimals must be exactly 18. Never a keyed RPC
+   URL here — it would sit in every visitor's wallet and in page source. */
+const CHAIN = Object.freeze({
+  id: 4663, hex: "0x1237", ns: "eip155:4663", name: "Robinhood Chain",
+  add: { chainId: "0x1237", chainName: "Robinhood Chain",
+    rpcUrls: ["https://rpc.mainnet.chain.robinhood.com/"],
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    blockExplorerUrls: ["https://robinhoodchain.blockscout.com/"] },
+});
+/* Compare with BigInt: Phantom/Rabby answer "0x1237", a legacy provider can answer
+   "4663", and a string compare calls the right chain wrong. */
+const onOurChain = (cid) => { try { return BigInt(cid) === BigInt(CHAIN.id); } catch { return false; } };
+
 const wbtn = document.getElementById("wbtn");
 const wpanel = document.getElementById("wallet");
 let ME = null, CFG = null;
+/* The provider that signed in, kept for payments: { info:{name,rdns,icon}, provider }. */
+let ACTIVE = null;
 
-const short = (a) => a ? a.slice(0, 4) + "…" + a.slice(-4) : "";
+const short = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
 const fmt = (baseUnits, dec) => (Number(BigInt(baseUnits) / 10n ** BigInt(Math.max(0, dec - 3))) / 1000)
   .toLocaleString(undefined, { maximumFractionDigits: 3 });
 
@@ -892,7 +919,7 @@ async function refreshMe() {
 function renderWallet() {
   if (!ME) {
     wpanel.classList.remove("on");
-    wbtn.textContent = "Connect wallet";
+    wbtn.textContent = GATE?.wallet && !token() ? `Continue as ${short(GATE.wallet)}` : "Connect wallet";
     wbtn.classList.remove("on");
     return;
   }
@@ -902,6 +929,9 @@ function renderWallet() {
   wpanel.innerHTML = "";
   const a = document.createElement("div");
   a.className = "addr"; a.textContent = ME.wallet;
+  const ch = document.createElement("div");
+  ch.className = "bal"; ch.style.opacity = ".7";
+  ch.textContent = `${CHAIN.name} · chain ${CHAIN.id}`;
   const wal = document.createElement("div");
   wal.className = "bal";
   wal.innerHTML = "In your wallet: <b></b> $CLAUDECO";
@@ -913,8 +943,10 @@ function renderWallet() {
   const note = document.createElement("div");
   note.className = "bal";
   note.style.opacity = ".7";
-  note.textContent = "Credit is what you've sent the treasury and not yet spent — it pays leases, rent and runs.";
-  wpanel.append(a, wal, bal, note);
+  note.textContent = ME.launched === false
+    ? "The Robinhood-edition token is not launched yet — balances read “—” until it is."
+    : "Credit is what you've sent the treasury and not yet spent — it pays leases, rent and runs.";
+  wpanel.append(a, ch, wal, bal, note);
   if (ME.lease) {
     const m = document.createElement("div");
     m.className = "mine";
@@ -924,33 +956,29 @@ function renderWallet() {
 }
 
 /* ── which wallet? ──────────────────────────────────────────────────────────
-   Every modern Solana wallet — Phantom, Solflare, Backpack, Glow, Coinbase —
-   announces itself to the page via the Wallet Standard, so the chooser lists
-   what is actually installed instead of hardcoding one brand. Legacy injected
-   providers are swept up as a fallback for anything that predates the
-   standard. The auth flow itself is unchanged: connect, sign the nonce
-   message, verify — whoever does the signing. */
-const FOUND_WALLETS = new Map();
+   EIP-6963: every modern EVM wallet announces itself with a stable rdns and an icon,
+   so the chooser lists what is actually installed instead of hardcoding one brand.
+   The listener is registered BEFORE the request is dispatched — a wallet that
+   announced before anyone listened is a wallet that was never found. Phantom's EVM
+   provider (window.phantom.ethereum, chain 4663 built in) and a bare window.ethereum
+   are swept up as fallbacks for anything that predates the standard. */
+const FOUND_WALLETS = new Map();          // rdns -> { info, provider }
 (function discoverWallets() {
-  const api = { register: (...ws) => { for (const w of ws) {
-    const chains = w.chains ?? [];
-    const canSign = !!w.features?.["solana:signMessage"] && !!w.features?.["standard:connect"];
-    if (canSign && chains.some((c) => String(c).startsWith("solana:")))
-      FOUND_WALLETS.set(w.name, { kind: "standard", w });
-  } } };
-  window.addEventListener("wallet-standard:register-wallet", (e) => { try { e.detail(api); } catch {} });
+  window.addEventListener("eip6963:announceProvider", (e) => {
+    const d = e.detail;
+    if (d?.provider && d?.info?.rdns) FOUND_WALLETS.set(d.info.rdns, { info: d.info, provider: d.provider });
+  });
   /* SCAN AGAIN, ON DEMAND. Discovery used to run once, 300ms after load — and a
      wallet that injects a moment later (a slow page, an in-app browser, an
      extension waking up) was simply never found. The button then "did nothing",
      because the no-wallets path called window.open, which browsers block. */
   window.__scanWallets = () => {
-    try { window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", { detail: api })); } catch {}
-    if (window.solana?.isPhantom && ![...FOUND_WALLETS.keys()].some((n) => /phantom/i.test(n)))
-      FOUND_WALLETS.set("Phantom", { kind: "legacy", w: window.solana });
-    if (window.solflare?.isSolflare && ![...FOUND_WALLETS.keys()].some((n) => /solflare/i.test(n)))
-      FOUND_WALLETS.set("Solflare", { kind: "legacy", w: window.solflare });
-    if (window.backpack && ![...FOUND_WALLETS.keys()].some((n) => /backpack/i.test(n)))
-      FOUND_WALLETS.set("Backpack", { kind: "legacy", w: window.backpack });
+    try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch {}
+    const ph = window.phantom?.ethereum;
+    if (ph && ![...FOUND_WALLETS.keys()].some((r) => /phantom/i.test(r)))
+      FOUND_WALLETS.set("app.phantom", { info: { name: "Phantom", rdns: "app.phantom" }, provider: ph });
+    if (!FOUND_WALLETS.size && window.ethereum)
+      FOUND_WALLETS.set("legacy", { info: { name: window.ethereum.isMetaMask ? "MetaMask" : "Browser wallet", rdns: "legacy" }, provider: window.ethereum });
     return FOUND_WALLETS.size;
   };
   window.__scanWallets();
@@ -958,7 +986,49 @@ const FOUND_WALLETS = new Map();
   setTimeout(window.__scanWallets, 1200);          // late injectors
 })();
 
-function chooseWallet() {
+const isMobile = () => /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+function overlay(inner) {
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;z-index:80;background:rgba(10,14,16,.6);display:grid;place-items:center";
+  const bx = document.createElement("div");
+  bx.style.cssText = "background:var(--panel,#1b2b2f);color:inherit;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:20px 22px;max-width:360px;min-width:260px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5";
+  ov.appendChild(bx);
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.onclick = (e) => { if (e.target === ov) { close(); inner.onClose?.(); } };
+  return { ov, bx, close };
+}
+
+function noWalletModal(resolve) {
+  /* A blocked popup is indistinguishable from a broken button. Say what is wrong, in
+     the page, with real links the browser will honour. Desktop and phone get different
+     doors: an extension cannot exist on a phone, and a phone browser can hand this URL
+     to the wallet's own in-app browser. */
+  const { bx, close } = overlay({ onClose: () => resolve(null) });
+  const here = location.href;
+  const link = (text, href) => `<a href="${href}" target="_blank" rel="noopener" style="color:var(--amber,#e0ad3d)">${text} ↗</a>`;
+  bx.innerHTML = "<div style='font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.7'>No wallet found</div>" +
+    (isMobile()
+      ? `<div>Open this page inside a wallet that speaks ${CHAIN.name}.</div>` +
+        `<div style='display:flex;flex-direction:column;gap:6px'>` +
+        link("Open in Phantom", `https://phantom.app/ul/browse/${encodeURIComponent(here)}?ref=${encodeURIComponent(location.origin)}`) +
+        link("Open in MetaMask", `https://link.metamask.io/dapp/${location.host}${location.pathname}${location.search}`) +
+        `</div><div style='opacity:.8;font-size:12px'>Robinhood Wallet: open its in-app browser and type this address — it has no deep link yet.</div>`
+      : `<div>This browser has no EVM wallet extension available to the page.</div>` +
+        `<div style='display:flex;flex-direction:column;gap:6px'>` +
+        link("Get Phantom", "https://phantom.app/download") +
+        link("Get Rabby", "https://rabby.io/") +
+        link("Get MetaMask", "https://metamask.io/download/") +
+        `</div><div style='opacity:.8;font-size:12px'>If one IS installed: unlock it, then press Connect again — a locked wallet does not announce itself.</div>`);
+  const cl = document.createElement("button");
+  cl.textContent = "Close";
+  cl.style.cssText = "font:inherit;font-size:11px;opacity:.7;background:none;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:6px 10px;color:inherit;cursor:pointer;align-self:flex-start";
+  cl.onclick = () => { close(); resolve(null); };
+  bx.appendChild(cl);
+}
+
+function chooseWallet(preferRdns = null) {
   return new Promise(async (resolve) => {
     // one more look at click time — the wallet may have arrived since load
     if (!FOUND_WALLETS.size) {
@@ -967,206 +1037,204 @@ function chooseWallet() {
       window.__scanWallets?.();
     }
     const list = [...FOUND_WALLETS.entries()];
-    if (!list.length) {
-      /* A blocked popup is indistinguishable from a broken button. Say what is
-         wrong, in the page, with a real link the browser will honour. */
-      const ov = document.createElement("div");
-      ov.style.cssText = "position:fixed;inset:0;z-index:80;background:rgba(10,14,16,.6);display:grid;place-items:center";
-      const bx = document.createElement("div");
-      bx.style.cssText = "background:var(--panel,#1b2b2f);color:inherit;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:20px 22px;max-width:340px;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.5";
-      bx.innerHTML = "<div style='font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.7'>No wallet found</div>" +
-        "<div>This browser has no Solana wallet extension available to the page.</div>" +
-        "<div style='opacity:.8;font-size:12px'>If Phantom IS installed: unlock it, then press Connect again \u2014 a locked wallet does not announce itself. On a phone, open this page inside your wallet's own browser.</div>" +
-        "<a href='https://phantom.app/download' target='_blank' rel='noopener' style='color:var(--amber,#e0ad3d)'>Get Phantom \u2197</a>";
-      const cl = document.createElement("button");
-      cl.textContent = "Close";
-      cl.style.cssText = "font:inherit;font-size:11px;opacity:.7;background:none;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:6px 10px;color:inherit;cursor:pointer;align-self:flex-start";
-      cl.onclick = () => { ov.remove(); resolve(null); };
-      bx.appendChild(cl);
-      ov.appendChild(bx);
-      ov.onclick = (e) => { if (e.target === ov) { ov.remove(); resolve(null); } };
-      document.body.appendChild(ov);
-      return;
-    }
+    if (!list.length) return noWalletModal(resolve);
+    if (preferRdns && FOUND_WALLETS.has(preferRdns)) return resolve(FOUND_WALLETS.get(preferRdns));
     if (list.length === 1) return resolve(list[0][1]);
-    const overlay = document.createElement("div");
-    overlay.style.cssText = "position:fixed;inset:0;z-index:80;background:rgba(10,14,16,.6);display:grid;place-items:center";
-    const box = document.createElement("div");
-    box.style.cssText = "background:var(--panel,#1b2b2f);color:inherit;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:18px 20px;min-width:260px;display:flex;flex-direction:column;gap:8px";
-    box.innerHTML = "<div style='font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.7'>Sign in with</div>";
-    for (const [name, entry] of list) {
+    const { bx, close } = overlay({ onClose: () => resolve(null) });
+    bx.innerHTML = "<div style='font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.7'>Sign in with</div>";
+    for (const [, entry] of list) {
       const btn = document.createElement("button");
       btn.style.cssText = "display:flex;align-items:center;gap:10px;font:inherit;padding:10px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;cursor:pointer;text-align:left";
-      const ico = entry.kind === "standard" && entry.w.icon ? `<img src="${entry.w.icon}" width="22" height="22" style="border-radius:5px" alt="">` : "👛";
-      btn.innerHTML = `${ico}<span>${name}</span>`;
-      btn.onclick = () => { document.body.removeChild(overlay); resolve(entry); };
-      box.appendChild(btn);
+      const ico = entry.info.icon ? `<img src="${entry.info.icon}" width="22" height="22" style="border-radius:5px" alt="">` : "👛";
+      btn.innerHTML = `${ico}<span></span>`;
+      btn.querySelector("span").textContent = entry.info.name;
+      btn.onclick = () => { close(); resolve(entry); };
+      bx.appendChild(btn);
     }
     const cancel = document.createElement("button");
     cancel.textContent = "Cancel";
     cancel.style.cssText = "font:inherit;font-size:11px;opacity:.6;background:none;border:none;color:inherit;cursor:pointer;margin-top:2px";
-    cancel.onclick = () => { document.body.removeChild(overlay); resolve(null); };
-    box.appendChild(cancel);
-    overlay.appendChild(box);
-    overlay.onclick = (e) => { if (e.target === overlay) { document.body.removeChild(overlay); resolve(null); } };
-    document.body.appendChild(overlay);
+    cancel.onclick = () => { close(); resolve(null); };
+    bx.appendChild(cancel);
   });
 }
 
-async function walletConnect(entry) {
-  if (entry.kind === "legacy") {
-    const { publicKey } = await entry.w.connect();
-    window.__walletTx = { kind: "legacy", w: entry.w };
-    return { wallet: publicKey.toString(),
-      sign: async (bytes) => { const s = await entry.w.signMessage(bytes, "utf8"); return s.signature ?? s; } };
+/* ── the chain guard ────────────────────────────────────────────────────────
+   Switch, and if the wallet has never heard of 4663 (MetaMask, Coinbase extension —
+   Rabby and Phantom ship it built in) add it, then CHECK AGAIN: MetaMask can add a
+   network without switching to it. No nonce is requested until eth_chainId agrees. */
+async function ensureChain(provider) {
+  let cid = await provider.request({ method: "eth_chainId" });
+  if (onOurChain(cid)) return true;
+  try {
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN.hex }] });
+  } catch (e) {
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4902 || code === -32603 /* some mobiles */) {
+      await provider.request({ method: "wallet_addEthereumChain", params: [CHAIN.add] });
+    } else throw e;
   }
-  const res = await entry.w.features["standard:connect"].connect();
-  const account = res.accounts.find((a) => (a.chains ?? []).some((c) => String(c).startsWith("solana:"))) ?? res.accounts[0];
-  if (!account) throw new Error("the wallet returned no account");
-  window.__walletTx = { kind: "standard", w: entry.w, account };
-  return { wallet: account.address,
-    sign: async (bytes) => {
-      const [out] = await entry.w.features["solana:signMessage"].signMessage({ account, message: bytes });
-      return out.signature;
-    } };
+  cid = await provider.request({ method: "eth_chainId" });
+  if (!onOurChain(cid)) throw Object.assign(new Error("wrong-chain"), { code: "wrong-chain" });
+  return true;
+}
+
+/* ── the wrong-chain banner ─────────────────────────────────────────────── */
+let banner = null;
+function showChainBanner(provider) {
+  if (banner) return;
+  banner = document.createElement("div");
+  banner.id = "chainbanner";
+  banner.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:70;background:var(--panel,#1b2b2f);color:inherit;border:1px solid var(--amber,#e0ad3d);border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;gap:12px;align-items:center;max-width:92vw";
+  const t = document.createElement("span");
+  t.textContent = `Your wallet is on another network. This building is on ${CHAIN.name} (chain ${CHAIN.id}).`;
+  const b = document.createElement("button");
+  b.textContent = `Switch to ${CHAIN.name}`;
+  b.style.cssText = "font:inherit;font-size:11px;background:var(--amber,#e0ad3d);color:#2a2018;border:none;border-radius:6px;padding:6px 10px;cursor:pointer";
+  b.onclick = async () => { try { await ensureChain(provider); hideChainBanner(); } catch {} };
+  banner.append(t, b);
+  document.body.appendChild(banner);
+}
+function hideChainBanner() { banner?.remove(); banner = null; }
+
+function attachProviderEvents(provider) {
+  if (provider.__ccWired) return;
+  provider.__ccWired = true;
+  try {
+    /* The account changed under a session that proves a DIFFERENT account: sign out,
+       never carry on as the previous owner. */
+    provider.on?.("accountsChanged", (accs) => {
+      if (!ME) return;
+      const now = (accs?.[0] || "").toLowerCase();
+      if (now !== ME.wallet) signOut();
+    });
+    provider.on?.("chainChanged", (cid) => { onOurChain(cid) ? hideChainBanner() : showChainBanner(provider); });
+    provider.on?.("disconnect", () => { if (ME) signOut(); });
+  } catch {}
+}
+
+async function signOut() {
+  await api("/api/auth/signout", { method: "POST", body: "{}" }).catch(() => {});
+  setToken(null); ME = null; ACTIVE = null; renderWallet(); renderSel();
+}
+
+/* ── THE GATEWAY HAND-OFF ────────────────────────────────────────────────────
+   The gateway page stores sessionStorage cc_gate = { world, wallet } when a visitor
+   picks this building. If it names this world and a wallet, the provider is
+   pre-selected and the button reads "Continue as 0x…" — the person still clicks, and
+   the wallet still shows its own sheet. Nothing is ever signed without that click. */
+const GATE = (() => {
+  try {
+    const g = JSON.parse(sessionStorage.getItem("cc_gate") || "null");
+    if (g && g.world === "rh" && /^0x[0-9a-fA-F]{40}$/.test(String(g.wallet || "")))
+      return { world: "rh", wallet: String(g.wallet).toLowerCase(), rdns: g.rdns || null };
+  } catch {}
+  return null;
+})();
+/* Which installed provider already holds the gateway's wallet? eth_accounts is silent —
+   it prompts nobody — so this can run at load. */
+async function providerHolding(wallet) {
+  for (const [rdns, entry] of FOUND_WALLETS) {
+    try {
+      const accs = await entry.provider.request({ method: "eth_accounts" });
+      if ((accs || []).some((a) => String(a).toLowerCase() === wallet)) return rdns;
+    } catch {}
+  }
+  return null;
 }
 
 async function connect() {
-  if (ME) {                                   // already signed in → sign out
-    await api("/api/auth/signout", { method: "POST", body: "{}" });
-    setToken(null); ME = null; renderWallet(); renderSel(); return;
-  }
-  const entry = await chooseWallet();
+  if (ME) return signOut();                   // already signed in → sign out
+  let prefer = GATE?.rdns || null;
+  if (GATE?.wallet && !prefer) prefer = await providerHolding(GATE.wallet);
+  const entry = await chooseWallet(prefer);
   if (!entry) return;
+  const { provider } = entry;
   try {
-    const { wallet, sign } = await walletConnect(entry);
-    const { body: n } = await api("/api/auth/nonce", { method: "POST", body: JSON.stringify({ wallet }) });
+    const accounts = await provider.request({ method: "eth_requestAccounts" });
+    const address = String(accounts?.[0] || "");
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new Error("the wallet returned no account");
+    await ensureChain(provider);
+    hideChainBanner();
+
+    const { body: n } = await api("/api/auth/nonce", { method: "POST", body: JSON.stringify({ wallet: address, chain: CHAIN.ns }) });
     if (!n?.message) throw new Error(n?.error || "could not start sign-in");
 
-    const encoded = new TextEncoder().encode(n.message);
-    const signed = await sign(encoded);
-    // wallets return bytes; the server wants base58
-    const sigB58 = b58(signed);
+    // personal_sign takes [message, address] — hex of the UTF-8 bytes, address second.
+    const hex = "0x" + [...new TextEncoder().encode(n.message)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const signature = await provider.request({ method: "personal_sign", params: [hex, address] });
 
     const { status, body } = await api("/api/auth/verify", {
-      method: "POST", body: JSON.stringify({ wallet, nonce: n.nonce, signature: sigB58 }),
+      method: "POST", body: JSON.stringify({ wallet: address, nonce: n.nonce, signature, chain: CHAIN.ns }),
     });
     if (status !== 200) throw new Error(body.error || "sign-in failed");
     setToken(body.token);
+    ACTIVE = entry;
+    attachProviderEvents(provider);
+    try { sessionStorage.removeItem("cc_gate"); } catch {}
     await refreshMe();
   } catch (e) {
-    if (!/User rejected|4001/i.test(String(e?.message))) alert("Sign-in failed: " + (e?.message || e));
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4001 || /User rejected/i.test(String(e?.message))) return;      // declined: silent, as before
+    if (code === -32002) return alert("Your wallet already has a request open — check its pop-up, then try again.");
+    if (code === "wrong-chain") return showChainBanner(provider);
+    alert("Sign-in failed: " + (e?.message || e));
   }
 }
 
 /* ── ONE-SIGNATURE LEASING ────────────────────────────────────────────────
-   The buyer should be a signer, not a postman. This builds the SPL transfer
-   in-page (web3.js from CDN, loaded only when needed), the wallet signs it,
-   and the building's scanner + an allocate poll do the rest. Non-custodial
-   end to end: the only key that ever signs is the buyer's own. */
-let _web3;
-function loadWeb3() {
-  if (_web3) return _web3;
-  _web3 = new Promise((res, rej) => {
-    if (window.solanaWeb3) return res(window.solanaWeb3);
-    const sc = document.createElement("script");
-    sc.src = "https://unpkg.com/@solana/web3.js@1.95.8/lib/index.iife.min.js";
-    sc.onload = () => window.solanaWeb3 ? res(window.solanaWeb3) : rej(new Error("web3 failed to load"));
-    sc.onerror = () => rej(new Error("web3 failed to load"));
-    document.head.appendChild(sc);
-  });
-  return _web3;
+   The buyer should be a signer, not a postman. An ERC-20 transfer is one call:
+   transfer(address to, uint256 amount) = selector a9059cbb + two 32-byte words. The
+   page encodes that by hand, the wallet fills nonce and gas itself and sends it, and
+   the building's log scanner + an allocate poll do the rest. Non-custodial end to
+   end: the only key that ever signs is the buyer's own. Nothing here waits on a
+   receipt — the sequencer can drop a tx silently; the credit poll is the truth. */
+const pad32 = (hex) => String(hex).replace(/^0x/, "").padStart(64, "0");
+function transferCalldata(to, amountBaseUnits) {
+  return "0xa9059cbb" + pad32(to.toLowerCase()) + pad32(BigInt(amountBaseUnits).toString(16));
 }
 
 async function payTreasury(amountBaseUnits, onStep) {
-  const W3 = await loadWeb3();
-  const handle = window.__walletTx;
-  if (!handle) throw new Error("connect the wallet first");
-  if (!CFG.pay?.treasuryTokenAccount || !CFG.pay?.tokenProgram)
-    throw new Error("one-click pay is not ready — use the manual send below");
-  const owner = new W3.PublicKey(ME.wallet);
-  const mint = new W3.PublicKey(CFG.mint);
-  const tokenProgram = new W3.PublicKey(CFG.pay.tokenProgram);
-  const dest = new W3.PublicKey(CFG.pay.treasuryTokenAccount);
-  const ATA_PROGRAM = new W3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-  const [src] = W3.PublicKey.findProgramAddressSync(
-    [owner.toBytes(), tokenProgram.toBytes(), mint.toBytes()], ATA_PROGRAM);
-
-  onStep("Preparing the transfer\u2026");
-  // The wallet submits the transaction through its own infrastructure; the
-  // only chain read the page needs is a fresh blockhash, served by our API
-  // (the public RPC 403s browsers).
-  const { status: bhs, body: bh } = await api("/api/pay/blockhash");
-  if (bhs !== 200 || !bh?.blockhash) throw new Error("could not fetch a blockhash — try again in a moment");
-  const blockhash = bh.blockhash;
-
-  // TransferChecked, hand-encoded: [12][amount u64 LE][decimals u8]
-  const data = new Uint8Array(10);
-  data[0] = 12;
-  let v = BigInt(amountBaseUnits);
-  for (let i = 0; i < 8; i++) { data[1 + i] = Number(v & 0xffn); v >>= 8n; }
-  data[9] = CFG.decimals;
-  const ix = new W3.TransactionInstruction({
-    programId: tokenProgram,
-    keys: [
-      { pubkey: src, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: dest, isSigner: false, isWritable: true },
-      { pubkey: owner, isSigner: true, isWritable: false },
-    ],
-    data,
-  });
-  const tx = new W3.Transaction({ feePayer: owner, recentBlockhash: blockhash }).add(ix);
-
-  onStep("Sign in your wallet\u2026");
-  if (handle.kind === "legacy") {
-    const { signature } = await handle.w.signAndSendTransaction(tx);
-    return signature;
+  if (!ACTIVE?.provider) throw new Error("connect the wallet first");
+  if (!CFG?.pay?.token || !CFG?.pay?.treasury) {
+    throw new Error(CFG?.launched === false
+      ? "the Robinhood-edition token is not launched yet — leasing opens when it is"
+      : "one-click pay is not ready — use the manual send below");
   }
-  const feat = handle.w.features["solana:signAndSendTransaction"];
-  if (!feat) throw new Error("this wallet cannot send transactions here — use the manual send below");
-  const [out] = await feat.signAndSendTransaction({
-    account: handle.account, chain: "solana:mainnet",
-    transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }),
-  });
-  return b58(out.signature);
+  const provider = ACTIVE.provider;
+  onStep("Checking the network…");
+  await ensureChain(provider);
+  onStep("Sign in your wallet…");
+  const hash = await provider.request({ method: "eth_sendTransaction", params: [{
+    from: ME.wallet, to: CFG.pay.token, value: "0x0",
+    data: transferCalldata(CFG.pay.treasury, amountBaseUnits),
+  }] });
+  return hash;
 }
 
 async function buyAndLease(floorNo, wrap, btn) {
   const step = (t) => { wrap.className = "msg"; wrap.textContent = t; };
   try {
     btn.disabled = true;
-    const sig = await payTreasury(CFG.priceBaseUnits, step);
-    step(`Signed \u2713 (${String(sig).slice(0, 8)}\u2026) \u2014 waiting for the chain, then the building credits you\u2026`);
-    // The scanner walks the chain every 20s; poll until the credit lands, then claim.
+    const hash = await payTreasury(CFG.priceBaseUnits, step);
+    step(`Sent ✓ (${String(hash).slice(0, 10)}…) — waiting for the chain, then the building credits you…`);
+    // The scanner reads Transfer logs every 20s; poll until the credit lands, then claim.
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 6000));
       await refreshMe();
       if (ME && BigInt(ME.balanceBaseUnits) >= BigInt(ME.priceBaseUnits)) {
-        step("Credited \u2014 claiming the floor\u2026");
+        step("Credited — claiming the floor…");
         const { status, body } = await api("/api/lease/allocate", { method: "POST", body: JSON.stringify({ floorNo }) });
         if (status === 200) { wrap.className = "msg ok"; wrap.textContent = `Floor ${floorNo} is yours.`; await refreshMe(); await loadFloors(); renderSel(); return; }
         throw new Error(body.error || "could not claim the floor");
       }
     }
-    step("Payment sent \u2014 the credit is still confirming. This panel updates itself; the floor is one click away once it lands.");
+    step("Payment sent — the credit is still confirming. This panel updates itself; the floor is one click away once it lands.");
   } catch (e) {
+    const code = e?.code ?? e?.data?.originalError?.code;
     wrap.className = "msg err";
-    wrap.textContent = String(e?.message || e);
+    wrap.textContent = code === 4001 ? "Cancelled in the wallet." : String(e?.message || e);
   } finally { btn.disabled = false; }
-}
-
-const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-function b58(bytes) {
-  const arr = [...bytes]; const digits = [];
-  for (const byte of arr) {
-    let carry = byte;
-    for (let i = 0; i < digits.length; i++) { carry += digits[i] << 8; digits[i] = carry % 58; carry = (carry / 58) | 0; }
-    while (carry) { digits.push(carry % 58); carry = (carry / 58) | 0; }
-  }
-  let out = "";
-  for (let k = 0; k < arr.length && arr[k] === 0; k++) out += "1";
-  return out + digits.reverse().map((d) => B58[d]).join("");
 }
 
 wbtn.addEventListener("click", connect);
@@ -1192,7 +1260,12 @@ window.__leaseUI = function (f, selEl) {
     // symptom that made the contradiction visible in the first place.
     return;
   }
-  if (!CFG.ready) { wrap.textContent = "Leasing opens once the treasury is configured."; selEl.appendChild(wrap); return; }
+  if (!CFG.ready) {
+    wrap.textContent = CFG.launched === false
+      ? "Leasing opens when the Robinhood-edition token launches."
+      : "Leasing opens once the treasury is configured.";
+    selEl.appendChild(wrap); return;
+  }
 
   const btn = document.createElement("button");
   btn.className = "btn primary"; btn.type = "button";
@@ -1208,9 +1281,9 @@ window.__leaseUI = function (f, selEl) {
     wrap.textContent = "One floor per wallet.";
     selEl.appendChild(wrap);
   } else if (BigInt(ME.balanceBaseUnits) < BigInt(ME.priceBaseUnits)) {
-    btn.textContent = `Buy & lease floor ${f.n} \u2014 one signature`;
+    btn.textContent = `Buy & lease floor ${f.n} — one signature`;
     btn.onclick = () => buyAndLease(f.n, wrap, btn);
-    // the manual route stays for wallets that cannot sign transactions here
+    // the manual route stays for wallets that cannot send from this page
     const alt = document.createElement("details");
     alt.style.marginTop = "10px";
     const sm = document.createElement("summary");
@@ -1218,7 +1291,7 @@ window.__leaseUI = function (f, selEl) {
     sm.style.cssText = "cursor:pointer;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.7";
     const code = document.createElement("div");
     code.style.cssText = "font-family:'JetBrains Mono',monospace;font-size:11px;word-break:break-all;margin:8px 0;color:var(--ink)";
-    code.textContent = `${CFG.priceTokens.toLocaleString()} $CLAUDECO \u2192 ${CFG.treasury}`;
+    code.textContent = `${CFG.priceTokens.toLocaleString()} $CLAUDECO (token ${CFG.token}) → ${CFG.treasury} on ${CHAIN.name} (chain ${CHAIN.id})`;
     const note = document.createElement("div");
     note.style.fontSize = "11.5px";
     note.textContent = "The building watches the chain and credits you automatically, usually within a minute. Then press Lease.";

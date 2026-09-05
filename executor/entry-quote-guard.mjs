@@ -1,4 +1,4 @@
-import { PYTH_SOL_USD_CACHE_SOURCE, SOL_USD_ORACLE_POLICY } from "./sol-usd-oracle.mjs";
+import { ETH_USD_CACHE_SOURCE, ETH_USD_ORACLE_POLICY } from "./eth-usd-oracle.mjs";
 
 const raw = (value, label) => {
   const text = String(value ?? "");
@@ -12,9 +12,9 @@ const finitePositive = (value, label) => {
 };
 
 /**
- * Bind the last executable Jupiter order to the independently monitored entry mark.
+ * Bind the last executable aggregator order to the independently monitored entry mark.
  *
- * The preflight quote supplies raw-token units per lamport at the monitored mark.
+ * The preflight quote supplies raw-token units per wei at the monitored mark.
  * Comparing that ratio with the final order needs no trusted token-decimal field:
  * token decimals cancel. Both quoted output and the transaction's min-output floor
  * must remain inside the authored entry thesis before any signature is created.
@@ -28,8 +28,8 @@ export function validateExecutableEntryOrder(intent, order, {
   if (!verified) return null;
   const {
     context, reference, preflight, event, anchoredMark, low, high, stop, target,
-    observedAt, solUsd, tokenDecimals, solUsdPublishTime, solUsdConfidencePct,
-    solUsdProviderDivergencePct,
+    observedAt, ethUsd, tokenDecimals, ethUsdPublishTime, ethUsdConfidencePct,
+    ethUsdProviderDivergencePct,
   } = verified;
 
   const preIn = raw(preflight.inputAmountRaw, "preflight input");
@@ -43,13 +43,13 @@ export function validateExecutableEntryOrder(intent, order, {
 
   const tokenScale = 10 ** tokenDecimals;
   const impliedMark = (input, out, label) => {
-    const sol = Number(input) / 1_000_000_000;
+    const eth = Number(input) / 1e18;
     const tokens = Number(out) / tokenScale;
-    const mark = sol * solUsd / tokens;
+    const mark = eth * ethUsd / tokens;
     if (!Number.isFinite(mark) || mark <= 0) throw new Error(`${label} entry mark is invalid`);
     return mark;
   };
-  // Prove the preliminary Jupiter rate agreed with the independently monitored
+  // Prove the preliminary aggregator rate agreed with the independently monitored
   // USD mark before using it for any final-order comparison. This closes the
   // circular check where a bad preflight quote defined its own idea of fair value.
   const preflightMark = impliedMark(preIn, preOut, "preflight");
@@ -73,14 +73,14 @@ export function validateExecutableEntryOrder(intent, order, {
   if (target != null && worstCaseMark >= target)
     throw new Error(`final executable entry ${worstCaseMark.toPrecision(8)} has reached authored target ${target}`);
   return { preflightMark, quotedMark, worstCaseMark, driftPct, anchoredMark,
-    solUsd, tokenDecimals, observedAt, solUsdPublishTime, solUsdConfidencePct,
-    solUsdProviderDivergencePct };
+    ethUsd, tokenDecimals, observedAt, ethUsdPublishTime, ethUsdConfidencePct,
+    ethUsdProviderDivergencePct };
 }
 
 /**
  * Validate the durable, independently sourced entry context without consulting a
- * Jupiter order. Recovery calls this before it can disclose an older signed
- * transaction, so a pre-upgrade entry can never bypass the Pyth/dual-RPC gate merely
+ * aggregator order. Recovery calls this before it can disclose an older signed
+ * transaction, so a pre-upgrade entry can never bypass the Chainlink/dual-RPC gate merely
  * because its transaction bytes already exist.
  *
  * `requireFresh:false` is reserved for accounting a fill that is already finalized.
@@ -116,29 +116,29 @@ export function validateEntryPreflightContext(intent, {
 
   const tokenDecimals = Number(preflight.tokenDecimals);
   if (preflight.tokenDecimals == null || !Number.isInteger(tokenDecimals) ||
-      tokenDecimals < 0 || tokenDecimals > 18)
+      tokenDecimals < 0 || tokenDecimals > 36)
     throw new Error("entry preflight has no valid on-chain token decimals");
-  const solUsd = finitePositive(preflight.solUsd, "entry SOL/USD");
-  if (preflight.solUsdSource !== PYTH_SOL_USD_CACHE_SOURCE)
-    throw new Error("entry SOL/USD did not come from the independent two-RPC Pyth oracle");
-  const solUsdPublishTime = Number(preflight.solUsdPublishTime);
-  const solUsdConfidencePct = Number(preflight.solUsdConfidencePct);
-  const solUsdProviderDivergencePct = Number(preflight.solUsdProviderDivergencePct);
+  const ethUsd = finitePositive(preflight.ethUsd, "entry ETH/USD");
+  if (preflight.ethUsdSource !== ETH_USD_CACHE_SOURCE)
+    throw new Error("entry ETH/USD did not come from the independent two-RPC Chainlink oracle");
+  const ethUsdPublishTime = Number(preflight.ethUsdPublishTime);
+  const ethUsdConfidencePct = Number(preflight.ethUsdConfidencePct);
+  const ethUsdProviderDivergencePct = Number(preflight.ethUsdProviderDivergencePct);
   // Bind provenance to the instant it was observed. A delayed recovery may account
-  // an already-finalized fill, but it may never reinterpret a stale Pyth print as one
+  // an already-finalized fill, but it may never reinterpret a stale Chainlink print as one
   // that was fresh when the order was built.
-  const oracleAgeAtObservationMs = observedAt - solUsdPublishTime * 1_000;
-  if (!Number.isSafeInteger(solUsdPublishTime) || solUsdPublishTime <= 0 ||
-      oracleAgeAtObservationMs < -SOL_USD_ORACLE_POLICY.maxFutureSkewMs ||
-      oracleAgeAtObservationMs > SOL_USD_ORACLE_POLICY.maxAgeMs)
-    throw new Error("entry independent SOL/USD oracle observation is stale or invalid");
-  if (!Number.isFinite(solUsdConfidencePct) || solUsdConfidencePct < 0 ||
-      solUsdConfidencePct > SOL_USD_ORACLE_POLICY.maxConfidencePct)
-    throw new Error("entry independent SOL/USD oracle confidence is invalid");
-  if (!Number.isFinite(solUsdProviderDivergencePct) || solUsdProviderDivergencePct < 0 ||
-      solUsdProviderDivergencePct > SOL_USD_ORACLE_POLICY.maxProviderDivergencePct)
-    throw new Error("entry independent SOL/USD RPC consensus is invalid");
+  const oracleAgeAtObservationMs = observedAt - ethUsdPublishTime * 1_000;
+  if (!Number.isSafeInteger(ethUsdPublishTime) || ethUsdPublishTime <= 0 ||
+      oracleAgeAtObservationMs < -ETH_USD_ORACLE_POLICY.maxFutureSkewMs ||
+      oracleAgeAtObservationMs > ETH_USD_ORACLE_POLICY.maxAgeMs)
+    throw new Error("entry independent ETH/USD oracle observation is stale or invalid");
+  if (!Number.isFinite(ethUsdConfidencePct) || ethUsdConfidencePct < 0 ||
+      ethUsdConfidencePct > ETH_USD_ORACLE_POLICY.maxConfidencePct)
+    throw new Error("entry independent ETH/USD oracle confidence is invalid");
+  if (!Number.isFinite(ethUsdProviderDivergencePct) || ethUsdProviderDivergencePct < 0 ||
+      ethUsdProviderDivergencePct > ETH_USD_ORACLE_POLICY.maxProviderDivergencePct)
+    throw new Error("entry independent ETH/USD RPC consensus is invalid");
   return { context, reference, preflight, event, anchoredMark, low, high, stop, target,
-    observedAt, solUsd, tokenDecimals, solUsdPublishTime, solUsdConfidencePct,
-    solUsdProviderDivergencePct };
+    observedAt, ethUsd, tokenDecimals, ethUsdPublishTime, ethUsdConfidencePct,
+    ethUsdProviderDivergencePct };
 }

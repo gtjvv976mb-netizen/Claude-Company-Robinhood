@@ -2,6 +2,10 @@ import db, { ensureColumn } from "./lib/store.js";
 import { cfg } from "./config.js";
 import { leaveOneOut } from "./agents/composite.js";
 import { runContext } from "./lib/bus.js";
+/* The cycle budget is ONE number, owned by llm.js. This file used to read the env with
+ * its own default (8) while llm.js paced against a different one (4) — so the recorded
+ * behaviour profile could disagree with the brake that actually ran. One export. */
+import { CYCLE_BUDGET_USD } from "./lib/llm.js";
 import { canonicalJson, decisionManifest, deployedCommit, sha256 } from "./provenance.js";
 import { POLICY_DEFAULTS, POLICY_VERSION, pricePolicy } from "../executor/trade-policy.mjs";
 export { POLICY_VERSION } from "../executor/trade-policy.mjs";
@@ -165,7 +169,7 @@ export function runtimeBehaviorProfile({ runKind = "cycle", pmProvider = "claude
       maxAgeHours: Number(process.env.DESK_MAX_AGE_HOURS || POLICY_DEFAULTS.maxAgeHours),
       trailPct: Number(process.env.DESK_TRAIL_PCT || POLICY_DEFAULTS.trailPct),
       workupsPerCycle: Number(process.env.PENTHOUSE_WORKUPS || 8),
-      cycleBudgetUsd: Number(process.env.PENTHOUSE_CYCLE_BUDGET_USD || 8),
+      cycleBudgetUsd: CYCLE_BUDGET_USD,
       topN: Number(process.env.PENTHOUSE_TOP_N || 5),
       perCell: Number(process.env.PENTHOUSE_PER_CELL || 5),
       padQuota: Math.min(1, Math.max(0, Number(process.env.PENTHOUSE_PAD_QUOTA || 0.6))),
@@ -185,8 +189,13 @@ export function runtimeBehaviorProfile({ runKind = "cycle", pmProvider = "claude
       whaleMinUsd: Number(process.env.WHALE_MIN_USD || 500),
       prepareTransaction: process.env.DESK_PREPARE_TX === "1",
       walletConfigured: Boolean(process.env.DESK_WALLET_PUBKEY),
-      customRpc: Boolean(process.env.SOLANA_RPC),
-      rpcOrigin: endpointOrigin(process.env.SOLANA_RPC),
+      /* The RPC named in the contract: RH_RPC (default rpc.mainnet.chain.robinhood.com),
+       * with RH_RPC_SECONDARY as an optional second provider. A SOLANA_RPC in the
+       * environment is not a fingerprint of this desk's behaviour and is not read. */
+      customRpc: Boolean(process.env.RH_RPC),
+      rpcOrigin: endpointOrigin(process.env.RH_RPC),
+      secondaryRpc: Boolean(process.env.RH_RPC_SECONDARY),
+      secondaryRpcOrigin: endpointOrigin(process.env.RH_RPC_SECONDARY),
       birdeyeEnabled: Boolean(process.env.BIRDEYE_API_KEY),
       xaiEnabled: Boolean(process.env.XAI_API_KEY),
       customXaiBase: Boolean(process.env.XAI_BASE_URL),

@@ -11,8 +11,8 @@ COMMAND="${1:-}"
 if [ "$#" -gt 0 ]; then shift; fi
 EXECUTOR_DIR=""
 ENV_FILE=""
-MAX_SOL=""
-DAILY_SOL_CAP=""
+MAX_ETH=""
+DAILY_ETH_CAP=""
 DAILY_LOSS_CAP=""
 
 usage() {
@@ -30,9 +30,9 @@ Commands:
 Options:
   --executor-dir DIR   Directory containing poller.mjs and launchd-runner.mjs.
   --env-file FILE      Existing owner-only .cc-executor.env (default: executor dir).
-  --max-sol SOL        arm-caps: maximum SOL per trade (up to 0.05).
-  --daily-sol-cap SOL  arm-caps: rolling 24-hour deployment cap (up to 0.5).
-  --daily-loss-cap SOL arm-caps: rolling realized-loss entry brake (up to 0.15).
+  --max-eth ETH        arm-caps: maximum ETH per trade (up to 0.004).
+  --daily-eth-cap ETH  arm-caps: rolling 24-hour deployment cap (up to 0.04).
+  --daily-loss-cap ETH arm-caps: rolling realized-loss entry brake (up to 0.012).
 
 This lifecycle never funds a wallet, changes trading mode, removes pause or hard-stop
 sentinels, or terminates a manually-started poller. arm-caps is the sole cap-changing
@@ -53,8 +53,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --executor-dir) need_value "$@"; EXECUTOR_DIR="$2"; shift 2;;
     --env-file) need_value "$@"; ENV_FILE="$2"; shift 2;;
-    --max-sol) need_value "$@"; MAX_SOL="$2"; shift 2;;
-    --daily-sol-cap) need_value "$@"; DAILY_SOL_CAP="$2"; shift 2;;
+    --max-eth) need_value "$@"; MAX_ETH="$2"; shift 2;;
+    --daily-eth-cap) need_value "$@"; DAILY_ETH_CAP="$2"; shift 2;;
     --daily-loss-cap) need_value "$@"; DAILY_LOSS_CAP="$2"; shift 2;;
     --help|-h) usage; exit 0;;
     *) fail "unknown option: $1";;
@@ -68,7 +68,7 @@ case "$COMMAND" in
 esac
 
 if [ "$COMMAND" != "arm-caps" ] &&
-   { [ -n "$MAX_SOL" ] || [ -n "$DAILY_SOL_CAP" ] || [ -n "$DAILY_LOSS_CAP" ]; }; then
+   { [ -n "$MAX_ETH" ] || [ -n "$DAILY_ETH_CAP" ] || [ -n "$DAILY_LOSS_CAP" ]; }; then
   fail "cap options are accepted only by the explicit arm-caps command"
 fi
 
@@ -266,8 +266,8 @@ case "$COMMAND" in
     echo "State and safety sentinels were not changed."
     ;;
   arm-caps)
-    if [ -z "$MAX_SOL" ] || [ -z "$DAILY_SOL_CAP" ] || [ -z "$DAILY_LOSS_CAP" ]; then
-      fail "arm-caps requires --max-sol, --daily-sol-cap, and --daily-loss-cap"
+    if [ -z "$MAX_ETH" ] || [ -z "$DAILY_ETH_CAP" ] || [ -z "$DAILY_LOSS_CAP" ]; then
+      fail "arm-caps requires --max-eth, --daily-eth-cap, and --daily-loss-cap"
     fi
     if [ ! -t 0 ] || [ ! -t 1 ]; then
       fail "arm-caps requires an interactive terminal (TTY); piped input is refused"
@@ -278,7 +278,7 @@ case "$COMMAND" in
     validate_runtime
     "$NODE_BIN" "$RUNNER" arm-caps \
       --env "$ENV_FILE" --workdir "$EXECUTOR_DIR" \
-      --max-sol "$MAX_SOL" --daily-sol-cap "$DAILY_SOL_CAP" \
+      --max-eth "$MAX_ETH" --daily-eth-cap "$DAILY_ETH_CAP" \
       --daily-loss-cap "$DAILY_LOSS_CAP"
     echo "Review the retained entry pause and run monitor before any later explicit load/unpause decision."
     ;;

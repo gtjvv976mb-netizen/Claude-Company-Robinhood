@@ -1,48 +1,64 @@
-import db from "./lib/store.js";
-import { isAddress } from "./lib/base58.js";
+import db, { ensureColumn } from "./lib/store.js";
+import { isEvmAddress, normalise, isZeroAddress, ZERO_ADDRESS, CHAIN_ID } from "./lib/address.js";
 import { FLOORS, HQ_FLOOR } from "./tower.js";
-import { readRpc } from "./lib/http.js";
-import { cfg } from "./config.js";
+import { erc20BalanceOf } from "./treasury-evm.js";
 
 /**
- * Floor leasing, paid in $CLAUDECO.
+ * Floor leasing, paid in the Robinhood-edition $CLAUDECO — an ERC-20 on Robinhood
+ * Chain (4663). Prices stay in whole tokens (FLOOR_PRICE_CLAUDECO etc.); base units are
+ * wei-style, price * 10^CLAUDECO_RH_DECIMALS.
  *
  * Two facts are kept strictly separate, because they cannot be made atomic:
  *
- *   1. MONEY ARRIVED — a verified inbound $CLAUDECO transfer to the treasury becomes a
- *      wallet-scoped credit, in base units, written ONLY by the treasury scanner.
- *   2. A FLOOR WAS TAKEN — spending 50 CLAUDECO-worth of credit on a vacant floor. Pure
+ *   1. MONEY ARRIVED — a verified inbound ERC-20 Transfer to the treasury becomes a
+ *      wallet-scoped credit, in base units, written ONLY by the treasury scanner
+ *      (src/treasury-evm.js, reading Transfer logs — never a user-submitted tx hash).
+ *   2. A FLOOR WAS TAKEN — spending the lease price of credit on a vacant floor. Pure
  *      database transaction, no RPC, instant.
  *
  * That separation is what removes the attacks an earlier reservation-based design had:
  * there is no reservation to squat, so the cheapest way to deny a floor is to buy it;
  * and a dust payment produces a dust credit and touches no floor at all.
+ *
+ * THE TOKEN LAUNCHED 2026-09-04 22:56 UTC on PONS V2, paired to NVDA:
+ * 0x7039986CaC6C7885b53f10c7492E653055470ab9 (pool 0x595aa54d2a32d9c6ced42e88355dae507aaf6fa5).
+ * CLAUDECO_RH_TOKEN carries it; when the env is unset (a scratch boot) everything below
+ * still says "not launched" cleanly rather than throw: the tower renders, sign-in works,
+ * and the lease button explains itself.
  */
 
-export const MINT = process.env.CLAUDECO_MINT || "HRkkxgaFDDmZ3qZX8xP5SiMRBNvFNVUUv4FJUjPCpump";
-export const DECIMALS = Number(process.env.CLAUDECO_DECIMALS || 6);
+export const TOKEN = (process.env.CLAUDECO_RH_TOKEN || ZERO_ADDRESS).toLowerCase();
+/** @deprecated Solana name, kept so a stale import cannot crash boot. Same value as TOKEN. */
+export const MINT = TOKEN;
+export const DECIMALS = Number(process.env.CLAUDECO_RH_DECIMALS || 18);
 /** Price in whole tokens; base units = price * 10^decimals. */
 export const PRICE_TOKENS = Number(process.env.FLOOR_PRICE_CLAUDECO || 1_000_000);
 export const PRICE_BASE_UNITS = BigInt(Math.round(PRICE_TOKENS)) * 10n ** BigInt(DECIMALS);
-export const TREASURY = process.env.TREASURY_OWNER || "";
+export const TREASURY = (process.env.TREASURY_OWNER_RH || "").trim().toLowerCase();
+/** True once CLAUDECO_RH_TOKEN names a real contract. */
+export const launched = () => isEvmAddress(TOKEN) && !isZeroAddress(TOKEN);
+export const NOT_LAUNCHED = "token not launched yet";
 /** Rent, in whole tokens, charged per period. CLAUDECO buys access, not exposure. */
 export const RENT_TOKENS = Number(process.env.FLOOR_RENT_CLAUDECO || 250_000);
 export const RENT_BASE_UNITS = BigInt(Math.round(RENT_TOKENS)) * 10n ** BigInt(DECIMALS);
 export const RENT_PERIOD_DAYS = Number(process.env.FLOOR_RENT_DAYS || 30);
 
 db.exec(`
--- One credit row per (transaction, destination token account). Keyed that way so a single
--- transaction carrying two transfers is two credits, not one silently-dropped one.
+-- One credit row per Transfer LOG: (tx hash, log index). Keyed that way so a single
+-- transaction carrying two transfers to the treasury is two credits, not one
+-- silently-dropped one. Column names keep the Solana edition's shape (signature = tx
+-- hash, slot = block number) so the ledger readers did not have to change.
 CREATE TABLE IF NOT EXISTS credits (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  signature     TEXT NOT NULL,
-  dest_account  TEXT NOT NULL,
-  wallet        TEXT NOT NULL,        -- owner of the DEBITED account: who actually paid
+  signature     TEXT NOT NULL,        -- 0x tx hash
+  dest_account  TEXT NOT NULL,        -- the treasury, lowercase
+  log_index     INTEGER NOT NULL DEFAULT 0,
+  wallet        TEXT NOT NULL,        -- the DEBITED address (Transfer.from): who actually paid
   base_units    TEXT NOT NULL,        -- decimal string; JS numbers cannot hold these safely
-  slot          INTEGER,
+  slot          INTEGER,              -- block number
   block_time    INTEGER,
   seen_at       INTEGER NOT NULL,
-  UNIQUE (signature, dest_account)    -- replay of the same transfer is impossible
+  UNIQUE (signature, log_index)       -- replay of the same transfer is impossible
 );
 CREATE INDEX IF NOT EXISTS idx_credits_wallet ON credits(wallet);
 
@@ -78,6 +94,12 @@ CREATE TABLE IF NOT EXISTS spends (
 );
 CREATE INDEX IF NOT EXISTS idx_spends_wallet ON spends(wallet);
 `);
+/* A database carried over from the Solana edition has the old credits table, whose
+   inline UNIQUE(signature, dest_account) cannot be dropped without a rebuild. This adds
+   the column so the scanner's INSERT works there too; on such a database a second
+   transfer inside one tx would be refused as a duplicate. The Robinhood service is a
+   fresh disk, so this is belt and braces, said out loud. */
+ensureColumn("credits", "log_index", "INTEGER NOT NULL DEFAULT 0");
 
 const sum = (rows) => rows.reduce((t, r) => t + BigInt(r.base_units), 0n);
 
@@ -85,22 +107,21 @@ const sum = (rows) => rows.reduce((t, r) => t + BigInt(r.base_units), 0n);
 /* The credit ledger above is the BUILDING'S number — deposits to the treasury
  * minus spends. It is not, and was never, the wallet's own holdings; showing it
  * under the bare label "Balance" convinced the first real user their tokens had
- * vanished. This is the wallet's actual on-chain $CLAUDECO, read-only, cached
- * for thirty seconds so a busy page does not become an RPC bill. */
+ * vanished. This is the wallet's actual on-chain $CLAUDECO — one eth_call to
+ * balanceOf(owner) on the token — read-only, cached for thirty seconds so a busy
+ * page does not become an RPC bill. Returns null (not 0n) before the token is
+ * launched: "no token yet" and "holds nothing" are different things to show. */
 const onchainCache = new Map();
 export async function walletBalanceOf(wallet) {
-  const hit = onchainCache.get(wallet);
+  const w = normalise(wallet);
+  if (!w) throw new Error("bad wallet");
+  if (!launched()) return null;
+  const hit = onchainCache.get(w);
   if (hit && Date.now() - hit.ts < 30_000) return hit.v;
-  const res = await readRpc(cfg.rpc, "getTokenAccountsByOwner",
-    [wallet, { mint: MINT }, { encoding: "jsonParsed" }]);
-  // readRpc wraps: { ok, data } — reading .value off the wrapper cost this
-  // function its first probe, where it reported a whale's balance as zero.
+  const res = await erc20BalanceOf(TOKEN, w);
   if (!res?.ok) throw new Error(res?.error || "rpc failed");
-  let total = 0n;
-  for (const acc of res.data?.value ?? [])
-    total += BigInt(acc.account?.data?.parsed?.info?.tokenAmount?.amount ?? "0");
-  onchainCache.set(wallet, { ts: Date.now(), v: total });
-  return total;
+  onchainCache.set(w, { ts: Date.now(), v: res.value });
+  return res.value;
 }
 
 export function balanceOf(wallet) {
@@ -128,7 +149,8 @@ export function leaseFor(floorNo) {
  * requests cannot both win — the unique indexes are the referee, not the if-statements.
  */
 export function allocate({ wallet, floorNo, name = null }) {
-  if (!isAddress(wallet)) return { ok: false, error: "bad wallet" };
+  if (!isEvmAddress(wallet)) return { ok: false, error: "bad wallet" };
+  wallet = normalise(wallet);
   floorNo = Number(floorNo);
   if (!Number.isInteger(floorNo) || floorNo < 1 || floorNo > FLOORS) {
     return { ok: false, error: "no such floor" };
@@ -252,13 +274,27 @@ export function settleArrears() {
   return { settled, remaining: rows.length - settled };
 }
 
+/** The EVM pay object the page needs to build its own transfer(treasury, amount): no
+ *  token account, no program id, no blockhash — an ERC-20 transfer is one calldata. Null
+ *  until the token exists, so the page says "not launched" instead of composing a call
+ *  to the zero address. */
+export function payConfig() {
+  if (!launched() || !TREASURY) return null;
+  return { chainId: CHAIN_ID, token: TOKEN, decimals: DECIMALS, treasury: TREASURY };
+}
+
 export function config() {
+  const isLaunched = launched();
   return {
-    mint: MINT, decimals: DECIMALS,
+    chainId: CHAIN_ID,
+    token: TOKEN, mint: TOKEN,          // `mint` is the Solana-era name the page still reads
+    decimals: DECIMALS,
     priceTokens: PRICE_TOKENS, priceBaseUnits: PRICE_BASE_UNITS.toString(),
     rentTokens: RENT_TOKENS, rentPeriodDays: RENT_PERIOD_DAYS,
     treasury: TREASURY || null,
     oneFloorPerWallet: true,
-    ready: Boolean(TREASURY),
+    launched: isLaunched,
+    ready: isLaunched && Boolean(TREASURY),
+    reason: !isLaunched ? NOT_LAUNCHED : !TREASURY ? "treasury not configured" : null,
   };
 }

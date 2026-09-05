@@ -1,5 +1,21 @@
 # Codex Improvement Engineer
 
+**Robinhood edition.** The worker reviews THIS fork's API —
+`https://claude-company-robinhood-api.onrender.com/api/improvements/review-bundle`, the
+workflow's default `bundle_url` and its `CODEX_BUNDLE_HOSTS` allowlist — with this fork's
+own `CODEX_REVIEW_TOKEN`, which must differ from the Solana desk's (it is a bearer for
+this bundle). The bundle is bound to this checkout's decision manifest, which names the
+EVM surface (`executor/evm-swap.mjs`, `approvals.mjs`, `scope-guard.mjs`,
+`thresholds.mjs`, `live-thresholds.mjs`, `evm-executor.mjs`, `erc20-hazards.mjs`,
+`src/data/evm.js`, `pons-live.js`, `kyber.js`) instead of the Solana adapters, and it
+carries a `thresholds` section — every number the executor trades on with its
+provenance (`measured` / `inherited` / `assumed`) and date — so the reviewer can see
+which numbers are still void on this chain and propose the measurement. The prompt also
+fixes the first deliverable of every review: the charter-vs-bundle cross-check (every
+evidence key cited in `src/agents/*.js` against `gather()` and
+`docs/EVIDENCE-CONTRACT.md`), which changes no policy and is therefore exempt from the
+behaviour-change gate.
+
 Codex is an advisory improvement service outside Claude Company's trading pipeline. It
 is not a trading seat. Its only output is a review artifact proposing improvements to
 tests, evaluation, observability, workflow, security, cost, or—only after the evidence

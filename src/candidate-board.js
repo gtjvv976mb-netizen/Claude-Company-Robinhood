@@ -7,6 +7,7 @@
  */
 import db from "./lib/store.js";
 import { CAP_BANDS, COIN_TYPES } from "./categories.js";
+import { canonicalAddress } from "./canonical.js";
 
 // This is a product contract, not just a UI page size. The persisted snapshot is
 // the five coins the desk actually had in each drawer before paid judgement began.
@@ -133,7 +134,8 @@ export function recordCandidateBoard(cycle, board, {
       seenCells.add(cellKey);
       let rank = 0;
       for (const coin of cell.coins.slice(0, CANDIDATES_PER_CELL)) {
-        const mint = textOrNull(coin?.mint, 64);
+        // The `mint` column stays (schema stability); it holds a lowercase 0x address now.
+        const mint = canonicalAddress(textOrNull(coin?.mint, 64));
         if (!mint) continue;
         rank++;
         const pair = coin.pair ?? {};

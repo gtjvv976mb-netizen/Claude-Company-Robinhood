@@ -1,0 +1,1484 @@
+{
+ "ok": true,
+ "address": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+ "mint": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+ "token": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+ "chainId": 4663,
+ "hook": "probe",
+ "symbol": "GOOGL",
+ "name": "Alphabet Class A • Robinhood Token",
+ "fetchedAt": "2026-09-05T01:19:18.639Z",
+ "band": "very_high",
+ "hold": {
+  "band": "very_high",
+  "holdMinMs": 18000000,
+  "holdMaxMs": 86400000
+ },
+ "pair": {
+  "dex": "uniswap",
+  "version": "v4",
+  "pairAddress": "0xd4ecb79fdc521d7725d22b33ed43cb4e47aa96bfad76aa29577e3151f723ac5e",
+  "url": "https://dexscreener.com/robinhood/0xd4ecb79fdc521d7725d22b33ed43cb4e47aa96bfad76aa29577e3151f723ac5e",
+  "baseSymbol": "GOOGL",
+  "baseName": "Alphabet Class A • Robinhood Token",
+  "baseAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+  "quoteSymbol": "USDG",
+  "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+  "priceUsd": 338.99,
+  "priceNative": 338.5755,
+  "liquidityUsd": 646305.61,
+  "liquidityBase": 1079.3349,
+  "liquidityQuote": 280841,
+  "fdv": 2802410,
+  "marketCap": 2802410,
+  "pairCreatedAt": 1783917555000,
+  "ageHours": 1292.7,
+  "volume": {
+   "h24": 694600.34,
+   "h6": 212268.82,
+   "h1": 1634.26,
+   "m5": 24.55
+  },
+  "txns": {
+   "m5": {
+    "buys": 1,
+    "sells": 0
+   },
+   "h1": {
+    "buys": 5,
+    "sells": 10
+   },
+   "h6": {
+    "buys": 888,
+    "sells": 911
+   },
+   "h24": {
+    "buys": 2305,
+    "sells": 2344
+   }
+  },
+  "priceChange": {
+   "m5": 0.01,
+   "h1": 0.12,
+   "h6": 0.08,
+   "h24": -1.29
+  },
+  "imageUrl": null,
+  "socials": [],
+  "websites": []
+ },
+ "pairs": {
+  "count": 30,
+  "totalLiquidityUsd": 1846402.02,
+  "venues": [
+   "uniswap",
+   "up",
+   "sushiswap",
+   "giga",
+   "ramses",
+   "alandale"
+  ],
+  "pools": [
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xd4ecb79fdc521d7725d22b33ed43cb4e47aa96bfad76aa29577e3151f723ac5e",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 646305.61,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v3",
+    "address": "0x34D0dC122CF9A8Eb296fC5e0D3A233625D7d19b7",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 547853.55,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x2bca43d9d8c75399e3c6ba14e9dc88f44ca8968bb4694a8be4f80bd5a550df2e",
+    "quoteAddress": "0x117cc2133c37b721f49de2a7a74833232b3b4c0c",
+    "pairToken": "0x117cc2133c37b721f49de2a7a74833232b3b4c0c",
+    "quoteSymbol": "SPY",
+    "pairTokenClass": "equity_unlisted",
+    "pairAllowed": false,
+    "pairTokenReason": "a Stock Token not on the pair-asset allowlist",
+    "liquidityUsd": 354872.67,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xfce98dcd43a9c0bdfdb5d5c10c87db298294426faf9b03d47caa5cec0ef16a03",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 181055.94,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xaa0fea3dcacaa73aa29644c9ad019055106cee757ee664be26abe9399d1fa3be",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 98298.05,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xa53605addbbc279b54b0857036493d3e6405c98c5b7f7b9df78674e5a0e660b4",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 73897.97,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x5e2cf3ad5d8e7ad0f40d469f74e1216d99ac4e80073ae3719d26ba44a6f0c93d",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 66069.79,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x6abdda781ac2dd3fc204eae603a01a2ec34e9adcdce292eb6f13840e96a66822",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 50738.12,
+    "feeTierBps": null
+   },
+   {
+    "dex": "up",
+    "version": "v3",
+    "address": "0xE279774B0Bf7e23E4f4aaf3c7bbC552BC5A92A28",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 49985.55,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xa7cf9c9db0793778a2b8e94f1f4cd2c423cc96835a7cd8bf9a9b840dd34e4859",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 45653.37,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x5182d37e70a1c2e1060f8671739ae929913ceabcf2bd80a1a2a6356eafd4b506",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 41207.28,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xcb18df49bbc06098179e20bff48e4a08d3a6b2019c41fa710eb919d85a2ad586",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 34733.21,
+    "feeTierBps": null
+   },
+   {
+    "dex": "sushiswap",
+    "version": "v3",
+    "address": "0xCd0bAeD92A00F7B1349A8cE02203aC1b905129d2",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 27673.23,
+    "feeTierBps": null
+   },
+   {
+    "dex": "giga",
+    "version": "v3",
+    "address": "0xa6e2e2CEAc575d25353401D862bf73620A3D2196",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 26445.75,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x1a69855144b370337ab15f1a5bb761e35a073bd8ba5238ba9d6bcad22eb861c8",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 13094.03,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v3",
+    "address": "0x8fB9301586f27e2cff85312F7c1d0F16C6167cdE",
+    "quoteAddress": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "pairToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "quoteSymbol": "WETH",
+    "pairTokenClass": "weth",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 10487.11,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xb2e08d52e1e4bede5a34a77251cf15e9e081ec59aa8ac9a04eeba7fdb2d6e191",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 5950.78,
+    "feeTierBps": null
+   },
+   {
+    "dex": "ramses",
+    "version": "v3",
+    "address": "0x0c66727fDA2c1D7e3b0B9dAcDD6b0777B010E0e0",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 4954.23,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xc4852acea8d50e2e27aed3f68f0fae3e7ca4f394b80c59da68391e8ecbcd2b41",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 4722.19,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xfa29c8b263aee15ed167cbe5e90ea9d89e6eec484f7de64a3465ad6b1ac1a7f6",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 4111.17,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v3",
+    "address": "0x553e9a453425CD9B90919F317061FbC3794CC57a",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 3055.56,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x7a2fab550d73c8e933eb28609c2e009b6a593560c5cfdacfb90a8364ee884a87",
+    "quoteAddress": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "pairToken": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+    "quoteSymbol": "GOOGL",
+    "pairTokenClass": "allowed_equity",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 3048.5,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xa78ebe6df7bea653ca32561671e0080d8705198eb19967c76174edc022a448ba",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 1177.79,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x069bf854bd2f4f454c3d93cf60e1c0af074027050d2c1da1a1ce15c548d06c09",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 1127.91,
+    "feeTierBps": null
+   },
+   {
+    "dex": "alandale",
+    "version": null,
+    "address": "0xa3B86e42A1E73BeE804B73E6cb6544fE71FEe503",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 387.69,
+    "feeTierBps": null
+   },
+   {
+    "dex": "giga",
+    "version": "v3",
+    "address": "0x78f960530c38D76E0C590ca0a770af21953EE975",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 354.35,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x5bd030d0556dc5ca07ef25f6e8c43f2434e2cd26d942a1b27d588db327a1fc87",
+    "quoteAddress": "0xaf3d76f1834a1d425780943c99ea8a608f8a93f9",
+    "pairToken": "0xaf3d76f1834a1d425780943c99ea8a608f8a93f9",
+    "quoteSymbol": "AAPL",
+    "pairTokenClass": "equity_unlisted",
+    "pairAllowed": false,
+    "pairTokenReason": "a Stock Token not on the pair-asset allowlist",
+    "liquidityUsd": 208.19,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x34e46aca8e527e2384a88d5d2346f84716a5331ef3d26f7900af0e4951cbc6d2",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 109.25,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0xda34f8f8272cdf76ace4b3b4d83301d1eaf364dfade7914a3218a86487a40710",
+    "quoteAddress": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "pairToken": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "quoteSymbol": "USDG",
+    "pairTokenClass": "stable",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": null,
+    "feeTierBps": null
+   },
+   {
+    "dex": "uniswap",
+    "version": "v4",
+    "address": "0x73326ba7b37d8f91b495b46551da4990bb96372858976fa03428d2acca96fad4",
+    "quoteAddress": "0x0000000000000000000000000000000000000000",
+    "pairToken": "0x0000000000000000000000000000000000000000",
+    "quoteSymbol": "ETH",
+    "pairTokenClass": "native",
+    "pairAllowed": true,
+    "pairTokenReason": null,
+    "liquidityUsd": 0,
+    "feeTierBps": null
+   }
+  ]
+ },
+ "promotion": {
+  "boosted": false,
+  "paidOrders": 0,
+  "boosts": 0,
+  "lastPaidAt": null
+ },
+ "callouts": [],
+ "marketRegime": {
+  "ethRet25d": 30.6,
+  "btcRet25d": 25.4,
+  "solRet25d": 30.6,
+  "regime": "risk_on",
+  "asOf": 1788571145268
+ },
+ "crosscheck": {
+  "verdicts": [
+   {
+    "check": "price",
+    "verdict": "VERIFIED",
+    "detail": "two independent sources agree within 0.1%"
+   }
+  ],
+  "killed": false
+ },
+ "ethUsd": {
+  "value": 2454.99,
+  "stalenessSec": 8,
+  "source": "coingecko+kyber",
+  "divergencePct": 0.003,
+  "error": null,
+  "btcUsd": 79660
+ },
+ "gasPriceWei": "406294000",
+ "contract": {
+  "ok": true,
+  "address": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3",
+  "codeSize": 283,
+  "cloneOf": null,
+  "cloneVariant": null,
+  "isProxy": true,
+  "proxyKind": "erc1967_beacon",
+  "implementation": null,
+  "beacon": "0xe10b6f6b275de231345c20d14ab812db62151b00",
+  "proxyAdmin": {
+   "address": null,
+   "kind": "unknown",
+   "delaySec": null,
+   "note": "beacon owner(): execution reverted"
+  },
+  "name": "Alphabet Class A • Robinhood Token",
+  "symbol": "GOOGL",
+  "decimals": 18,
+  "totalSupply": "8276724000000000000000",
+  "totalSupplyUnits": 8276.724,
+  "owner": null,
+  "hasOwnable": false,
+  "ownershipRenounced": null,
+  "hasPausable": true,
+  "paused": false,
+  "isEquity": true,
+  "equityReason": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3 is a Robinhood Stock Token (equity beacon 0xe10b6f6b275de231345c20d14ab812db62151b00) — this desk is scoped to memecoins only",
+  "unknownBeacon": false,
+  "upgradeCount": 0,
+  "lastUpgradeAt": null,
+  "upgradeScan": {
+   "method": "event_scan",
+   "fromBlock": 54662620,
+   "toBlock": 54722619,
+   "complete": false,
+   "error": null
+  },
+  "verifiedSource": null,
+  "transferFeeBps": 0,
+  "feeSettable": null,
+  "maxFeeBps": null,
+  "privilegedRoles": [
+   {
+    "role": "upgrade",
+    "holder": null,
+    "canDo": "replace the token's logic",
+    "kind": "unknown",
+    "delaySec": null
+   },
+   {
+    "role": "pause",
+    "holder": null,
+    "canDo": "halt all transfers"
+   }
+  ],
+  "flags": [
+   {
+    "flag": "equity_token",
+    "detail": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3 is a Robinhood Stock Token (equity beacon 0xe10b6f6b275de231345c20d14ab812db62151b00) — this desk is scoped to memecoins only"
+   },
+   {
+    "flag": "upgradeable",
+    "detail": "erc1967_beacon — the logic can be replaced by an unknown key (unknown)"
+   },
+   {
+    "flag": "pausable",
+    "detail": "paused() exists — a role can halt every transfer, sells included"
+   },
+   {
+    "flag": "pausable_live",
+    "detail": "paused() exists and a live role can flip it"
+   }
+  ],
+  "errors": [],
+  "tax": {
+   "transferFeeBps": 0,
+   "buyFeeBps": 0,
+   "sellFeeBps": 0,
+   "buyRouteGapBps": 0,
+   "sellRouteGapBps": 0,
+   "simulated": true,
+   "basis": "buy/sellFeeBps = balanceOf delta on a simulated transfer (token-level); *RouteGapBps = chain-returned amountOut of the aggregator's calldata vs its quote, which includes the quote's own error"
+  },
+  "taxbuyFeeBps": 0,
+  "taxsellFeeBps": 0,
+  "taxsimulated": true
+ },
+ "buySim": {
+  "ok": true,
+  "simulatedOut": "222891042325175550",
+  "quotedOut": "222896725439608672",
+  "effectiveTaxBps": 0,
+  "router": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5"
+ },
+ "mintAccount": {
+  "flags": [
+   {
+    "flag": "equity_token",
+    "detail": "0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3 is a Robinhood Stock Token (equity beacon 0xe10b6f6b275de231345c20d14ab812db62151b00) — this desk is scoped to memecoins only"
+   },
+   {
+    "flag": "upgradeable",
+    "detail": "erc1967_beacon — the logic can be replaced by an unknown key (unknown)"
+   },
+   {
+    "flag": "pausable",
+    "detail": "paused() exists — a role can halt every transfer, sells included"
+   },
+   {
+    "flag": "pausable_live",
+    "detail": "paused() exists and a live role can flip it"
+   }
+  ],
+  "error": null
+ },
+ "sellSim": {
+  "ok": true,
+  "revertReason": null,
+  "effectiveTaxBps": 0,
+  "routeGapBps": 0,
+  "transferFeeBps": 0,
+  "simulatedOut": "30968432129670904",
+  "quotedOut": "30969264401458764",
+  "router": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+  "slot": "0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00",
+  "status": "simulated",
+  "basis": "effectiveTaxBps is the chain-vs-quote gap on the aggregator's sell calldata (quote error included); transferFeeBps is the token's own take on a plain transfer"
+ },
+ "transferSim": {
+  "ok": true,
+  "sent": "222896725439608672",
+  "received": "222896725439608672",
+  "transferFeeBps": 0,
+  "revertReason": null,
+  "basis": "balanceOf(recipient) delta around token.transfer() from a helper placed by state override; no aggregator in the path"
+ },
+ "holders": {
+  "ok": false,
+  "error": "no launch block — ledger has no start (token older than the scan budget)",
+  "top1Pct": null,
+  "top10Pct": null,
+  "clusteredHolders": null,
+  "bundleSuspect": null,
+  "midToHead": null,
+  "count": null,
+  "poolShareOfSupplyPct": 49.93,
+  "excluded": [
+   {
+    "address": "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+    "label": "pool:uniswap-v3",
+    "pctOfSupply": 10.29
+   },
+   {
+    "address": "0xe279774b0bf7e23e4f4aaf3c7bbc552bc5a92a28",
+    "label": "pool:up-v3",
+    "pctOfSupply": 0.81
+   },
+   {
+    "address": "0xcd0baed92a00f7b1349a8ce02203ac1b905129d2",
+    "label": "pool:sushiswap-v3",
+    "pctOfSupply": 0.15
+   },
+   {
+    "address": "0xa6e2e2ceac575d25353401d862bf73620a3d2196",
+    "label": "pool:giga-v3",
+    "pctOfSupply": 0.51
+   },
+   {
+    "address": "0x8fb9301586f27e2cff85312f7c1d0f16c6167cde",
+    "label": "pool:uniswap-v3",
+    "pctOfSupply": 0.18
+   },
+   {
+    "address": "0x0c66727fda2c1d7e3b0b9dacdd6b0777b010e0e0",
+    "label": "pool:ramses-v3",
+    "pctOfSupply": 0.14
+   },
+   {
+    "address": "0x553e9a453425cd9b90919f317061fbc3794cc57a",
+    "label": "pool:uniswap-v3",
+    "pctOfSupply": 0.08
+   },
+   {
+    "address": "0xa3b86e42a1e73bee804b73e6cb6544fe71fee503",
+    "label": "pool:alandale",
+    "pctOfSupply": 0.01
+   },
+   {
+    "address": "0x78f960530c38d76e0c590ca0a770af21953ee975",
+    "label": "pool:giga-v3",
+    "pctOfSupply": 0.01
+   },
+   {
+    "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    "label": "pool:uniswap-v4-manager",
+    "pctOfSupply": 37.75
+   }
+  ]
+ },
+ "exitProbe": {
+  "targetSizeUsd": 75,
+  "targetSizeWei": "30550022607016732",
+  "ok": true,
+  "buy": {
+   "ok": true,
+   "inAmount": "30550022607016732",
+   "outAmount": "222896725439608672",
+   "amountInUsd": 74.99784397278341,
+   "amountOutUsd": 75.50370621676836,
+   "gas": 655171,
+   "gasPriceWei": "420530000",
+   "gasUsdQuoted": 0.6763770942647563,
+   "hops": 2,
+   "amms": [
+    "uniswap-v4-fee",
+    "up-v3"
+   ],
+   "pools": [
+    "0x4fcd93aba7b4671dd3bfedeaf45970b8833320ae48b6c72a6588533b6a85e300",
+    "0xe279774b0bf7e23e4f4aaf3c7bbc552bc5a92a28"
+   ],
+   "impliedEthUsd": 2454.9194263299137
+  },
+  "sell": {
+   "ok": true,
+   "inAmount": "222896725439608672",
+   "outAmount": "30969264401458764",
+   "amountInUsd": 75.57296671796294,
+   "amountOutUsd": 76.06274028798175,
+   "gas": 655171,
+   "gasPriceWei": "413840000",
+   "gasUsdQuoted": 0.6659294307390062,
+   "hops": 2,
+   "amms": [
+    "uniswapv3",
+    "uniswap-v4-fee"
+   ],
+   "pools": [
+    "0x34d0dc122cf9a8eb296fc5e0d3a233625d7d19b7",
+    "0x2f457325fd72db9c4c4f27213a72ca9c745c58144f178bca48ccf07664fd1811"
+   ],
+   "impliedEthUsd": null
+  },
+  "quoteToken": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  "quoteAmountWei": "30550022607016732",
+  "tokensOut": "222896725439608672",
+  "weiBack": "30969264401458764",
+  "roundTripLossPct": -1.3723,
+  "buyImpactPct": -0.675,
+  "sellImpactPct": -0.648,
+  "gasUnitsRoundTrip": 1310342,
+  "hops": 4,
+  "impliedEthUsd": 2454.9194263299137,
+  "gasUsdRoundTrip": 1.307,
+  "error": null
+ },
+ "launch": {
+  "venue": "unknown",
+  "phase": "graduated",
+  "onCurve": false,
+  "name": null,
+  "launchpad": null,
+  "curveProgressPct": null,
+  "curveProgressReason": null,
+  "graduatedAt": null,
+  "graduationPool": null,
+  "graduationScanComplete": null,
+  "block": null,
+  "tx": null,
+  "curve": null,
+  "vault": null,
+  "quoteToken": null,
+  "quoteTokenClass": null,
+  "exemptShareOfSupplyPct": null,
+  "exemptReason": "not a PONS V2 launch within the scan window",
+  "firstBlockBuyers": [],
+  "curveViews": null,
+  "creatorTaxBps": null,
+  "maxCreatorTaxBps": null,
+  "feeClaimCount": null,
+  "feeClaimedEth": null,
+  "creatorFeeReason": "no public ABI for the PONS V2 creator-fee views or claim events; unread, not zero"
+ },
+ "launchpad": {
+  "venue": "unknown",
+  "creatorHandle": null,
+  "creator": null
+ },
+ "deployer": {
+  "ok": false,
+  "address": null,
+  "isContract": null,
+  "kind": "unknown",
+  "txSender": null,
+  "priorLaunches": null,
+  "priorLaunchesWindowBlocks": null,
+  "graduated": null,
+  "dead": null,
+  "sameImplementation": null,
+  "fundedBy": null,
+  "note": "deployer unknown — no PONS V2 launch log inside the scan window"
+ },
+ "equityPair": {
+  "paired": false,
+  "ticker": null,
+  "shareOfLiquidityPct": 19.2
+ },
+ "identity": {
+  "symbolCollisions": false,
+  "collidingContracts": [],
+  "resolvedBy": "address"
+ },
+ "lp": {
+  "kind": "v4_position",
+  "burnedPct": null,
+  "lockedPct": null,
+  "locker": null,
+  "lockerAddress": null,
+  "positionNftOwner": null,
+  "pullableSharePct": null,
+  "unlockAt": null,
+  "basis": "V4 position in the PoolManager; owner not read"
+ },
+ "depth": {
+  "sellSideUsdWithin1Pct": null,
+  "sellSideUsdWithin5Pct": null,
+  "inRangeLiquidityPct": null,
+  "basis": "lower bound: the $75 probe's sell leg moved the price -0.648%; larger sizes are NOT extrapolated (v3/v4 depth is range-dependent)"
+ },
+ "candles": {
+  "bars": [
+   {
+    "t": 1788559980000,
+    "o": 337.522159724654,
+    "h": 339.995516795509,
+    "l": 337.515816331261,
+    "c": 339.995516795509,
+    "volUsd": 411.4188255194794
+   },
+   {
+    "t": 1788560100000,
+    "o": 339.995516795509,
+    "h": 339.995516795509,
+    "l": 337.397137619225,
+    "c": 337.397137619225,
+    "volUsd": 708.294080039359
+   },
+   {
+    "t": 1788560160000,
+    "o": 337.397137619225,
+    "h": 339.691989960939,
+    "l": 337.397137619225,
+    "c": 339.691989960939,
+    "volUsd": 24.5279487398752
+   },
+   {
+    "t": 1788560280000,
+    "o": 339.691989960939,
+    "h": 339.691989960939,
+    "l": 337.368496162628,
+    "c": 337.368496162628,
+    "volUsd": 67.0632844480727
+   },
+   {
+    "t": 1788560460000,
+    "o": 337.368496162628,
+    "h": 337.426965406631,
+    "l": 337.368496162628,
+    "c": 337.426965406631,
+    "volUsd": 4.36670957894875
+   },
+   {
+    "t": 1788560520000,
+    "o": 337.426965406631,
+    "h": 337.434988429235,
+    "l": 337.426965406631,
+    "c": 337.434988429235,
+    "volUsd": 122.137913532356
+   },
+   {
+    "t": 1788560700000,
+    "o": 337.434988429235,
+    "h": 337.49236416584,
+    "l": 337.434988429235,
+    "c": 337.49236416584,
+    "volUsd": 8.52047208031553
+   },
+   {
+    "t": 1788560940000,
+    "o": 337.49236416584,
+    "h": 337.49236416584,
+    "l": 337.355829532717,
+    "c": 337.355829532717,
+    "volUsd": 22.427108800986
+   },
+   {
+    "t": 1788561060000,
+    "o": 337.355829532717,
+    "h": 339.666150923317,
+    "l": 337.355829532717,
+    "c": 339.666150923317,
+    "volUsd": 973.6398288653972
+   },
+   {
+    "t": 1788561120000,
+    "o": 339.666150923317,
+    "h": 339.666150923317,
+    "l": 337.297323693031,
+    "c": 337.297323693031,
+    "volUsd": 1006.61648429784
+   },
+   {
+    "t": 1788561240000,
+    "o": 337.297323693031,
+    "h": 337.297323693031,
+    "l": 337.247862871246,
+    "c": 337.247862871246,
+    "volUsd": 3.17661210802657
+   },
+   {
+    "t": 1788561300000,
+    "o": 337.247862871246,
+    "h": 339.747767655296,
+    "l": 337.247862871246,
+    "c": 339.747767655296,
+    "volUsd": 46.13788621021366
+   },
+   {
+    "t": 1788561360000,
+    "o": 339.747767655296,
+    "h": 339.747767655296,
+    "l": 339.689835020128,
+    "c": 339.689835020128,
+    "volUsd": 1717.18663073489
+   },
+   {
+    "t": 1788561420000,
+    "o": 339.689835020128,
+    "h": 339.743748531752,
+    "l": 339.689835020128,
+    "c": 339.743748531752,
+    "volUsd": 9.71943087873588
+   },
+   {
+    "t": 1788561480000,
+    "o": 339.743748531752,
+    "h": 339.743748531752,
+    "l": 337.338364909224,
+    "c": 337.338364909224,
+    "volUsd": 192.032806607705
+   },
+   {
+    "t": 1788561600000,
+    "o": 337.338364909224,
+    "h": 339.904342556945,
+    "l": 337.338364909224,
+    "c": 337.486614893696,
+    "volUsd": 332.37158326378
+   },
+   {
+    "t": 1788561720000,
+    "o": 337.486614893696,
+    "h": 339.871924517925,
+    "l": 337.486614893696,
+    "c": 339.871924517925,
+    "volUsd": 2430.08366107637
+   },
+   {
+    "t": 1788561780000,
+    "o": 339.871924517925,
+    "h": 339.871924517925,
+    "l": 337.616821243692,
+    "c": 337.616821243692,
+    "volUsd": 0.995593983813819
+   },
+   {
+    "t": 1788561840000,
+    "o": 337.616821243692,
+    "h": 337.655981104042,
+    "l": 337.616821243692,
+    "c": 337.655981104042,
+    "volUsd": 53.0632353689626
+   },
+   {
+    "t": 1788561900000,
+    "o": 337.655981104042,
+    "h": 340.097486292488,
+    "l": 337.655981104042,
+    "c": 340.097486292488,
+    "volUsd": 70.9755516466021
+   },
+   {
+    "t": 1788561960000,
+    "o": 340.097486292488,
+    "h": 340.097486292488,
+    "l": 337.811162685692,
+    "c": 337.811162685692,
+    "volUsd": 651.453999449652
+   },
+   {
+    "t": 1788562020000,
+    "o": 337.811162685692,
+    "h": 340.248135242838,
+    "l": 337.770226158358,
+    "c": 340.248135242838,
+    "volUsd": 1718.514065583251
+   },
+   {
+    "t": 1788562140000,
+    "o": 340.248135242838,
+    "h": 340.248135242838,
+    "l": 337.300929622986,
+    "c": 337.300929622986,
+    "volUsd": 294.547148326949
+   },
+   {
+    "t": 1788562260000,
+    "o": 337.300929622986,
+    "h": 337.659138842274,
+    "l": 337.300929622986,
+    "c": 337.659138842274,
+    "volUsd": 129.879633277536
+   },
+   {
+    "t": 1788562380000,
+    "o": 337.659138842274,
+    "h": 340.138723786518,
+    "l": 337.659138842274,
+    "c": 340.138723786518,
+    "volUsd": 17.0102504172865
+   },
+   {
+    "t": 1788562440000,
+    "o": 340.138723786518,
+    "h": 340.138723786518,
+    "l": 337.855610038002,
+    "c": 337.855610038002,
+    "volUsd": 116.522204843667
+   },
+   {
+    "t": 1788562500000,
+    "o": 337.855610038002,
+    "h": 340.040865669217,
+    "l": 337.586205971498,
+    "c": 337.586205971498,
+    "volUsd": 392.2985780367646
+   },
+   {
+    "t": 1788562560000,
+    "o": 337.586205971498,
+    "h": 339.984589942182,
+    "l": 337.586205971498,
+    "c": 339.984589942182,
+    "volUsd": 118.31072964474433
+   },
+   {
+    "t": 1788562620000,
+    "o": 339.984589942182,
+    "h": 340.01648786756,
+    "l": 337.603471310664,
+    "c": 340.01648786756,
+    "volUsd": 44.2154848700192
+   },
+   {
+    "t": 1788562740000,
+    "o": 340.01648786756,
+    "h": 340.061818182994,
+    "l": 337.691041008983,
+    "c": 337.691041008983,
+    "volUsd": 425.7790200702227
+   },
+   {
+    "t": 1788562800000,
+    "o": 337.691041008983,
+    "h": 340.302038937786,
+    "l": 337.691041008983,
+    "c": 340.302038937786,
+    "volUsd": 24.3022993345649
+   },
+   {
+    "t": 1788562920000,
+    "o": 340.302038937786,
+    "h": 340.302038937786,
+    "l": 337.895980916689,
+    "c": 337.895980916689,
+    "volUsd": 26.1625714802501
+   },
+   {
+    "t": 1788563040000,
+    "o": 337.895980916689,
+    "h": 340.025422853336,
+    "l": 337.69058948971,
+    "c": 340.025422853336,
+    "volUsd": 268.6221420605479
+   },
+   {
+    "t": 1788563400000,
+    "o": 340.025422853336,
+    "h": 340.025422853336,
+    "l": 339.893261822276,
+    "c": 339.893261822276,
+    "volUsd": 294.136477170792
+   },
+   {
+    "t": 1788563640000,
+    "o": 339.893261822276,
+    "h": 340.085214462091,
+    "l": 339.893261822276,
+    "c": 340.085214462091,
+    "volUsd": 0.000500112599890672
+   },
+   {
+    "t": 1788563700000,
+    "o": 340.085214462091,
+    "h": 340.124604440198,
+    "l": 337.747271099676,
+    "c": 337.747271099676,
+    "volUsd": 53.3542857948353
+   },
+   {
+    "t": 1788563820000,
+    "o": 337.747271099676,
+    "h": 339.598322507857,
+    "l": 337.747271099676,
+    "c": 339.598322507857,
+    "volUsd": 601.447681889027
+   },
+   {
+    "t": 1788564120000,
+    "o": 339.598322507857,
+    "h": 339.598322507857,
+    "l": 337.385407887132,
+    "c": 337.385407887132,
+    "volUsd": 19.7195698799397
+   },
+   {
+    "t": 1788564240000,
+    "o": 337.385407887132,
+    "h": 339.937127840723,
+    "l": 337.384960525442,
+    "c": 339.937127840723,
+    "volUsd": 948.2326519108841
+   },
+   {
+    "t": 1788564300000,
+    "o": 339.937127840723,
+    "h": 339.937127840723,
+    "l": 337.549833573885,
+    "c": 337.549833573885,
+    "volUsd": 9.18250457808239
+   },
+   {
+    "t": 1788564480000,
+    "o": 337.549833573885,
+    "h": 339.823793438896,
+    "l": 337.450545483096,
+    "c": 337.452721427519,
+    "volUsd": 1171.8418942184335
+   },
+   {
+    "t": 1788564660000,
+    "o": 337.452721427519,
+    "h": 337.512751700829,
+    "l": 337.452721427519,
+    "c": 337.512751700829,
+    "volUsd": 26.3827768695409
+   },
+   {
+    "t": 1788564780000,
+    "o": 337.512751700829,
+    "h": 337.540295730599,
+    "l": 337.512751700829,
+    "c": 337.540295730599,
+    "volUsd": 245.733542763868
+   },
+   {
+    "t": 1788564840000,
+    "o": 337.540295730599,
+    "h": 337.540295730599,
+    "l": 337.502452997945,
+    "c": 337.502452997945,
+    "volUsd": 182.821538826867
+   },
+   {
+    "t": 1788565020000,
+    "o": 337.502452997945,
+    "h": 337.502452997945,
+    "l": 337.257454742699,
+    "c": 337.257454742699,
+    "volUsd": 2.12418101932408
+   },
+   {
+    "t": 1788565620000,
+    "o": 337.257454742699,
+    "h": 339.652845290625,
+    "l": 337.257454742699,
+    "c": 339.652845290625,
+    "volUsd": 121.591691658775
+   },
+   {
+    "t": 1788565680000,
+    "o": 339.652845290625,
+    "h": 339.659010497876,
+    "l": 339.652845290625,
+    "c": 339.659010497876,
+    "volUsd": 121.588704133276
+   },
+   {
+    "t": 1788566160000,
+    "o": 339.659010497876,
+    "h": 339.659010497876,
+    "l": 337.473117994502,
+    "c": 337.473117994502,
+    "volUsd": 157.747072580877
+   },
+   {
+    "t": 1788566400000,
+    "o": 337.473117994502,
+    "h": 339.799116057293,
+    "l": 337.289658252226,
+    "c": 337.289658252226,
+    "volUsd": 55.55117391319186
+   },
+   {
+    "t": 1788567240000,
+    "o": 337.289658252226,
+    "h": 337.821723633479,
+    "l": 337.289658252226,
+    "c": 337.821723633479,
+    "volUsd": 53.6194787738994
+   },
+   {
+    "t": 1788567720000,
+    "o": 337.821723633479,
+    "h": 337.821723633479,
+    "l": 337.555790049859,
+    "c": 337.555790049859,
+    "volUsd": 103.102433996323
+   },
+   {
+    "t": 1788568080000,
+    "o": 337.555790049859,
+    "h": 337.555790049859,
+    "l": 337.241638600533,
+    "c": 337.241638600533,
+    "volUsd": 1.06193075422155
+   },
+   {
+    "t": 1788568440000,
+    "o": 337.241638600533,
+    "h": 337.241638600533,
+    "l": 336.745429254816,
+    "c": 336.745429254816,
+    "volUsd": 0.000397207123784339
+   },
+   {
+    "t": 1788568800000,
+    "o": 336.745429254816,
+    "h": 337.39043018783,
+    "l": 336.745429254816,
+    "c": 337.39043018783,
+    "volUsd": 260.912108991223
+   },
+   {
+    "t": 1788568860000,
+    "o": 337.39043018783,
+    "h": 337.39043018783,
+    "l": 337.218135774599,
+    "c": 337.218135774599,
+    "volUsd": 266.881571468688
+   },
+   {
+    "t": 1788569100000,
+    "o": 337.218135774599,
+    "h": 340.002434842489,
+    "l": 337.218135774599,
+    "c": 340.002434842489,
+    "volUsd": 4.91003782244724
+   },
+   {
+    "t": 1788569220000,
+    "o": 340.002434842489,
+    "h": 340.111021739878,
+    "l": 337.561293361486,
+    "c": 337.561293361486,
+    "volUsd": 685.537380256088
+   },
+   {
+    "t": 1788570000000,
+    "o": 337.561293361486,
+    "h": 339.844053656801,
+    "l": 337.538938585016,
+    "c": 339.844053656801,
+    "volUsd": 282.7137970623321
+   },
+   {
+    "t": 1788570300000,
+    "o": 339.844053656801,
+    "h": 339.844053656801,
+    "l": 337.624771581916,
+    "c": 337.624771581916,
+    "volUsd": 4.70180249410295
+   },
+   {
+    "t": 1788571020000,
+    "o": 337.624771581916,
+    "h": 339.776058241446,
+    "l": 337.624771581916,
+    "c": 339.776058241446,
+    "volUsd": 24.5558427287913
+   }
+  ],
+  "barsCovered": 60,
+  "interval": "1m",
+  "pool": "0xd4ecb79fdc521d7725d22b33ed43cb4e47aa96bfad76aa29577e3151f723ac5e",
+  "error": null
+ },
+ "whales": {
+  "ok": true,
+  "trades": [
+   {
+    "wallet": "0xc2622e4a6fdd7f34170ebd61bd8f305b948ff5aa",
+    "side": "buy",
+    "usd": 2430.08366107637,
+    "tokens": 7.14999823690411,
+    "signature": "0x7bfa590953aa07f8e129370dbb109d30b74b6926e2d885e6d0189aa55018187b",
+    "block": 54629248,
+    "at": 1788561728000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xc2881e3e671a57c96f63cc0473f5df2e58df5d47",
+    "side": "buy",
+    "usd": 1717.18663073489,
+    "tokens": 5.05516048377822,
+    "signature": "0x0fd46b28e4e23c1419a67ae9e247e9835e16dd6ab05c8b8bb4add9ba1c494f79",
+    "block": 54625662,
+    "at": 1788561365000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xe95b4b6cb42bb9f378aa423b502f7756c6b377fd",
+    "side": "sell",
+    "usd": 1006.61648429784,
+    "tokens": 2.98435953560646,
+    "signature": "0x788086fd6f9eafae2dc090cf8c20eb238bf0b37f7517a6dad6d10cd5425a2f26",
+    "block": 54623417,
+    "at": 1788561141000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x3723a6f3521497314f6074447b66b74d7e735ff0",
+    "side": "sell",
+    "usd": 936.082543637341,
+    "tokens": 2.7745236248216,
+    "signature": "0x3315105243b17e10ba5369486e98a32e6a7f24a059af5d1b35a7f874f79ba7d6",
+    "block": 54654572,
+    "at": 1788564283000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x3723a6f3521497314f6074447b66b74d7e735ff0",
+    "side": "buy",
+    "usd": 835.146237558477,
+    "tokens": 2.45802316779888,
+    "signature": "0x91c93a33155c1cce8dc1de9f314e2aaaba04887c97385ad067b4324ef259b430",
+    "block": 54593054,
+    "at": 1788558071000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xd167b2bf2cea7c6e2cb32d36402c9c5ee5be0c93",
+    "side": "sell",
+    "usd": 817.75599048383,
+    "tokens": 2.42355083164926,
+    "signature": "0x9bb6603784d258cf2ee90130d5564ba5f7c781e6a033403058d6fae62c1de3d7",
+    "block": 54602125,
+    "at": 1788558984000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x6cf0b007326dbbadbe6fe35b05a533118b0b88a9",
+    "side": "sell",
+    "usd": 732.064650576998,
+    "tokens": 2.16938434362053,
+    "signature": "0x0290762565cf0b9f1b8367a9381da2adea5eef26fd8d604b572c036ac8fda20b",
+    "block": 54656931,
+    "at": 1788564519000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x77fddd84355f93d4541a5ad40dd2e3814038d5e4",
+    "side": "sell",
+    "usd": 678.156250947882,
+    "tokens": 2.00919541507249,
+    "signature": "0xfbbb94ef2968e71d565fac8487b38019175d94577715bb1ac89bcb42794a8d81",
+    "block": 54602100,
+    "at": 1788558982000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0xb9a8eda0156ce8e50f4b45f8219b8cd415744323",
+    "side": "sell",
+    "usd": 660.08745926886,
+    "tokens": 1.95632549783357,
+    "signature": "0x8ba4bb94e2c6897b77bec68b4b566d6bbe93ebf65a88e133bd22114821f46a73",
+    "block": 54602283,
+    "at": 1788559000000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x64064bc9dc9fce078bb77f644164a51b90eb30e5",
+    "side": "sell",
+    "usd": 651.453999449652,
+    "tokens": 1.92845610627669,
+    "signature": "0x69b1551a4a0b5721f69710fc7b2dbd37d61ddf238d0b9ac04dbac95c9bb6ec14",
+    "block": 54631634,
+    "at": 1788561970000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x31315fbebbbc67550299ad86ca6fea4646ceaab6",
+    "side": "buy",
+    "usd": 601.447681889027,
+    "tokens": 1.77105610371533,
+    "signature": "0x0b559d7df0d3e48866bd2d212eefbbe16bb46833e16ebafd7e6bce989ff23a5d",
+    "block": 54650051,
+    "at": 1788563826000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   },
+   {
+    "wallet": "0x4b264209d78b006b45f917debf4d4152536ee2b6",
+    "side": "sell",
+    "usd": 585.637868530086,
+    "tokens": 1.73575233228866,
+    "signature": "0x031ce0aca02f240f657f3d1bc61651f52928322ae2383e09dbdf104ddbd5d0ea",
+    "block": 54613711,
+    "at": 1788560157000,
+    "evidenceKind": "indexer_trade_usd",
+    "valueBasis": "GeckoTerminal volume_in_usd at execution"
+   }
+  ],
+  "sample": 300
+ },
+ "derived": {
+  "totalLiquidityUsd": 1846402.02,
+  "volToLiqRatio": 0.38,
+  "fdvToLiqRatio": 1.5,
+  "buySellRatio24h": 0.98,
+  "txns24h": 4649,
+  "avgTradeSizeUsd": 149.41,
+  "gasRoundTripPct": 1.743,
+  "markAgeMs": 10272,
+  "uniqueTraders24h": 169,
+  "roundTripWalletPct": 59.1,
+  "sameBlockTradePct": 22.3,
+  "interArrivalCv": 2.32,
+  "commonFunderPct": null,
+  "customRouterPct": null,
+  "flowSample": 300,
+  "flowNote": "computed on the indexer's most recent 300 trades, not the full 24h tape",
+  "exemptShareOfSupplyPct": null,
+  "voidedTxPct": null
+ },
+ "xRead": null
+}

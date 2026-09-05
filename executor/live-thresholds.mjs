@@ -100,3 +100,33 @@ export const MAX_NETWORK_FEE = defineThreshold("exec.maxNetworkFeeWei", null,
     "on a ~135k-CU transaction. There is NO priority auction here, so the concept it priced does not " +
     "exist — this needs re-deriving as a gas ceiling, and note the Solana build separately learned to " +
     "keep the refusal gate apart from the cost model."), unit: "wei", live: true });
+
+/* ── the nonce machine's own unknowns, registered so assertLiveReady() blocks on them ──
+ *
+ * evm-executor.mjs treats "no receipt past deadline_block" as a sequencer drop and
+ * CANCELS the nonce. Three facts decide whether that machine is tuned or guessing, and
+ * none has been measured: how long inclusion takes (sets deadlineBlocks — 300 is a
+ * guess), how often a submitted transaction simply never appears (sets how much of the
+ * exit budget the cancel path will consume), and whether the sequencer honours a
+ * same-nonce replacement at all on an FCFS chain with no fee auction (if it does not,
+ * a cancel is only ever a second chance for the ORIGINAL to be dropped too, and the
+ * bound on maxCancelResends is the only thing between the desk and a permanent
+ * ambiguous latch). All three need a funded burner and a real send; the read-only
+ * campaign in probe-measure-4663.mjs cannot produce them and says so. */
+export const INCLUSION_LATENCY_MS = defineThreshold("exec.inclusionLatencyMs", null,
+  { ...VOID("submit → receipt latency distribution at 100ms blocks; unmeasured — needs a funded " +
+    "burner sending real 0-value self-transfers. deadlineBlocks=300 in evm-executor.mjs is a guess " +
+    "pending this number."), unit: "ms", live: true });
+
+export const DROP_RATE_PCT = defineThreshold("exec.dropRatePct", null,
+  { ...VOID("share of submitted transactions that never receive a receipt (sequencer-level " +
+    "rejection, documented generically for Arbitrum Nitro, never measured on 4663). Sets how " +
+    "often the cancel path runs and therefore how much fee the exit budget must reserve."),
+    unit: "%", live: true });
+
+export const NONCE_REPLACEMENT_HONOURED = defineThreshold("exec.nonceReplacementHonoured", null,
+  { ...VOID("whether a same-nonce, higher-fee replacement is accepted by the sequencer at all. " +
+    "Priority fees are refunded and there is no fee auction, so nothing in the chain's design " +
+    "promises it. Until measured, the cancel path assumes NOTHING about it: a dropped cancel is " +
+    "resent, and after maxCancelResends the intent is quarantined rather than retried forever."),
+    live: true });

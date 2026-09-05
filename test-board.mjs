@@ -6,18 +6,22 @@
  * empty drawer was invisible: "no legitimate coin under $100k this hour" is a finding,
  * and it looked exactly like not having looked.
  */
-import { CAP_BANDS, COIN_TYPES, capBandOf, coinTypeOf, cellOf, buildBoard, selectAcrossBoard, PAD_QUOTA }
+import { CAP_BANDS, COIN_TYPES, capBandOf, coinTypeOf, cellOf, buildBoard, selectAcrossBoard, PAD_QUOTA, PREFERRED_PAD }
   from "./src/categories.js";
+/* The pad the quota is keyed on: PONS V2 on chain 4663. The fixtures are attributed to
+   it by the same name the selection reads, so a rename of the constant cannot leave
+   this file testing a pad the desk no longer prefers. */
+const PAD = PREFERRED_PAD;
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { c ? (pass++, console.log(`  ok   ${n}${d ? "  — " + d : ""}`))
                                  : (fail++, console.log(`  FAIL ${n}${d ? "  — " + d : ""}`)); };
 
-/* Attributed to pump.fun on purpose. Since 2026-09-03 a full launchpad quota is
-   exclusive, so an unattributed coin is not selected at all — the desk was told to
-   trade pump.fun, and "we could not tell which pad this is" is not that. */
+/* Attributed to the preferred pad on purpose. Since 2026-09-03 a full launchpad quota
+   is exclusive, so an unattributed coin is not selected at all — the desk was told to
+   trade one pad, and "we could not tell which pad this is" is not that. */
 const coin = (mcap, name = "Dog", sym = "DOG", score = 50) => ({
-  mint: `${sym}${mcap}`, score, launchpad: "pump.fun",
+  mint: `${sym}${mcap}`, score, launchpad: PAD,
   pair: { marketCap: mcap, baseName: name, baseSymbol: sym, websites: [] },
 });
 
@@ -79,45 +83,46 @@ ok("a coin the screen would refuse never gets shortlisted",
   strict.cells.every((c) => c.coins.every((x) => x.pair.marketCap >= 500_000)),
   "the board never shortlists what the desk was always going to refuse");
 
-console.log("\nPUMP.FUN GETS THE MAJORITY OF PAID ATTENTION");
+console.log(`\nTHE PREFERRED PAD (${PAD}) GETS THE MAJORITY OF PAID ATTENTION`);
+ok("the preferred pad is PONS V2, the pad that carries the volume on 4663", PAD === "pons-v2", PAD);
 // A market rigged AGAINST the quota: every top-scoring coin is another pad, and the
-// pump.fun coins are buried at the bottom of their cells.
+// preferred pad's coins are buried at the bottom of their cells.
 const padded = (mcap, pad, sym, score) => ({
   mint: sym, score, launchpad: pad,
   pair: { marketCap: mcap, baseName: sym, baseSymbol: sym, websites: [] },
 });
 const padMarket = [
-  padded(200_000, "meteora-dbc", "MET1", 99), padded(210_000, "bags.fm", "BAG1", 98),
-  padded(220_000, "moonshot", "MOON1", 97),   padded(230_000, "meteora-dbc", "MET2", 96),
-  padded(240_000, "pump.fun", "PF1", 60),     padded(60_000, "pump.fun", "PF2", 55),
-  padded(700_000, "pump.fun", "PF3", 50),     padded(3_000_000, "pump.fun", "PF4", 45),
+  padded(200_000, "uniswap", "MET1", 99), padded(210_000, "hoodit", "BAG1", 98),
+  padded(220_000, "pools.trade", "MOON1", 97),   padded(230_000, "uniswap", "MET2", 96),
+  padded(240_000, PAD, "PF1", 60),     padded(60_000, PAD, "PF2", 55),
+  padded(700_000, PAD, "PF3", 50),     padded(3_000_000, PAD, "PF4", 45),
 ];
 const padBoard = buildBoard(padMarket, { perCell: 5 });
 const padPick = selectAcrossBoard(padBoard, 6);
-const pf = padPick.filter((p) => p.launchpad === "pump.fun").length;
-ok("pump.fun is the MAJORITY of a cycle's workups", pf / padPick.length > 0.5,
-  `${pf} of ${padPick.length} — where pump.fun carries the volume, it gets the attention`);
-const padAvailable = padMarket.filter((c) => c.launchpad === "pump.fun").length;
+const pf = padPick.filter((p) => p.launchpad === PAD).length;
+ok("the preferred pad is the MAJORITY of a cycle's workups", pf / padPick.length > 0.5,
+  `${pf} of ${padPick.length} — where the preferred pad carries the volume, it gets the attention`);
+const padAvailable = padMarket.filter((c) => c.launchpad === PAD).length;
 ok("...and it meets the quota, up to what the board actually holds",
   pf >= Math.min(padAvailable, Math.ceil(6 * PAD_QUOTA)),
   `${pf} of ${padAvailable} available, quota ${Math.ceil(6 * PAD_QUOTA)}`);
-/* AT A FULL QUOTA IT IS EXCLUSIVE. The owner's instruction is pump.fun only, so a seat
+/* AT A FULL QUOTA IT IS EXCLUSIVE. The owner's instruction is the preferred pad only, so a seat
    the pad cannot fill is left empty rather than handed to a launchpad the desk was told
    not to trade. Below 1 the quota stays a floor and the rest of the board fills in. */
 if (PAD_QUOTA >= 1) {
-  ok("nothing but pump.fun is studied at a full quota",
-    padPick.every((p) => p.launchpad === "pump.fun"),
+  ok("nothing but the preferred pad is studied at a full quota",
+    padPick.every((p) => p.launchpad === PAD),
     padPick.map((p) => p.launchpad).join(", "));
   ok("...and a seat it cannot fill is simply not taken", padPick.length === padAvailable,
     `${padPick.length} picked from ${padAvailable} available, against a budget of 6`);
   const mixed = selectAcrossBoard(buildBoard(padMarket, { perCell: 5 }), 6, { padQuota: 0.5 });
   ok("a lowered quota lets the other pads back in",
-    mixed.some((p) => p.launchpad !== "pump.fun"),
+    mixed.some((p) => p.launchpad !== PAD),
     mixed.map((p) => p.launchpad).join(", "));
 }
-ok("a pump.fun coin beats a HIGHER-SCORING coin from another pad",
-  padPick.some((p) => p.launchpad === "pump.fun" && p.score < 99) &&
-  padPick.findIndex((p) => p.launchpad === "pump.fun") === 0,
+ok("a preferred-pad coin beats a HIGHER-SCORING coin from another pad",
+  padPick.some((p) => p.launchpad === PAD && p.score < 99) &&
+  padPick.findIndex((p) => p.launchpad === PAD) === 0,
   "the quota is filled first, so the free score no longer decides the top of the list alone");
 
 /* The bug this test exists for: a filtered pass that stops at the first barren depth
@@ -130,17 +135,17 @@ console.log("\nAT A FULL QUOTA, AN EMPTY SEAT BEATS THE WRONG LAUNCHPAD");
 /* This assertion is the exact reverse of what it said until 2026-09-03, and
  * deliberately so. The quota was a FLOOR then — "refusing a good coin for being born on
  * the wrong pad would be the worse mistake" — which was right while the desk traded
- * every launchpad. The owner has since said pump.fun only. A rule that quietly spends
- * the desk's research elsewhere whenever pump.fun is quiet is not that rule, so at a
+ * every launchpad. The owner has since said the preferred pad only. A rule that quietly spends
+ * the desk's research elsewhere whenever the preferred pad is quiet is not that rule, so at a
  * full quota an unfillable seat is left unfilled. Lower PENTHOUSE_PAD_QUOTA and the old
  * behaviour comes back verbatim, which is what the second case here checks. */
-const noPump = buildBoard(padMarket.filter((c) => c.launchpad !== "pump.fun"), { perCell: 5 });
+const noPump = buildBoard(padMarket.filter((c) => c.launchpad !== PAD), { perCell: 5 });
 const noPumpPick = selectAcrossBoard(noPump, 4);
-ok("a market with NO pump.fun is not studied at all at a full quota",
+ok("a market with NO the preferred pad is not studied at all at a full quota",
   PAD_QUOTA >= 1 ? noPumpPick.length === 0 : noPumpPick.length === 4,
   `${noPumpPick.length} picked at quota ${PAD_QUOTA}`);
 ok("...and the same market fills the budget once the quota is lowered",
-  selectAcrossBoard(buildBoard(padMarket.filter((c) => c.launchpad !== "pump.fun"),
+  selectAcrossBoard(buildBoard(padMarket.filter((c) => c.launchpad !== PAD),
     { perCell: 5 }), 4, { padQuota: 0.5 }).length === 4,
   "the floor behaviour is one environment variable away");
 ok("no coin is ever picked twice", new Set(padPick.map((p) => p.mint)).size === padPick.length,

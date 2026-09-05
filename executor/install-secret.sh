@@ -17,27 +17,28 @@ if [ ! -f .cc-executor.env ]; then
 # cannot move funds. Never put a private key or seed phrase in this file.
 CC_SECRET=PASTE_THE_FEED_SECRET_HERE
 CC_FLOOR=$FLOORNO
-CC_API=https://claude-company-api.onrender.com
+CC_API=https://claude-company-robinhood-api.onrender.com
 # DRY RUN by default: downloads calls, applies full policy, signs nothing.
 # Going live is a separate deliberate step. Follow the exact-commit Linux or macOS
 # workflow in executor/README.md; the legacy install-live.sh rewriter is retired.
 EXECUTE=0
-KEYPAIR=./burner.json
+KEY_FILE=./burner.key
 STATE_DB=./.cc-executor.sqlite
 POLL_MS=15000
 EOF
   chmod 600 .cc-executor.env
   echo "Created .cc-executor.env for floor $FLOORNO."
 fi
-if [ ! -f burner.json ]; then
+if [ ! -f burner.key ]; then
   node -e "
-const {Keypair}=require('@solana/web3.js');
 const fs=require('fs');
-const kp=Keypair.generate();
-fs.writeFileSync('burner.json', JSON.stringify(Array.from(kp.secretKey)), {mode:0o600});
-console.log('Generated this machine\'s burner wallet (unfunded).');
+const {randomBytes}=require('crypto');
+const {Wallet,getAddress}=require('ethers');
+const key='0x'+randomBytes(32).toString('hex');
+fs.writeFileSync('burner.key', key+'\n', {mode:0o600});
+console.log('Generated this machine\'s burner key for Robinhood Chain (4663), unfunded.');
 console.log('Its PUBLIC address - fund this one, LAST, only with what you can lose:');
-console.log('    ' + kp.publicKey.toBase58());
+console.log('    ' + getAddress(new Wallet(key).address));
 " || { echo "Could not generate the burner (is 'npm ci' done in executor/?)"; exit 1; }
 fi
 

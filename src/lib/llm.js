@@ -120,6 +120,34 @@ const OPPORTUNISTIC = new Set(["fresh", "promote"]);
  */
 export const HOURLY_BURST = Math.max(1, Number(process.env.DESK_HOURLY_BURST || 3));
 
+/** ONE cycle budget, read in ONE place. This used to be read three times with two
+ * different defaults — 4 here, 8 in penthouse.js and evaluation.js — so the pace floor
+ * below (`cycleBudget * 1.25`) was computed against half the cycle the desk actually
+ * runs. Latent at DESK_DAILY_BUDGET_USD=90 (the pace, $11.25/h, exceeds both), but at
+ * a $25 day the floor would be $5 against a real $8 cycle: the exact deadlock the
+ * comment below describes. penthouse.js and evaluation.js should import this rather
+ * than re-read the env var (see docs/HANDOFF-llm-cache.md). llm.js sits below both in
+ * the import graph, so the constant lives here. */
+export const CYCLE_BUDGET_USD = Number(process.env.PENTHOUSE_CYCLE_BUDGET_USD || 8);
+
+/**
+ * PROMPT-CACHE TTL for the shared rules block. Default 5 minutes.
+ *
+ * The research loop runs continuously (index.js: 45s after a productive pass, 240s
+ * idle) with three workups in flight, so while the desk is working, start-to-start gaps
+ * between calls on the same model are well under five minutes and every call after the
+ * first is a 0.1x read on the 5m entry. The 1h entry costs 2x to write (5m is 1.25x)
+ * and only pays for prefixes reused at 5-60 minute gaps — the first workup after the
+ * money brake sleeps the desk, or a floor that runs one tenant call an hour. So 5m is
+ * the default and DESK_CACHE_TTL=1h is an operator choice for a sparse desk, not a
+ * free upgrade. Only the SHARED_RULES marker carries it: the API requires longer-TTL
+ * breakpoints to precede shorter ones, and SHARED_RULES is always first.
+ */
+export const CACHE_TTL = process.env.DESK_CACHE_TTL === "1h" ? "1h" : "5m";
+const cacheMark = (ttl = "5m") => ttl === "1h"
+  ? { type: "ephemeral", ttl: "1h" }
+  : { type: "ephemeral" };
+
 /** Throws before any tokens are spent if this lane's share of the last 24h is gone. */
 export function assertDailyBudget(capUsd, { lane = "cycle" } = {}) {
   if (!capUsd || capUsd <= 0) return;
@@ -143,8 +171,7 @@ export function assertDailyBudget(capUsd, { lane = "cycle" } = {}) {
      *
      * Read from the same env var penthouse.js reads rather than imported from it;
      * llm.js is below penthouse in the graph and must not reach back up. */
-    const cycleBudget = Number(process.env.PENTHOUSE_CYCLE_BUDGET_USD || 4);
-    const hourCap = Math.max((capUsd / 24) * HOURLY_BURST, cycleBudget * 1.25);
+    const hourCap = Math.max((capUsd / 24) * HOURLY_BURST, CYCLE_BUDGET_USD * 1.25);
     const spentHour = spendSince(Date.now() - 3600e3,
       { evidenceScope: "house", includeUnattributed: true }).usd;
     if (spentHour >= hourCap) {
@@ -319,7 +346,11 @@ export function spendSince(sinceMs, { evidenceScope, includeUnattributed = false
 }
 
 export const SHARED_RULES = `
-You are a specialist on an automated Solana research desk called Claude Company ("Claude Co").
+You are a specialist on an automated research desk called Claude Company ("Claude Co")
+trading memecoins on Robinhood Chain (chain id 4663, an Arbitrum Nitro L2: ~100ms blocks,
+first-come-first-served ordering, no priority-fee auction, gas that must be read live per
+ticket because it moved 0.02 to 0.7 gwei in two weeks and spikes above 5, and a sequencer
+that can silently drop a transaction with no receipt).
 You hold exactly one seat. Do that seat's job and no other seat's job.
 
 ${CHARTER}
@@ -334,7 +365,8 @@ Operating rules for your reply:
 - Be concrete and terse. A number with a source beats a paragraph of adjectives.
 - You are producing research for a human who will decide. You never execute anything.
 
-THIS DESK TRADES PUMP.FUN, AND IT TRADES A CLOCK.
+THIS DESK TRADES ROBINHOOD CHAIN LAUNCHPADS (PONS V1/V2, hood.fun, pools.trade), AND IT
+TRADES A CLOCK.
 Every coin sits in one of six market-cap bands, and the bundle states which in
 \`band\`, with \`hold.holdMaxMs\` alongside it. That window is not advice: the position
 is SOLD when it expires, whether or not the target printed. So a thesis has to be able
@@ -350,12 +382,130 @@ Two consequences you are expected to reason with rather than around:
 - On nano and micro the coin is minutes old by design. Youth is the ordinary condition
   here, not a reason to abstain. Say "the data is absent" when it is; do not say "too
   new to tell" about the population this desk exists to trade.
-Costs are real and proportional at the bottom: pump.fun charges roughly 1.25% a side on
-the small bands, so about 2.5% of a round trip is gone before slippage. A thesis worth
-under a few percent is not a thesis.
+Costs here are a FIXED toll plus a pool cost, not a percentage of size. Every position
+carries a round trip of roughly 661,000 gas at the live gwei (ROUND_TRIP_GAS in executor/live-thresholds.mjs: median of 9 Kyber round trips, 618k–823k) — a toll that no amount of
+pool depth reduces, and that the bundle measures as \`exitProbe.gasUsdRoundTrip\` (read it;
+never assume it) — PLUS the pool's fee each way (1% on a PONS curve) and the executor's
+slippage. A fixed toll is a larger share of a small clip than of a large one: on a $3-$10
+clip it can be 4-12% before slippage. A thesis that cannot clear that toll is not a thesis.
+There is no block-0 edge to chase: a PONS launch taxes the first five seconds at 99%
+falling to 0%, so the desk's edge is SELECTION among coins that have already graduated,
+not speed.
 `.trim();
 
 export class Refusal extends Error {}
+
+/**
+ * The system prompt as CACHED BLOCKS — two tiers, two of the four breakpoints.
+ *
+ *   tier 1  SHARED_RULES          shared by every seat on a model; a process constant
+ *   tier 2  charter + orders      this seat's charter plus the coach's standing orders
+ *
+ * The seat block used to be sent UNCACHED on the argument that the standing orders
+ * change and "a stale cached copy would mean a seat working under orders that were
+ * reverted an hour ago". That argument was wrong about the mechanism: the cache is a
+ * byte-prefix lookup, so a changed order changes the bytes, misses, and is re-written —
+ * it can never serve the old text. What the marker buys is the common case: orders
+ * change at most once per TUTOR_REVIEW_MINS (180), and between changes every seat was
+ * paying its 1-2.2k-token charter at 1x on every call (charter sizes measured by bytes:
+ * forensics 6,541 B, flow 6,252 B, narrative 8,694 B, red team 5,752 B). A change now
+ * costs one miss on the seat block while SHARED_RULES still hits.
+ *
+ * Two caveats, both from the caching reference, neither faked here:
+ *   - Haiku 4.5 caches nothing under 4,096 tokens, and SHARED_RULES is ~2k by bytes/4,
+ *     so the scout's marker is a NO-OP. It is left in place because it is harmless and
+ *     the scout may be retiered; do not expect cachedTok on that seat.
+ *   - A change of `output_config.effort` invalidates the messages tier on every model
+ *     and the system tier on models that render effort ahead of it (model-specific).
+ *     The analysts run at mixed medium/high (config.js); whether Sonnet 5 keeps the
+ *     system tier across that is UNVERIFIED — check cachedTok per seat in
+ *     GET /api/spend/seats before trusting the saving on those seats.
+ */
+export function systemBlocks(seat, system, { ttl = CACHE_TTL, policy = withPolicy } = {}) {
+  return [
+    { type: "text", text: SHARED_RULES, cache_control: cacheMark(ttl) },
+    ...(system
+      ? [{ type: "text", text: policy(seat, system), cache_control: cacheMark("5m") }]
+      : []),
+  ];
+}
+
+/** A user-message block the caller composed. Only text blocks, only an ephemeral
+ * marker: the caller is trusted with ORDER (stable first, volatile last) and nothing
+ * else, and a wrong shape is a programming error caught here, not a 400 three retries
+ * later. */
+function checkContentBlock(b, i) {
+  if (!b || typeof b !== "object" || b.type !== "text" || typeof b.text !== "string") {
+    throw new Error(`ask(): content[${i}] must be { type: "text", text: string }`);
+  }
+  if (b.cache_control != null) {
+    const cc = b.cache_control;
+    if (typeof cc !== "object" || cc.type !== "ephemeral" ||
+        (cc.ttl != null && cc.ttl !== "5m" && cc.ttl !== "1h")) {
+      throw new Error(`ask(): content[${i}].cache_control must be { type: "ephemeral", ttl?: "5m"|"1h" }`);
+    }
+  }
+  return b;
+}
+
+/**
+ * The exact request ask() sends, as a pure function so a test can hold it up to the
+ * light without an API key. `content`, when given, is sent as the user message
+ * VERBATIM (blocks may carry their own cache_control) and `prompt` is ignored — the
+ * analysts use it to put the evidence bundle first under a marker and their seat text
+ * after it, so five seats share one cached bundle.
+ */
+export function buildRequest({ seat, model, effort = "high", schema, prompt, content, system, maxTokens }) {
+  // Thinking counts against max_tokens, so the deeper the effort the more headroom the
+  // visible answer needs. 8000 flat starved the xhigh seats of any room to reply.
+  maxTokens ??= effort === "max" ? 32000 : effort === "xhigh" ? 24000 : 16000;
+  // The retier taught this the hard way, in production: `fallbacks` is an
+  // Opus 5 / Fable 5 parameter — Sonnet rejects it with a 400 — and
+  // `output_config.effort` errors on Haiku 4.5. Every capability gate here
+  // exists because a live cycle hit the 400 for its absence.
+  const opusTier = /opus-5|fable-5/.test(model);
+  const haiku = /haiku/.test(model);
+  let userContent;
+  /* STANDING ORDERS MUST NOT FORK THE SHARED PREFIX. The five analysts send one system
+     (their common contract) so the bundle block behind it is one cache entry for all five.
+     withPolicy() appends a seat's standing orders — and if that lands on the system tier,
+     a seat with orders gets a different prefix and its bundle can never be the hit the other
+     four wrote. So when the caller composed `content`, the orders go onto the block that
+     names the seat ("=== YOUR SEAT ===", the analysts' second block) and the system stays
+     byte-identical across seats. A caller with `content` but no seat block gets the old
+     behaviour: orders on the system tier. Handoff from the agents lane, 2026-09-05. */
+  let systemPolicy = withPolicy;
+  if (content != null) {
+    if (!Array.isArray(content) || content.length === 0) {
+      throw new Error("ask(): content must be a non-empty array of text blocks");
+    }
+    userContent = content.map(checkContentBlock);
+    const seatIdx = userContent.findIndex((b) => b.text.startsWith("=== YOUR SEAT ==="));
+    if (seatIdx >= 0) {
+      systemPolicy = (_seat, text) => text;
+      userContent = userContent.map((b, i) => i === seatIdx ? { ...b, text: withPolicy(seat, b.text) } : b);
+    }
+  } else {
+    if (typeof prompt !== "string") throw new Error("ask(): prompt must be a string when content is not given");
+    userContent = prompt;
+  }
+  const req = {
+    model,
+    max_tokens: maxTokens,
+    system: systemBlocks(seat, system, { policy: systemPolicy }),
+    messages: [{ role: "user", content: userContent }],
+    output_config: haiku
+      ? { format: betaZodOutputFormat(schema) }
+      : { format: betaZodOutputFormat(schema), effort },
+  };
+  if (opusTier) {
+    // Server-side fallback: if a safety classifier declines, the request is
+    // routed to a comparable model instead of failing the whole cycle.
+    req.betas = ["server-side-fallback-2026-07-01"];
+    req.fallbacks = "default";
+  }
+  return req;
+}
 
 /**
  * One structured call to a seat. Returns the parsed object, validated against `schema`.
@@ -368,13 +518,15 @@ export async function ask({
   effort = "high",
   schema,
   prompt,
+  content,
   system,
   maxTokens,
   attempts = 3,
 }) {
-  // Thinking counts against max_tokens, so the deeper the effort the more headroom the
-  // visible answer needs. 8000 flat starved the xhigh seats of any room to reply.
-  maxTokens ??= effort === "max" ? 32000 : effort === "xhigh" ? 24000 : 16000;
+  // Built once: the request is a pure function of its inputs, and a shape error in
+  // `content` should throw here rather than be retried as if the provider had failed.
+  const req = buildRequest({ seat, model, effort, schema, prompt, content, system, maxTokens });
+  maxTokens = req.max_tokens;
   let lastErr;
   for (let a = 1; a <= attempts; a++) {
     try {
@@ -382,37 +534,6 @@ export async function ask({
       // Streaming, not parse(): the SDK refuses a non-streaming call at these token
       // budgets because it could exceed the HTTP timeout. finalMessage() gives the same
       // assembled response, and the schema check below is the authority on shape anyway.
-      // The retier taught this the hard way, in production: `fallbacks` is an
-      // Opus 5 / Fable 5 parameter — Sonnet rejects it with a 400 — and
-      // `output_config.effort` errors on Haiku 4.5. Every capability gate here
-      // exists because a live cycle hit the 400 for its absence.
-      const opusTier = /opus-5|fable-5/.test(model);
-      const haiku = /haiku/.test(model);
-      const req = {
-        model,
-        max_tokens: maxTokens,
-        system: [
-          { type: "text", text: SHARED_RULES, cache_control: { type: "ephemeral" } },
-          /* THE SEAT'S STANDING ORDERS. Its charter is the constant its module ships;
-             the orders below it are written by the coach from the desk's own graded
-             results, between workups. Injected here, once, so every seat in the
-             building learns the same way — and so a new seat cannot be added that
-             quietly opts out of the feedback loop. Uncached deliberately: guidance
-             changes far more often than a charter, and a stale cached copy would mean
-             a seat working under orders that were reverted an hour ago. */
-          ...(system ? [{ type: "text", text: withPolicy(seat, system) }] : []),
-        ],
-        messages: [{ role: "user", content: prompt }],
-        output_config: haiku
-          ? { format: betaZodOutputFormat(schema) }
-          : { format: betaZodOutputFormat(schema), effort },
-      };
-      if (opusTier) {
-        // Server-side fallback: if a safety classifier declines, the request is
-        // routed to a comparable model instead of failing the whole cycle.
-        req.betas = ["server-side-fallback-2026-07-01"];
-        req.fallbacks = "default";
-      }
       const res = await withProviderBudget({ provider: "anthropic", maxTokens, payload: req }, async () => {
         const stream = client.beta.messages.stream(req);
         const message = await stream.finalMessage();
@@ -469,7 +590,32 @@ export async function ask({
  * Two-step for the narrative seat: server-side web search cannot be combined with a
  * structured output format, so we search in one call and shape the result in a second.
  */
-export async function askWithWeb({ seat, model, effort, schema, prompt, system, maxTokens = 16000 }) {
+/**
+ * THE SHAPING CALL DOES NOT NEED THE TAPE.
+ *
+ * Call 2 used to append the whole ORIGINAL BRIEF — the evidence bundle included — so
+ * the narrative seat was the one analyst whose input was bought twice (measured at
+ * ~41k tokens a run before max_uses was cut to 2). The shaping instruction already
+ * says "Use ONLY what the notes support"; what it needs to keep the notes honest is
+ * the token's identity and the X read, not pools, holders and candles. So the brief
+ * is cut at the bundle marker and only the xRead subtree of the bundle survives.
+ *
+ * `brief` lets a caller hand over the compact object directly; without it the brief is
+ * derived from the prompt, and a prompt with no bundle marker is sent unchanged — this
+ * must never make the seat blinder than before, only cheaper.
+ */
+export function compactBrief(prompt, brief) {
+  if (brief && typeof brief === "object") return JSON.stringify(brief);
+  const MARK = "=== EVIDENCE BUNDLE ===";
+  const at = typeof prompt === "string" ? prompt.indexOf(MARK) : -1;
+  if (at < 0) return prompt;
+  const head = prompt.slice(0, at).trimEnd();
+  let xRead = null;
+  try { xRead = JSON.parse(prompt.slice(at + MARK.length).trim())?.xRead ?? null; } catch { /* no bundle to mine */ }
+  return head + (xRead ? `\n\n=== X READ (from the bundle) ===\n${JSON.stringify(xRead)}` : "");
+}
+
+export async function askWithWeb({ seat, model, effort, schema, prompt, brief, system, maxTokens = 16000 }) {
   emit("seat:searching", { seat, model });
 
   // Server-tool errors do NOT throw: they arrive as a result block whose content is an
@@ -481,7 +627,14 @@ export async function askWithWeb({ seat, model, effort, schema, prompt, system, 
     const req = {
       model,
       max_tokens: maxTokens,
-      system: SHARED_RULES + (system ? `\n\n${system}` : ""),
+      /* Cached blocks, not one concatenated string: the string form carried no marker
+       * at all, so the ~4.2k-token SHARED_RULES + narrative charter was bought at 1x on
+       * every workup. The seat text is sent as it always was here — bare charter, no
+       * standing orders; those reach the seat in call 2 through ask() — so the only
+       * change to this call is the marker. The tools tier precedes system in the cache
+       * prefix, so this call's entries are its own (call 2 has no tools): still a hit
+       * workup to workup. */
+      system: systemBlocks(seat, system, { policy: (_seat, text) => text }),
       // max_uses 4 fed ~41k tokens of raw results back through the loop per run;
       // two searches answer "is there a story and is it true" or nothing will.
       tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 2 }],
@@ -531,6 +684,7 @@ export async function askWithWeb({ seat, model, effort, schema, prompt, system, 
         : "") +
       `=== YOUR RESEARCH NOTES ===\n${notes}\n\n` +
       `=== SOURCES YOU ACTUALLY READ ===\n${cited.join("\n") || "(none returned)"}\n\n` +
-      `=== ORIGINAL BRIEF ===\n${prompt}`,
+      `=== ORIGINAL BRIEF (identity and X read only; the evidence bundle is not re-sent) ===\n` +
+      compactBrief(prompt, brief),
   });
 }

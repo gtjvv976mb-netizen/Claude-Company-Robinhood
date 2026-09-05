@@ -7,15 +7,15 @@ import { announceExit } from "./alerts.js";
 import { listFloors, HQ_FLOOR } from "./tower.js";
 import { emit, runFor, runForEvidence } from "./lib/bus.js";
 import db from "./lib/store.js";
-import { spend, OutOfCredit, spendSince } from "./lib/llm.js";
-import * as jup from "./data/jupiter.js";
+import { spend, OutOfCredit, spendSince, CYCLE_BUDGET_USD } from "./lib/llm.js";
 import { callouts, whaleScore } from "./whales.js";
+import { canonicalAddress, canonicalLaunchpad } from "./canonical.js";
 import { recordWhaleCallout } from "./identity.js";
 import { regime } from "./data/regime.js";
 import { cfg, floorsFor } from "./config.js";
 import * as store from "./lib/store.js";
 import * as shadow from "./shadow.js";
-import { buildBoard, selectAcrossBoard, CAP_BANDS, COIN_TYPES } from "./categories.js";
+import { buildBoard, selectAcrossBoard, CAP_BANDS, COIN_TYPES, PREFERRED_PAD } from "./categories.js";
 import { recordCandidateBoard } from "./candidate-board.js";
 import * as funnel from "./funnel.js";
 import * as ds from "./data/dexscreener.js";
@@ -43,8 +43,21 @@ export const WORKUPS_PER_CYCLE = Number(process.env.PENTHOUSE_WORKUPS || 8);
 /* $10 was more than the hourly pace allowed ($40/24 x 3 = $5), so every cycle was cut
  * off mid-hunt and none could complete. Four fits inside the pace with room to spare,
  * and at the measured $0.126 a workup it still buys ~32 of them — a shortlist of three
- * plus a deep mandate hunt. Smaller cycles running often beat large ones that die. */
-export const CYCLE_BUDGET_USD = Number(process.env.PENTHOUSE_CYCLE_BUDGET_USD || 8);
+ * plus a deep mandate hunt. Smaller cycles running often beat large ones that die.
+ * The number itself lives in llm.js, where the pace brake reads it: two copies with two
+ * defaults (this file said 8, llm.js said 4) let the profile disagree with the brake. */
+export { CYCLE_BUDGET_USD };
+
+/* THE CHAIN'S CLOCK. Chain 4663 seals a block every ~100 ms: measured 100.6 ms over
+ * 10,000 blocks on 2026-09-04 (executor/live-thresholds.mjs BLOCK_MS) and 0.102 s over
+ * 60 consecutive blocks the same evening (market brief). Every clock on this desk is
+ * kept in milliseconds — the hold windows in bands.js are user-tuned and are NOT
+ * re-derived — but it is stated in blocks wherever a decision compares two clocks, so
+ * "how many chances does this call get" is read in the unit the chain moves in. Solana
+ * ran at ~400 ms with a fee auction; here a 30-minute nano hold is 18,000 blocks of
+ * first-come-first-served ordering, and a ten-minute monitor pass is 6,000 of them. */
+export const BLOCK_MS = Number(process.env.RH_BLOCK_MS || 100);
+export const blocksFor = (ms) => (Number.isFinite(Number(ms)) && Number(ms) > 0 ? Number(ms) / BLOCK_MS : null);
 export const TOP_N = Number(process.env.PENTHOUSE_TOP_N || 5);
 /* How many candidates the board shortlists per cell — the owner's "at least 5 per
  * category". Shortlisting is free; only what selectAcrossBoard picks gets paid for. */
@@ -216,6 +229,25 @@ export function rank(c) {
 /** Categories with a survivable base rate, as opposed to a launchpad lottery ticket. */
 const SUBSTANTIVE = new Set(["established", "utility", "infra", "defi", "ai"]);
 
+/* THE CHAIN FACTS THE EXIT WATCHES, read from the bundle the evidence contract names.
+ * `contract.flags` carries the same {flag, detail} shape the Solana bundle's
+ * mintAccount.flags had (docs/EVIDENCE-CONTRACT.md), so one reader serves both until
+ * the data lane's gather() lands; a bundle that carries neither is UNREADABLE, and an
+ * unreadable read must never be mistaken for "no flags" — that is how a pre-existing
+ * control gets reported as "appeared" and fires a spurious exit. */
+export function contractFlags(ev) {
+  const src = ev?.contract ?? ev?.mintAccount ?? null;
+  if (!src || src.error) return { flags: [], readable: false };
+  return { flags: (src.flags ?? []).map((f) => f?.flag ?? f), readable: true };
+}
+
+/** The weather line, in the major this chain is quoted in. */
+const majorWeather = (wx) => {
+  const eth = wx?.ethRet25d, sol = wx?.solRet25d;
+  const major = eth != null ? `ETH ${eth}%` : sol != null ? `SOL ${sol}% (regime.js still reads Solana — handoff)` : "major unknown";
+  return `${major} / BTC ${wx?.btcRet25d ?? "?"}%`;
+};
+
 /**
  * Pick who gets the expensive seats.
  *
@@ -318,6 +350,28 @@ export function wouldSurviveScreen(c) {
   if (s.minMarketCapUsd > 0 && mcap != null && mcap < s.minMarketCapUsd) return "too_small";
   if (liq > 0 && vol / liq > s.maxVolToLiqRatio) return "wash_suspect";
   if (liq > 0 && mcap != null && mcap / liq > s.maxFdvToLiqRatio) return "fdv_propped";
+  /* THE PHASE GATE, at the free screen. A coin the sweep KNOWS is still on its curve is
+   * held at `watch` (recordScreen's kill path) and never bought a workup: on 4663 the
+   * edge is selection among graduates, not sniping the curve (block-0 is a 99% tax and
+   * there is no auction to buy ordering). Read last, so a dead-tape curve coin is still
+   * reported as no_volume — the kill that would hold it whatever its phase. An absent
+   * phase passes here and is judged on the paid bundle's launch.phase in mandate.js. */
+  if (launchPhaseOf(c) != null && launchPhaseOf(c) !== "graduated") return "on_curve";
+  return null;
+}
+
+/** A sweep row with one spelling of its address and one name for its pad. The sweep
+ *  says "pons" for a PONS V2 coin and the desk's constants say "pons-v2"; compared raw,
+ *  every pad-keyed decision (quota, tripwire, tenant allow-list) missed on the string. */
+export const canonicalCandidate = (c) =>
+  (c?.mint ? { ...c, mint: canonicalAddress(c.mint), launchpad: canonicalLaunchpad(c.launchpad) } : c);
+
+/** The launch phase the sweep attached to a candidate, or null when it said nothing.
+ *  Vocabulary per docs/EVIDENCE-CONTRACT.md launch.phase: "curve" | "graduated" | "unknown". */
+export function launchPhaseOf(c) {
+  const p = c?.launch?.phase ?? c?.phase ?? null;
+  if (p != null) return String(p);
+  if (c?.onCurve === true) return "curve";
   return null;
 }
 
@@ -363,17 +417,18 @@ export function selectShortlist(scored, workups) {
  * THE IGNITION LANE'S CONTRIBUTION TO THE UNIVERSE.
  *
  * The keyword sweep returns coins a search engine thinks are relevant, whose median age
- * measured twenty-five days. This adds the coins pump.fun is trading RIGHT NOW, with a
- * minute tape attached so the screen can judge a four-minute-old coin on evidence
- * rather than on the absence of a 24-hour history. It is free and it calls no model.
+ * measured twenty-five days. This adds the coins the launchpad is trading RIGHT NOW,
+ * with a minute tape attached so the screen can judge a four-minute-old coin on
+ * evidence rather than on the absence of a 24-hour history. It is free and it calls
+ * no model. Curve depth is priced in ETH (ethUsd), the chain's gas and quote token.
  *
- * It degrades to nothing: if pump.fun is unreachable the desk runs on the sweep alone,
- * exactly as it did before.
+ * It degrades to nothing: if the launchpad feed is unreachable the desk runs on the
+ * sweep alone, exactly as it did before.
  */
-export async function ignitionUniverse({ solUsd = null, tapes = 40 } = {}) {
+export async function ignitionUniverse({ ethUsd = null, tapes = 40 } = {}) {
   try {
     const { ignitionSweep } = await import("./ignition.js");
-    const r = await ignitionSweep({ solUsd, tapes });
+    const r = await ignitionSweep({ ethUsd, tapes });
     // Only coins whose tape says something is happening. A negative score is a coin
     // going the wrong way on real volume, and the desk has no reason to look at it.
     return r.ranked.filter((c) => c.ignition.score > 0);
@@ -388,7 +443,12 @@ export async function warmFunnel() {
   /* Ignition first so its richer row — the one carrying the minute tape — wins the
      dedupe against the same coin arriving from the keyword sweep. */
   const merged = new Map();
-  for (const c of [...igniting, ...swept]) if (c?.mint && !merged.has(c.mint)) merged.set(c.mint, c);
+  for (const raw of [...igniting, ...swept]) {
+    if (!raw?.mint) continue;
+    // One spelling, or the dedupe is a fiction; one pad name, or the quota is.
+    const c = { ...raw, mint: canonicalAddress(raw.mint), launchpad: canonicalLaunchpad(raw.launchpad) };
+    if (!merged.has(c.mint)) merged.set(c.mint, c);
+  }
   const universe = [...merged.values()];
   const scored = [];
   for (const c of universe) {
@@ -466,17 +526,20 @@ export async function runPenthouseCycle({
   const startSpend = spend.usd;
   emit("cycle:start", { cycle, desk: "penthouse" });
 
-  // MURDOCK reads the weather once per cycle. Risk-off (SOL and BTC both
+  // MURDOCK reads the weather once per cycle. Risk-off (the gas major and BTC both
   // negative over ~25d) grounds the ESTABLISHED sleeve — the one whose returns
   // ride the majors — per the TSMOM veto. Unknown weather never grounds anyone.
+  // ETH is the major on an ETH-quoted chain; ethRet25d is the data lane's field and
+  // solRet25d the one regime.js still exports until it moves (handoff).
   const wx = await regime();
-  emit("seat:verdict", { seat: "Regime", detail: `${wx.regime} · SOL ${wx.solRet25d}% / BTC ${wx.btcRet25d}% (25d)` });
+  emit("seat:verdict", { seat: "Regime", detail: `${wx.regime} · ${majorWeather(wx)} (25d)` });
 
   // 1-3. Everything free: sweep, classify, screen.
-  const universe = await sweep();
+  const universe = (await sweep()).map(canonicalCandidate);
   const scored = [];
   const repeats = [];
   for (const c of universe) {
+    if (!c?.mint) continue;
     if (liveCallFor(c.mint)) continue;                 // already holding a call on this one
     const cat = classify(c);
     const r = rank(c);
@@ -649,7 +712,7 @@ export async function runPenthouseCycle({
     : selectShortlist(scored, workups);        // board empty too: fall back rather than idle
   emit("scout:shortlist", { count: shortlist.length, considered: universe.length,
     source: fromFunnel.length ? "funnel" : board.cells.length ? "board (funnel cold)" : "flat ranking",
-    padMix: fromFunnel.length ? `${fromFunnel.filter((c) => c.launchpad === "pump.fun").length}/${fromFunnel.length} pump.fun` : null,
+    padMix: fromFunnel.length ? `${fromFunnel.filter((c) => canonicalLaunchpad(c.launchpad) === PREFERRED_PAD).length}/${fromFunnel.length} ${PREFERRED_PAD}` : null,
     mix: shortlist.map((c) => c.cellKey ?? c.category) });
 
   /* THE RESERVE BENCH.
@@ -1015,7 +1078,7 @@ export function publishCall(rec, { category = null, launchpad: pad = null, wx = 
   // MARKET rather than about the token, and only the cycle knows the weather.
   if (wx?.regime === "risk_off" && category === "established") {
     emit("call:withheld", { mint: rec.mint,
-      reason: `MURDOCK: not flying weather — SOL ${wx.solRet25d}% / BTC ${wx.btcRet25d}% over 25d` });
+      reason: `MURDOCK: not flying weather — ${majorWeather(wx)} over 25d` });
     return { outcome: "withheld", reason: "risk_off" };
   }
 
@@ -1039,9 +1102,13 @@ export function publishCall(rec, { category = null, launchpad: pad = null, wx = 
     target: rec.ticket?.take_profit?.[0]?.price ?? null,
     thesis: rec.pm?.thesis ?? null,
     invalidation: rec.pm?.invalidation ?? null,
-    flags: ev.mintAccount?.error ? null : (ev.mintAccount?.flags ?? []).map((f) => f.flag ?? f),
+    flags: contractFlags(ev).readable ? contractFlags(ev).flags : null,
     liqUsd: ev.pairs?.totalLiquidityUsd ?? ev.pair?.liquidityUsd ?? null,
     rtLossPct: ev.exitProbe?.roundTripLossPct ?? null,
+    // The flat gas toll and the ETH mark the bundle measured (evidence contract
+    // exitProbe.gasUsdRoundTrip, ethUsd.value): copy.js sizes every tenant from these.
+    gasUsdRoundTrip: ev.exitProbe?.gasUsdRoundTrip ?? null,
+    ethUsd: ev.ethUsd?.value ?? null,
     // Preserve the team's actual authorization. Floors may be more conservative,
     // but they may never silently throw this away and size larger on their own.
     deskSizeUsd: rec.order?.size ?? rec.ceo?.order_size_usd ?? rec.risk?.position_size_usd ?? null,
@@ -1173,7 +1240,9 @@ export async function promoteWatches() {
  * because a naming race pays exactly one winner.
  */
 export function namingRaces(universe) {
-  const stop = new Set(["coin", "token", "the", "official", "meme", "solana", "sol", "pump", "fun", "inu", "ai"]);
+  // The chain's own nouns are not a theme: on 4663 every fourth launch is a "hood" or
+  // "robinhood" something, the way every fourth pump.fun launch was a "sol" something.
+  const stop = new Set(["coin", "token", "the", "official", "meme", "pons", "hood", "robinhood", "eth", "inu", "ai"]);
   const clusters = new Map();
   for (const c of universe) {
     const age = c.pair?.ageHours ?? 0;
@@ -1215,6 +1284,10 @@ export async function trendHandoff(candidates = []) {
   const top = candidates[0];
   if (!top?.mint) return { workedUp: 0, note: "no candidate" };
   if (liveCallFor(top.mint)) return { workedUp: 0, note: "already live" };
+  // Same phase rule as every other lane: a curve coin is watched, never paid for.
+  const phase = launchPhaseOf(top);
+  if (phase != null && phase !== "graduated")
+    return { workedUp: 0, note: `on its curve (launch.phase = ${phase}) — watch only` };
   const book = bookState();
   if (book.full) return { workedUp: 0, halted: `book full at ${book.live}` };
   const hook = `trend front-run \u00b7 "${top.theme}" (${top.stage ?? "?"}) \u00b7 ` +
@@ -1223,8 +1296,13 @@ export async function trendHandoff(candidates = []) {
   const rec = await runFor(null, () => workup(
     new Date().toISOString().replace(/[:.]/g, "-"), top.mint, hook,
     { alwaysTicket: SEQUENTIAL, lane: "trend" }));
-  const pub = publishCall(rec, { category: rec?.ev?.category ?? "memecoin", launchpad: "pump.fun" });
-  return { workedUp: 1, symbol: top.symbol, theme: top.theme,
+  /* The pad is the candidate's OWN, from the dex id the sweep saw — never a literal.
+     Every trend call used to be labelled "pump.fun" whatever it was, which mislabelled
+     the record and, worse, keyed the creator-sold tripwire off a fiction. */
+  let pad = canonicalLaunchpad(top.launchpad) ?? null;
+  if (!pad) { try { pad = canonicalLaunchpad(launchpad(top.mint, top.dexId ?? top.pair?.dexId ?? null)); } catch { pad = null; } }
+  const pub = publishCall(rec, { category: rec?.ev?.category ?? "memecoin", launchpad: pad });
+  return { workedUp: 1, symbol: top.symbol, theme: top.theme, launchpad: pad,
     outcome: pub.outcome ?? rec?.outcome ?? rec?.finalDecision };
 }
 
@@ -1236,11 +1314,11 @@ export async function freshScan({ minScore = 45 } = {}) {
   if (book0.full) return { skipped: "position_open", holding: book0.holding?.symbol ?? null };
   freshBusy = true;
   try {
-    const universe = await sweep();
+    const universe = (await sweep()).map(canonicalCandidate);
     const races = namingRaces(universe);
     const young = [];
     for (const c of universe) {
-      if (liveCallFor(c.mint)) continue;
+      if (!c?.mint || liveCallFor(c.mint)) continue;
       // Already judged this coin in the last 6h — a 5-minute lane must not pay
       // to re-ask the same question until circumstances change (that is what
       // the watchlist is for).
@@ -1374,14 +1452,30 @@ export function writeWitnessMark(callId, mark) {
  * clock is retuned: a call is on the fast lane when its own hold window gives it fewer
  * than twelve chances to act on the slow timer. Today that is nano (30m) and micro
  * (1h); low, medium and high get 30 passes over 5h and very_high 144 over a day.
+ *
+ * IN BLOCKS, which is the unit this chain moves in: the slow timer is 6,000 blocks
+ * (10 min at 100 ms), the sub-tick 450, and the nano window 18,000 — so a nano call
+ * gets 3 slow passes and 40 sub-ticks. The hold windows themselves (bands.js) are the
+ * owner's numbers and are not touched; only the comparison is stated in blocks, so the
+ * ratio is read against the chain's cadence and not against Solana's 400 ms slots.
  */
 export const FAST_LANE_MIN_PASSES = 12;
-export function needsFastExitLane(call, { monitorMs = null } = {}) {
+export const MONITOR_TICK_MS = () => Math.max(1, Number(process.env.PENTHOUSE_MONITOR_MINS || 10)) * 60_000;
+/** Both clocks of a call, in blocks — what the fast-lane decision is actually about. */
+export function exitClockBlocks(call, { monitorMs = null, subTickSecs = _subTickSecs } = {}) {
   const holdMax = Number(call?.hold_max_ms);
-  if (!Number.isFinite(holdMax) || holdMax <= 0) return false;      // no clock, no fast lane
-  const slow = Number(monitorMs) > 0 ? Number(monitorMs)
-    : Math.max(1, Number(process.env.PENTHOUSE_MONITOR_MINS || 10)) * 60_000;
-  return holdMax / slow < FAST_LANE_MIN_PASSES;
+  if (!Number.isFinite(holdMax) || holdMax <= 0) return null;
+  const slow = Number(monitorMs) > 0 ? Number(monitorMs) : MONITOR_TICK_MS();
+  const holdBlocks = blocksFor(holdMax);
+  const slowBlocks = blocksFor(slow);
+  const subTickBlocks = blocksFor(Math.max(15, Number(subTickSecs) || 45) * 1000);
+  return { holdBlocks, slowBlocks, subTickBlocks,
+    slowPasses: holdBlocks / slowBlocks, subTicks: holdBlocks / subTickBlocks };
+}
+export function needsFastExitLane(call, { monitorMs = null } = {}) {
+  const clocks = exitClockBlocks(call, { monitorMs });
+  if (!clocks) return false;                                        // no clock, no fast lane
+  return clocks.slowPasses < FAST_LANE_MIN_PASSES;
 }
 
 /* THE ONE PLACE A CALL IS CLOSED BY AN EXIT. Both the slow pass and the fast tick land
@@ -1597,12 +1691,13 @@ export async function monitorCalls() {
           continue;
         }
 
+        const cf = contractFlags(ev);
         const now = {
           mark: ev.pair?.priceUsd ?? null,
           liqUsd: ev.pairs?.totalLiquidityUsd ?? ev.pair?.liquidityUsd ?? null,
           rtLossPct: ev.exitProbe?.roundTripLossPct ?? null,
-          flags: (ev.mintAccount?.flags ?? []).map((f) => f.flag ?? f),
-          flagsReadable: !ev.mintAccount?.error,
+          flags: cf.flags,
+          flagsReadable: cf.readable,
         };
         /* ── SEA OTTER'S DECAY ────────────────────────────────────────────
            A thesis is not true forever just because price has not hit the stop.

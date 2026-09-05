@@ -74,7 +74,9 @@ const MARKETING_ARTICLES = [
     ],
   },
 ];
-const SITE_URL = (process.env.SITE_URL || "https://claudedotcompany.com").replace(/\/$/, "");
+// The Robinhood edition's own host. The Solana desk owns the apex; this build must never
+// stamp that domain into og:image or the CNAME, or Pages would try to claim it.
+const SITE_URL = (process.env.SITE_URL || "https://robinhood.claudedotcompany.com").replace(/\/$/, "");
 // Where the API lives. Empty means "same origin", which is right for local dev and wrong
 // for a static host — Pages cannot run the scanner or the database.
 const API_BASE = (process.env.API_BASE || "").replace(/\/$/, "");
@@ -138,16 +140,39 @@ fs.mkdirSync(marketingOut, { recursive: true });
 fs.copyFileSync(marketingIndex, path.join(marketingOut, "index.html"));
 
 // The self-hosted executor, served static so the one-command install resolves.
+// This is the EVM graph (Robinhood Chain): evm-executor/evm-swap/approvals/scope-guard/
+// thresholds and the ETH-USD oracle replace jupiter/sol-usd-oracle. The list must agree
+// with executor/install.sh's fetch list and executor/test-install.mjs's `need` list —
+// a file missing from here is a file the one-command install cannot resolve.
+// evm-rpc.mjs is not in the shared contract's list but is imported by poller.mjs,
+// evm-executor.mjs, eth-usd-oracle.mjs and erc20-hazards.mjs (import-closure walk over this
+// list, 2026-09-05: those four were the only unpublished EVM edges); without it the
+// installed poller fails on its first import.
 fs.mkdirSync(path.join(OUT, "executor"), { recursive: true });
 const EXECUTOR_FILES = [
-  "poller.mjs", "journal.mjs", "jupiter.mjs", "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs", "sol-usd-oracle.mjs", "heartbeat-health.mjs", "sleep-assertion.mjs", "monitor.mjs", "install.sh", "macos-launchagent.sh", "macos-release.sh", "launchd-runner.mjs", "executor.mjs",
+  "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs", "scope-guard.mjs",
+  "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs", "erc20-hazards.mjs",
+  "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
+  "heartbeat-health.mjs", "sleep-assertion.mjs", "monitor.mjs", "install.sh", "macos-launchagent.sh",
+  "macos-release.sh", "launchd-runner.mjs", "executor.mjs",
   "README.md", "strategy.mjs", "trade-policy.mjs", "simulate.mjs",
   "package.json", "package-lock.json",
 ];
+const missingExecutorFiles = [];
 for (const f of EXECUTOR_FILES) {
   const src = path.join(ROOT, "executor", f);
-  if (!fs.existsSync(src)) throw new Error(`missing executor artifact: ${f}`);
+  if (!fs.existsSync(src)) { missingExecutorFiles.push(f); continue; }
   fs.copyFileSync(src, path.join(OUT, "executor", f));
+}
+if (missingExecutorFiles.length) {
+  // A pinned release build (EXECUTOR_COMMIT / CI) publishes the installer's fetch list,
+  // so a hole in it is a broken install for every user: hard error. A local preview is
+  // already non-installable (the sentinel above disables the copy buttons), so there it
+  // is a warning loud enough to read — the EVM files were being written in parallel
+  // when this list was cut (2026-09-05) and a preview must still build meanwhile.
+  const message = `missing executor artifact${missingExecutorFiles.length === 1 ? "" : "s"}: ${missingExecutorFiles.join(", ")}`;
+  if (releaseBuild) throw new Error(`${message} — a release build cannot publish a partial installer graph`);
+  console.warn(`\n!! WARNING (local preview only) ${message}\n!! The published installer would be broken; a release build refuses this.\n`);
 }
 
 // GitHub Pages reads dist/CNAME to bind the custom domain.

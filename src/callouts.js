@@ -1,9 +1,9 @@
 import db from "./lib/store.js";
-import { decode, isAddress } from "./lib/base58.js";
+import { canonicalAddress, canonicalTxHash, isEvmAddress, isEvmTxHash } from "./canonical.js";
 
 /* A ROLLING BOARD, NOT A SNAPSHOT.
  *
- * Each sweep sees only what pump.fun happens to be trading in that two-minute window,
+ * Each sweep sees only what the launchpad happens to be trading in that two-minute window,
  * and a verified caller is about one callout in eighteen — so the tab showed five cards,
  * then one, then none, and read as broken when it was working. What the reader wants is
  * "who has called something recently", which is a question about the last few hours, not
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS verified_callouts (
   username      TEXT,
   text          TEXT,
   multiple      REAL,
-  wallet_sol_usd REAL,
+  wallet_sol_usd REAL,                 -- the caller's gas-token holding in USD; ETH on this chain (column name kept for schema stability)
   callout_id    TEXT,
   url           TEXT,
   called_at     INTEGER,
@@ -48,11 +48,13 @@ export function rememberVerifiedCallouts(rows, { now = Date.now() } = {}) {
   let kept = 0;
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!r?.mint || !r?.user) continue;
+    // walletEthUsd is the name on this chain; walletSolUsd is read for one release.
+    const holdingUsd = r.walletEthUsd ?? r.walletSolUsd;
     try {
-      write.run(r.mint, r.user, r.symbol ?? null, r.username ?? null,
+      write.run(canonicalAddress(r.mint), canonicalAddress(r.user), r.symbol ?? null, r.username ?? null,
         typeof r.text === "string" ? r.text.slice(0, 240) : null,
         Number.isFinite(Number(r.multiple)) ? Number(r.multiple) : null,
-        Number.isFinite(Number(r.walletSolUsd)) ? Number(r.walletSolUsd) : null,
+        Number.isFinite(Number(holdingUsd)) ? Number(holdingUsd) : null,
         r.id ?? null, r.url ?? null,
         Number.isFinite(Number(r.ts)) ? Number(r.ts) : null, now, now);
       kept++;
@@ -71,7 +73,7 @@ export function rememberVerifiedCallouts(rows, { now = Date.now() } = {}) {
 /** The board: everything that cleared the bar inside the window, freshest first. */
 export function verifiedCalloutBoard({ now = Date.now(), hours = CALLOUT_BOARD_HOURS, limit = 60 } = {}) {
   try {
-    return db.prepare(`SELECT * FROM verified_callouts WHERE last_seen >= ?
+    return db.prepare(`SELECT *, wallet_sol_usd AS wallet_eth_usd FROM verified_callouts WHERE last_seen >= ?
       ORDER BY last_seen DESC, wallet_sol_usd DESC LIMIT ?`)
       .all(now - hours * 3600e3, Math.max(1, Math.min(200, limit)));
   } catch { return []; }
@@ -123,15 +125,16 @@ export function verifiedHolderCallouts(rows, { minUsd = CALLOUT_MIN_WALLET_USD, 
     /* Number(null) is 0, which would file every unreadable balance as "holds nothing"
        and hide a measurement failure inside an ordinary rejection. Read first, then
        decide whether there is a number at all. */
-    const raw = wallet && isAddress(wallet) ? read(wallet) : undefined;
+    const raw = wallet && isEvmAddress(wallet) ? read(canonicalAddress(wallet)) : undefined;
     const usd = raw == null ? NaN : Number(raw);
     if (!Number.isFinite(usd)) { unreadableHidden++; continue; }
     if (usd < bar) { belowBarHidden++; continue; }
-    kept.push({ ...row, walletSolUsd: Math.round(usd) });
+    // ETH is the gas token here; walletSolUsd rides along for one release as an alias.
+    kept.push({ ...row, walletEthUsd: Math.round(usd), walletSolUsd: Math.round(usd) });
   }
   // Biggest holder first: on a tab that shows five, the wallet with the most at stake
   // is the one worth reading.
-  kept.sort((a, b) => (b.walletSolUsd ?? 0) - (a.walletSolUsd ?? 0));
+  kept.sort((a, b) => (b.walletEthUsd ?? 0) - (a.walletEthUsd ?? 0));
   return { rows: kept, unverifiedHidden, belowBarHidden, unreadableHidden, walletUsd: bar };
 }
 
@@ -182,24 +185,22 @@ const httpsUrl = (value) => {
   }
 };
 
+/* A receipt is a transaction hash: 0x and 64 hex digits, lowercased so two spellings of
+ * one transaction are one receipt. (The Solana build accepted an 80-90 char base58
+ * signature here.) */
 const signature = (value) => {
   if (typeof value !== "string") return null;
-  const candidate = value.trim();
-  try {
-    return candidate.length >= 80 && candidate.length <= 90 && decode(candidate).length === 64
-      ? candidate : null;
-  } catch {
-    return null;
-  }
+  const candidate = canonicalTxHash(value.trim());
+  return isEvmTxHash(candidate) ? candidate : null;
 };
 
 const authorWallet = (callout) => {
   if (!record(callout)) return null;
   const wallet = callout.user ?? callout.wallet ?? callout.authorWallet ?? callout.author?.wallet;
-  return isAddress(wallet) ? wallet : null;
+  return isEvmAddress(wallet) ? canonicalAddress(wallet) : null;
 };
 
-const tradeWallet = (trade) => record(trade) && isAddress(trade.wallet) ? trade.wallet : null;
+const tradeWallet = (trade) => record(trade) && isEvmAddress(trade.wallet) ? canonicalAddress(trade.wallet) : null;
 
 const timestamp = (value) => {
   if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : null;
@@ -213,7 +214,8 @@ const receiptFor = (trade) => {
     currentValueUsd: finite(trade.currentValueUsd ?? trade.usd),
     timestamp: timestamp(trade.at ?? trade.timestamp),
     signature: sig,
-    link: suppliedLink ?? (sig ? `https://solscan.io/tx/${sig}` : null),
+    // Blockscout is the human-facing explorer on 4663 (answers 403 to curl, 200 to a browser).
+    link: suppliedLink ?? (sig ? `https://robinhoodchain.blockscout.com/tx/${sig}` : null),
     basis: "token-inflow-at-current-market-mark",
   };
 };
@@ -222,7 +224,7 @@ const receiptFor = (trade) => {
  * Join Pump.fun callout authors to the recent on-chain tape.
  *
  * A profile, username, badge, or impressive multiple is never evidence that the
- * author moved size. A row qualifies only when the author's exact, valid Solana wallet
+ * author moved size. A row qualifies only when the author's exact, valid 0x wallet
  * owns at least one confirmed pool-touching token inflow whose value at the current
  * market mark clears `minUsd`. That is evidence of matched wallet activity, not proof
  * of original purchase consideration. The caller owns recency by supplying its recent
@@ -234,6 +236,9 @@ const receiptFor = (trade) => {
  * made it eligible. Scan completeness and valuation basis ride beside the threshold so
  * a partial/current-mark approximation cannot be mistaken for a complete cost record.
  */
+/** The launchpad-neutral name; the Pumpfun-named export below is kept for one release
+ *  because office.js imports it by that name. Same function. */
+export const evidenceBackedCallouts = (args) => evidenceBackedPumpfunCallouts(args);
 export function evidenceBackedPumpfunCallouts({
   mint = null,
   callouts = [],
@@ -316,7 +321,7 @@ export function evidenceBackedPumpfunCallouts({
     mint: typeof mint === "string" && mint ? mint : null,
     callouts: matched,
     evidence: {
-      kind: "pumpfun_callout_author_token_inflow_match",
+      kind: "launchpad_callout_author_token_inflow_match",
       thresholdUsd,
       valueBasis: "token-inflow-at-current-market-mark",
       purchaseConsiderationProven: false,

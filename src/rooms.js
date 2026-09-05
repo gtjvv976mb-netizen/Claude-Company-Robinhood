@@ -1,6 +1,7 @@
 import db, { ensureColumn } from "./lib/store.js";
 import { runFor, emit } from "./lib/bus.js";
 import { leaseFor, leaseOf, balanceOf, DECIMALS } from "./leasing.js";
+import { isEvmAddress, normalise } from "./lib/address.js";
 import { workup } from "./desk.js";
 import { identityFor, ordinal } from "./identity.js";
 
@@ -174,7 +175,9 @@ export async function requestRun({ floorNo, wallet, mint, houseSeat = false }) {
     if (lease.wallet !== wallet) return { ok: false, error: "this is not your floor" };
   }
   if (busy.has(floorNo)) return { ok: false, error: "your team is already working — one at a time" };
-  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(mint || ""))) return { ok: false, error: "that is not a mint address" };
+  // A token on Robinhood Chain is an ERC-20 contract address, stored lowercase.
+  if (!isEvmAddress(mint)) return { ok: false, error: "that is not a token address (expected 0x…)" };
+  mint = normalise(mint);
 
   const useFree = houseSeat || freeRunsLeft(floorNo) > 0;
   if (!useFree && balanceOf(wallet) < RUN_PRICE_BASE_UNITS) {

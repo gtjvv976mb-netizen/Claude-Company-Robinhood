@@ -4,20 +4,30 @@
  * The owner's specification, verbatim in substance: a coin worth real size has whales
  * in it, and it matters WHICH whales; it is trending on X; its account is active with a
  * real following; and it sits between $100k and $500k of market cap. Then: study the
- * verified pump.fun whales, learn what they buy and how they behave, and hunt the coins
- * they would most likely buy next.
+ * verified whales, learn what they buy and how they behave, and hunt the coins they
+ * would most likely buy next.
  *
- * WHAT IS REAL HERE AND WHAT IS NOT. The whale roster is measured — it is built from
- * callouts this desk has actually seen, by accounts pump.fun itself has verified, whose
- * wallets we priced on chain, and pump.fun reports the multiple each call has done since
- * it was made. So "which whales, and are they any good" is evidence. The WEIGHTS below
- * are not evidence. They are the owner's thesis expressed as arithmetic, and until the
- * shadow book has graded enough of them, this ranks attention rather than proving edge.
- * It is deliberately built so that can be measured later: every score carries its
- * reasons, so a scorecard can ask which term actually predicted anything.
+ * THE WHALE TERM IS EMPTY ON THIS CHAIN, AND SAYS SO. On the Solana desk the roster was
+ * measured — callouts by accounts pump.fun itself had verified, wallets priced on chain,
+ * multiples reported per call. Robinhood Chain has no equivalent source: the launchpads
+ * verify nobody, the public smart-money leaderboard rendered "Top 0 ranked" when
+ * fetched (nockterminal.com/wallets, 2026-09-05), and the chain's own profit
+ * distribution is flat — the top ten wallets took 0.9% of $330M of gains and no named
+ * durably-profitable PONS wallet surfaced anywhere (Bitquery, 2026-07-28 and 2026-09-03).
+ * So `verified_callouts` is empty here, and a roster read from it would silently score
+ * every coin "no verified whale" while 54 of the owner's weighted points sat
+ * unreachable. Rather than let the absence masquerade as a judgement, whaleCap is 0:
+ * whales add nothing, the score explains the gap in `missing`, and the reader schema is
+ * kept so a future on-chain proven-address roster (addresses whose PONS curve buys later
+ * graduated, written to the same columns) turns the term back on by raising the cap —
+ * see docs/HANDOFF-agents.md. The remaining terms — band, X trend, the account — are
+ * the owner's thesis expressed as arithmetic, not evidence, until the shadow book has
+ * graded enough of them. Every score carries its reasons so a scorecard can ask which
+ * term actually predicted anything.
  *
  * Nothing here is a safety check and nothing here may loosen one. A coin with every
- * whale on earth in it still has to pass the screen, the exit probe and the mint audit.
+ * whale on earth in it still has to pass the screen, the exit probe and the contract
+ * audit.
  */
 import db from "./lib/store.js";
 import { bandForMarketCap } from "./bands.js";
@@ -107,9 +117,11 @@ export function whalesOn(mint, { roster = null, now = Date.now(), sinceMs = 30 *
    measurement — see the file header. They are gathered in one object so a later
    scorecard can retune them against the shadow book rather than hunting through code. */
 export const CONVICTION_WEIGHTS = Object.freeze({
-  provenWhale: 18,        // a whale with a real record is in it
+  provenWhale: 18,        // a whale with a real record is in it (unreachable: see whaleCap)
   unratedWhale: 7,        // a verified whale we have not watched long enough to rate
-  whaleCap: 54,           // no coin rides whale count alone
+  whaleCap: 0,            // NO WHALE ROSTER ON THIS CHAIN YET — the term is honest at zero
+                          // rather than penalising every coin identically; raise it only
+                          // when a measured roster exists (file header, HANDOFF-agents.md)
   bandSweetSpot: 20,      // $100k-$500k, the owner's stated band
   bandAdjacent: 8,        // $60k-$100k or $500k-$1m
   bandEarly: 2,           // nano/micro: early, but not the stated band
@@ -182,7 +194,11 @@ export function convictionScore({ marketCapUsd = null, whales = [], xRead = null
     missing: [
       marketCapUsd == null ? "market cap" : null,
       xRead ? null : "X read",
-      whales.length ? null : "no verified whale seen on it",
+      // The cap at zero means the term cannot be judged at all, and that is a different
+      // fact from "no whale was seen": the first is about the desk, the second about the
+      // coin. Say the first while it is true; fall back to the second once a roster exists.
+      W.whaleCap === 0 ? "no whale roster on this chain yet"
+        : whales.length ? null : "no verified whale seen on it",
     ].filter(Boolean),
   };
 }

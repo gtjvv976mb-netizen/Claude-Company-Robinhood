@@ -18,6 +18,12 @@ import * as evaluation from "./evaluation.js";
 
 const cycleId = () => new Date().toISOString().replace(/[:.]/g, "-");
 
+/** How long the lead analyst seat runs alone before the rest of its batch is launched,
+ *  so its cache write of the evidence bundle lands before the parallel reads. Tests
+ *  set it to 0; a live cycle keeps the second. */
+export const CACHE_LEAD_MS = process.env.NODE_ENV === "test" ? 0
+  : Math.max(0, Number(process.env.DESK_CACHE_LEAD_MS) || 1000);
+
 /** Stage 0: build the raw universe from public feeds. */
 export async function buildUniverse() {
   emit("stage", { stage: "scout", note: "pulling feeds" });
@@ -129,7 +135,22 @@ export async function workup(cycle, mint, hook = "", opts = {}) {
    * The cost of the reorder is one extra round trip on surviving coins. The screen
    * still runs first, so the desk still never researches a honeypot. */
   emit("stage", { stage: "analysis", mint, symbol: ev.symbol });
-  const cheapKeys = ["liquidity", "flow", "technical"];
+  /* ORDER MATTERS FOR THE CACHE, NOT ONLY FOR THE BILL.
+   *
+   * The five analyst seats now send the evidence bundle as one byte-identical cached
+   * block (analysts.js analystBlocks), so four of the five reads of it can be 0.1x cache
+   * hits — but only if ONE request has written the entry before the others arrive.
+   * Three seats fired in the same tick are three concurrent writers and every one of
+   * them misses. So the first cheap seat is launched alone and the other two follow
+   * CACHE_LEAD_MS later; technical goes first because it is the cheapest of the three
+   * (measured 2026-09-05: charter 4,595 bytes against liquidity's 6,284 and flow's
+   * 6,672, and the lightest weight on the desk) — the lead seat pays the write and the
+   * rest read it. The deep batch (forensics,
+   * narrative) arrives seconds later, after the X read, and reads the same entry: the
+   * read rides as a separate block after the bundle precisely so the bundle does not
+   * change between the two batches. Whether the write has landed after one second is
+   * UNVERIFIED against the live API; cachedTok in /api/spend/seats is the ruler. */
+  const cheapKeys = ["technical", "liquidity", "flow"];
   const analysts = {};
   const seatFailures = [];
   const collect = (k, r) => {
@@ -144,7 +165,9 @@ export async function workup(cycle, mint, hook = "", opts = {}) {
     }
   };
 
-  const cheap = await Promise.allSettled(cheapKeys.map((k) => runAnalyst(k, ev)));
+  const cheap = await Promise.allSettled(cheapKeys.map((k, i) =>
+    i === 0 ? runAnalyst(k, ev)
+      : new Promise((r) => setTimeout(r, CACHE_LEAD_MS)).then(() => runAnalyst(k, ev))));
   cheap.forEach((r, i) => collect(cheapKeys[i], r));
 
   /* A kill here is final, exactly as it is after the full batch — so stop, and keep the
@@ -166,7 +189,11 @@ export async function workup(cycle, mint, hook = "", opts = {}) {
   /* STARTED, NOT AWAITED, and only for a coin still standing. Forensics reads the
      deployer's public record and narrative reads the story, so both wait on it; nothing
      else does. A failed read must not take the workup down — enrichWithXRead degrades
-     to "no read", and the seats say so themselves when ev.xRead is missing. */
+     to "no read", and the seats say so themselves when the read is missing.
+     enrichWithXRead attaches the read to ev.xRead, where the red team, the PM, the
+     best pick and the record want it; the analyst prompts strip that key out of the
+     bundle block and carry the read as a separate block (analysts.js), so the cached
+     bundle the cheap batch wrote is the bundle the deep batch reads. */
   const xRead = enrichWithXRead(ev, hook);
   const deepKeys = ["forensics", "narrative"];
   const deep = await Promise.allSettled([

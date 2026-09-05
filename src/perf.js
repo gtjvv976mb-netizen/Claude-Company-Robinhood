@@ -1,9 +1,8 @@
 import db, { ensureColumn } from "./lib/store.js";
-import { readRpc } from "./lib/http.js";
-import { cfg } from "./config.js";
-import { isAddress } from "./lib/base58.js";
 import { emit } from "./lib/bus.js";
-import { DECIMALS } from "./leasing.js";
+import { DECIMALS, TOKEN } from "./leasing.js";
+import { evmRpc, TRANSFER_TOPIC, wordToAddress, hexToBigInt } from "./treasury-evm.js";
+import { canonicalAddress, isEvmAddress, isEvmTxHash } from "./canonical.js";
 // fills references calls(id), so that table must exist before this module's DDL runs.
 // Importing for the side effect is the dependency, and stating it here keeps it honest.
 import "./calls.js";
@@ -11,9 +10,9 @@ import "./calls.js";
 /**
  * PERFORMANCE — did the tenant actually take the call, and what did it make them?
  *
- * Read-only, always. Solana is public, so the desk can follow a floor owner's own
+ * Read-only, always. Chain 4663 is public, so the desk can follow a floor owner's own
  * wallet and see the fills without ever holding a key, a coin, or a permission. Nothing
- * here can move anything: it reads balance deltas out of confirmed transactions and
+ * here can move anything: it reads ERC-20 Transfer logs out of mined receipts and
  * writes rows to a local database.
  *
  * This exists because a track record the desk computes from chain data is worth
@@ -21,9 +20,15 @@ import "./calls.js";
  */
 
 export const FEE_PCT = Number(process.env.PERF_FEE_PCT || 10);
-export const MINT = process.env.CLAUDECO_MINT || "HRkkxgaFDDmZ3qZX8xP5SiMRBNvFNVUUv4FJUjPCpump";
-const SOL = "So11111111111111111111111111111111111111112";
-const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+/** The access token is leasing.js's TOKEN (CLAUDECO_RH_TOKEN, a placeholder zero
+ *  address until launch); MINT is kept as the name perf's callers have always read. */
+export const MINT = TOKEN;
+
+/* THE QUOTE LEGS a fill can be priced from. PONS V2 pairs against WETH or USDG
+ * (approvedPairTokens), V1 against WETH; Kyber may also take native ETH, which leaves
+ * no Transfer log at all — see readFill. USDG is a dollar with 6 decimals. */
+export const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73";
+export const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS fills (
@@ -31,12 +36,12 @@ CREATE TABLE IF NOT EXISTS fills (
   floor_no    INTEGER NOT NULL,
   call_id     INTEGER REFERENCES calls(id),
   wallet      TEXT NOT NULL,
-  mint        TEXT NOT NULL,
-  side        TEXT NOT NULL,          -- buy | sell
-  token_units TEXT NOT NULL,          -- base units of the token that moved
-  quote_usd   REAL,                   -- what it cost or returned, best effort
-  signature   TEXT NOT NULL,
-  slot        INTEGER,
+  mint        TEXT NOT NULL,             -- the token's 0x address (column name kept for schema stability)
+  side        TEXT NOT NULL,             -- buy | sell | transfer_in | transfer_out
+  token_units TEXT NOT NULL,             -- base units of the token that moved
+  quote_usd   REAL,                      -- what it cost or returned, best effort
+  signature   TEXT NOT NULL,             -- the transaction hash (column name kept)
+  slot        INTEGER,                   -- the block number (column name kept)
   block_time  INTEGER,
   seen_at     INTEGER NOT NULL,
   UNIQUE (signature, mint, side)
@@ -68,53 +73,76 @@ ensureColumn("results", "fee_usd", "REAL NOT NULL DEFAULT 0");
 ensureColumn("results", "fee_paid", "INTEGER NOT NULL DEFAULT 0");
 ensureColumn("results", "token_usd", "REAL");
 
-/** ALL of the wallet's token accounts for a mint — an aggregator route can land a
- * fill in an auxiliary account, and scanning only value[0] would never see it. */
-async function tokenAccountsOf(wallet, mint) {
-  const r = await readRpc(cfg.rpc, "getTokenAccountsByOwner",
-    [wallet, { mint }, { encoding: "jsonParsed", commitment: "finalized" }]);
-  if (!r.ok) return { ok: false, error: r.error };
-  const accts = (r.data?.value ?? []).map((v) => v.pubkey);
-  return accts.length ? { ok: true, accounts: accts } : { ok: false, error: "no token account" };
+/** The chain's ETH/USD, from the data lane's reconciled source (CoinGecko cross-checked
+ *  against Kyber's amountInUsd). Null when it cannot be read — a fill priced in ETH is
+ *  then left unpriced rather than priced at a guess. */
+export async function ethPrice() {
+  try {
+    const { ethUsd } = await import("./data/eth-usd.js");
+    const r = await ethUsd();
+    return r?.ok && Number(r.value) > 0 ? Number(r.value) : null;
+  } catch { return null; }
+}
+
+/** What one CLAUDECO is worth right now — the rate a fee is converted at. Kyber's
+ *  price() is the data lane's; a token not yet launched (zero address) has no price. */
+export async function tokenPriceUsd() {
+  if (!isEvmAddress(MINT) || /^0x0{40}$/.test(MINT)) return null;
+  try {
+    const { price } = await import("./data/kyber.js");
+    const p = await price([MINT]);
+    const v = p?.[MINT]?.usdPrice ?? p?.[MINT.toLowerCase()]?.usdPrice ?? null;
+    return Number(v) > 0 ? Number(v) : null;
+  } catch { return null; }
+}
+
+/** Every ERC-20 Transfer in a receipt, decoded. Pure. */
+export function transfersIn(receipt) {
+  const out = [];
+  for (const log of receipt?.logs ?? []) {
+    const t = log?.topics ?? [];
+    if (log?.removed || t.length !== 3 || t[0] !== TRANSFER_TOPIC) continue;
+    out.push({ token: canonicalAddress(String(log.address)), from: wordToAddress(t[1]), to: wordToAddress(t[2]),
+      value: hexToBigInt(log.data) });
+  }
+  return out;
 }
 
 /**
- * Read one transaction as a fill. The token side is unambiguous — the owner's balance in
- * that mint went up or down. The dollar side is best-effort: SOL and USDC deltas are
- * netted, and where neither moved the value is left null rather than invented.
+ * Read one mined transaction as a fill. Pure, from the receipt's logs.
+ *
+ * The token side is unambiguous — Transfer logs to or from the wallet in that token.
+ * The dollar side is best-effort: a USDG leg is a dollar; a WETH leg is priced through
+ * ETH/USD; a NATIVE ETH leg leaves no Transfer log, so `nativeWei` (the tx value on a
+ * buy) may be supplied by the caller, and where nothing prices the leg the value is
+ * left null rather than invented.
  */
-function readFill(tx, wallet, mint, solPriceUsd) {
-  const meta = tx?.meta;
-  if (!meta || meta.err) return null;
-
-  const pre = meta.preTokenBalances || [];
-  const post = meta.postTokenBalances || [];
-  const amountFor = (list, m) => list
-    .filter((b) => b.mint === m && b.owner === wallet)
-    .reduce((a, b) => a + BigInt(b.uiTokenAmount.amount), 0n);
-
-  const tokenDelta = amountFor(post, mint) - amountFor(pre, mint);
+export function readFill(receipt, wallet, token, ethPriceUsd, { nativeWei = 0n } = {}) {
+  if (!receipt || receipt.status !== "0x1") return null;      // reverted or voided (ArbOS 61: status 0x0, no logs)
+  const w = canonicalAddress(wallet), tk = canonicalAddress(token);
+  let tokenDelta = 0n, wethDelta = 0n, usdgDelta = 0n;
+  for (const x of transfersIn(receipt)) {
+    const signed = x.to === w ? x.value : x.from === w ? -x.value : 0n;
+    if (signed === 0n) continue;
+    if (x.token === tk) tokenDelta += signed;
+    else if (x.token === WETH) wethDelta += signed;
+    else if (x.token === USDG) usdgDelta += signed;
+  }
   if (tokenDelta === 0n) return null;
 
-  // what the wallet paid or received, in dollars
-  const usdcDelta = Number(amountFor(post, USDC) - amountFor(pre, USDC)) / 1e6;
-  const wsolDelta = Number(amountFor(post, SOL) - amountFor(pre, SOL)) / 1e9;
-
-  const keys = tx.transaction.message.accountKeys.map((k) => (typeof k === "string" ? k : k.pubkey));
-  const idx = keys.indexOf(wallet);
-  const lamportDelta = idx >= 0 && meta.preBalances && meta.postBalances
-    ? (meta.postBalances[idx] - meta.preBalances[idx]) / 1e9 : 0;
-  // the fee is the wallet's own, and is not part of the trade's economics
-  const solMoved = wsolDelta + (idx === 0 ? lamportDelta + (meta.fee ?? 0) / 1e9 : lamportDelta);
-
+  // What the wallet paid or received, in dollars. Native ETH spent on a buy is the
+  // transaction's value; on a sell the proceeds arrive as a WETH withdraw the logs do
+  // not attribute to the wallet, so a native-leg sell stays unpriced (null).
+  const usdgMoved = Number(usdgDelta) / 1e6;
+  const ethMoved = Number(wethDelta) / 1e18 - (tokenDelta > 0n ? Number(BigInt(nativeWei || 0n)) / 1e18 : 0);
   let quoteUsd = null;
-  if (Math.abs(usdcDelta) > 0.000001) quoteUsd = Math.abs(usdcDelta);
-  else if (Math.abs(solMoved) > 0.000001 && solPriceUsd) quoteUsd = Math.abs(solMoved) * solPriceUsd;
+  if (Math.abs(usdgMoved) > 0.000001) quoteUsd = Math.abs(usdgMoved);
+  else if (Math.abs(ethMoved) > 1e-9 && ethPriceUsd > 0) quoteUsd = Math.abs(ethMoved) * ethPriceUsd;
 
   // A genuine trade moves tokens AND meaningful value the other way. A plain transfer
-  // moves only tokens — the counter-movement is dust, rent or a fee. Reading a transfer
-  // as a sale is not a rounding error: it would bill a performance fee on money that was
-  // never made. The tenant's own payment to the treasury is exactly this shape.
+  // moves only tokens — the counter-movement is dust or nothing. Reading a transfer
+  // as a sale is not a rounding error: it would bill a performance fee on money that
+  // was never made. The tenant's own payment to the treasury is exactly this shape.
   const TRADE_FLOOR_USD = 0.5;
   const isTrade = quoteUsd != null && quoteUsd >= TRADE_FLOOR_USD;
   const side = tokenDelta > 0n
@@ -128,65 +156,95 @@ function readFill(tx, wallet, mint, solPriceUsd) {
   };
 }
 
-/** What one CLAUDECO is worth right now — the rate a fee is converted at. */
-export async function tokenPriceUsd() {
-  const { price } = await import("./data/jupiter.js");
-  const p = await price([MINT]);
-  return p?.[MINT]?.usdPrice ?? null;
-}
+/* BLOCKS FROM A TIMESTAMP, without an index: the chain seals a block every ~100 ms
+ * (100.6 ms measured over 10,000 blocks, live-thresholds.mjs BLOCK_MS), so a wall-clock
+ * window is a block window to within the cadence's drift. Over-reach by a margin;
+ * an extra chunk of empty logs costs a request, a missed fill costs a result. */
+const BLOCK_MS = Number(process.env.RH_BLOCK_MS || 100);
+const LOG_CHUNK = Number(process.env.PERF_LOG_CHUNK_BLOCKS || 50_000);
+const MAX_SCAN_BLOCKS = Number(process.env.PERF_MAX_SCAN_BLOCKS || 1_500_000);   // ~42h at 100 ms
 
-async function solPrice() {
-  const { price } = await import("./data/jupiter.js");
-  const p = await price([SOL]);
-  return p?.[SOL]?.usdPrice ?? null;
+const blockTimeCache = new Map();
+async function blockTimestamp(blockHex) {
+  const hit = blockTimeCache.get(blockHex);
+  if (hit) return hit;
+  const r = await evmRpc("eth_getBlockByNumber", [blockHex, false]);
+  const ts = r.ok && r.data?.timestamp ? Number(hexToBigInt(r.data.timestamp)) : null;
+  if (ts) blockTimeCache.set(blockHex, ts);
+  return ts;
 }
 
 /**
- * Follow one wallet's activity in one mint and record any fills found.
- * Purely observational: it asks the chain what already happened.
+ * Follow one wallet's activity in one token and record any fills found.
+ * Purely observational: it asks the chain what already happened, via eth_getLogs on
+ * the token's Transfer topic filtered to the wallet on either side.
  */
 export async function scanFills({ floorNo, callId, wallet, mint, limit = 40 }) {
-  if (!isAddress(wallet) || !isAddress(mint)) return { ok: false, error: "bad address" };
-  const ta = await tokenAccountsOf(wallet, mint);
-  if (!ta.ok) return { ok: true, fills: 0, note: ta.error };   // never held it: not an error
+  const w = canonicalAddress(wallet), token = canonicalAddress(mint);
+  if (!isEvmAddress(w) || !isEvmAddress(token)) return { ok: false, error: "bad address" };
 
   // Only activity DURING the call belongs to the call. A tenant who traded this
-  // mint last week did not trade the desk's idea — attributing those fills would
+  // token last week did not trade the desk's idea — attributing those fills would
   // bill a performance fee on money the call never made.
   const call = callId ? db.prepare("SELECT opened_at, closed_at FROM calls WHERE id=?").get(callId) : null;
   const windowStart = call ? Math.floor(call.opened_at / 1000) - 300 : null;   // 5 min of clock skew grace
   const windowEnd = call?.closed_at ? Math.floor(call.closed_at / 1000) + 48 * 3600 : null; // exits take time
 
-  const solUsd = await solPrice();
-  let found = 0;
+  const head = await evmRpc("eth_blockNumber", []);
+  if (!head.ok) return { ok: false, error: head.error, fills: 0 };
+  const headNo = Number(hexToBigInt(head.data));
+  const now = Date.now();
+  const sinceMs = windowStart != null ? now - windowStart * 1000 : 24 * 3600e3;
+  const span = Math.min(MAX_SCAN_BLOCKS, Math.ceil(sinceMs / BLOCK_MS) + 3_000);
+  const fromNo = Math.max(0, headNo - span);
 
-  for (const account of ta.accounts) {
-    const sigs = await readRpc(cfg.rpc, "getSignaturesForAddress",
-      [account, { limit, commitment: "finalized" }]);
-    if (!sigs.ok) return { ok: false, error: sigs.error, fills: found };
-
-    for (const s of (sigs.data || []).filter((x) => !x.err).reverse()) {
-      if (windowStart != null && s.blockTime != null && s.blockTime < windowStart) continue;
-      if (windowEnd != null && s.blockTime != null && s.blockTime > windowEnd) continue;
-      const already = db.prepare("SELECT 1 FROM fills WHERE signature=? AND mint=? LIMIT 1").get(s.signature, mint);
-      if (already) continue;
-      const tx = await readRpc(cfg.rpc, "getTransaction",
-        [s.signature, { encoding: "jsonParsed", commitment: "finalized", maxSupportedTransactionVersion: 0 }]);
-      if (!tx.ok || !tx.data) continue;
-
-      const fill = readFill(tx.data, wallet, mint, solUsd);
-      if (!fill) continue;
-      try {
-        db.prepare(`INSERT INTO fills (floor_no,call_id,wallet,mint,side,token_units,quote_usd,signature,slot,block_time,seen_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-          .run(floorNo, callId ?? null, wallet, mint, fill.side, fill.tokenUnits, fill.quoteUsd,
-               s.signature, tx.data.slot ?? null, tx.data.blockTime ?? null, Date.now());
-        found++;
-        emit("fill", { floorNo, callId, side: fill.side, quoteUsd: fill.quoteUsd, mint });
-      } catch (e) { if (!/UNIQUE/i.test(String(e.message))) throw e; }
+  const ethUsd = await ethPrice();
+  const wallWord = "0x" + w.slice(2).padStart(64, "0");
+  const hashes = new Set();
+  for (let lo = fromNo; lo <= headNo; lo += LOG_CHUNK) {
+    const hi = Math.min(headNo, lo + LOG_CHUNK - 1);
+    const range = { address: token, fromBlock: "0x" + lo.toString(16), toBlock: "0x" + hi.toString(16) };
+    // Two filters, because a topic position is one side of the transfer: to the wallet, from the wallet.
+    for (const topics of [[TRANSFER_TOPIC, null, wallWord], [TRANSFER_TOPIC, wallWord]]) {
+      const r = await evmRpc("eth_getLogs", [{ ...range, topics }]);
+      if (!r.ok) return { ok: false, error: r.error, fills: 0 };
+      for (const log of r.data ?? []) if (log?.transactionHash) hashes.add(String(log.transactionHash).toLowerCase());
     }
   }
-  return { ok: true, fills: found };
+
+  let found = 0;
+  for (const hash of [...hashes].slice(-Math.max(1, limit))) {
+    if (!isEvmTxHash(hash)) continue;
+    const already = db.prepare("SELECT 1 FROM fills WHERE signature=? AND mint=? LIMIT 1").get(hash, token);
+    if (already) continue;
+    const rc = await evmRpc("eth_getTransactionReceipt", [hash]);
+    if (!rc.ok || !rc.data) continue;
+    const receipt = rc.data;
+    const blockNo = Number(hexToBigInt(receipt.blockNumber ?? "0x0"));
+    const blockTime = await blockTimestamp(receipt.blockNumber);
+    if (windowStart != null && blockTime != null && blockTime < windowStart) continue;
+    if (windowEnd != null && blockTime != null && blockTime > windowEnd) continue;
+
+    /* The buy's ETH leaves as the transaction's value, which no log records; read it from
+       the transaction so a native buy is a fill and not a "transfer_in" that can never
+       settle (review, 2026-09-05). A sell's proceeds arrive as a WETH withdraw the logs do carry. */
+    let nativeWei = 0n;
+    try {
+      const txr = await evmRpc("eth_getTransactionByHash", [hash]);
+      if (txr.ok && txr.data && canonicalAddress(txr.data.from) === w) nativeWei = hexToBigInt(txr.data.value ?? "0x0");
+    } catch { nativeWei = 0n; }
+    const fill = readFill(receipt, w, token, ethUsd, { nativeWei });
+    if (!fill) continue;
+    try {
+      db.prepare(`INSERT INTO fills (floor_no,call_id,wallet,mint,side,token_units,quote_usd,signature,slot,block_time,seen_at)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(floorNo, callId ?? null, w, token, fill.side, fill.tokenUnits, fill.quoteUsd,
+             hash, blockNo, blockTime, Date.now());
+      found++;
+      emit("fill", { floorNo, callId, side: fill.side, quoteUsd: fill.quoteUsd, mint: token });
+    } catch (e) { if (!/UNIQUE/i.test(String(e.message))) throw e; }
+  }
+  return { ok: true, fills: found, scannedBlocks: headNo - fromNo, unpricedEthLeg: ethUsd == null };
 }
 
 /**

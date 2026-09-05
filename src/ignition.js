@@ -1,12 +1,13 @@
 /**
- * THE IGNITION LANE — what is moving on pump.fun right now.
+ * THE IGNITION LANE — what is moving on PONS right now.
  *
  * The desk's research is expensive and slow by design: eleven model calls, forty cents
  * and eight minutes to judge one coin. That is the right shape for a thesis and the
  * wrong shape for a $9k coin that doubles in five minutes, and the owner asked for
  * both. So this lane does no thinking at all. It is arithmetic over free data —
- * pump.fun's own listing and its own minute candles — and its only job is to answer
- * "which of the eleven hundred coins alive this hour is actually moving", cheaply
+ * GeckoTerminal's new-pool listing for chain 4663 and its minute candles per pool
+ * (pons-live.js; ~13-20 new pools a minute measured 2026-09-05) — and its only job is
+ * to answer "which of the coins launched this hour is actually moving", cheaply
  * enough to ask again every minute.
  *
  * What it costs: about six HTTP requests plus one minute-tape per shortlisted coin.
@@ -17,7 +18,7 @@
  * been told to LOOK at sooner, not one it has been told to buy.
  */
 import { CAP_BANDS } from "./categories.js";
-import { asCandidate, momentumFor, newLaunches, recentlyTraded } from "./data/pumpfun-live.js";
+import { asCandidate, momentumFor, newLaunches, recentlyTraded, padPools } from "./data/pons-live.js";
 import { emit } from "./lib/bus.js";
 
 /* HOW LONG A BAND IS WORTH HUNTING IN.
@@ -44,9 +45,13 @@ export function shortlist(candidates, { now = Date.now(), limit = 40 } = {}) {
     if (ageMs != null && ageMs > huntWindowMs(band)) continue;
     /* A coin nobody has traded in the last ten minutes is not igniting, whatever its
        market cap. This is the cheapest possible liveness test and it removes most of
-       the listing before a single tape is pulled. */
+       the listing before a single tape is pulled. GeckoTerminal has no last-trade
+       stamp; its five-minute transaction count is the same question asked differently,
+       and a pool with none is skipped on the same grounds. */
     const lastTradeAt = c.live.lastTradeAt;
     if (lastTradeAt != null && now - lastTradeAt > 10 * 60_000) continue;
+    const m5 = c.pair?.txns?.m5;
+    if (lastTradeAt == null && m5 && (m5.buys + m5.sells) === 0) continue;
     eligible.push({ candidate: c, ageMs });
   }
   /* Rank for ATTENTION, not for merit: this only decides whose minute tape gets pulled,
@@ -56,7 +61,10 @@ export function shortlist(candidates, { now = Date.now(), limit = 40 } = {}) {
     const band = candidate.live.band;
     const window = huntWindowMs(band) || 1;
     const freshness = ageMs == null ? 0.35 : Math.max(0, 1 - ageMs / window);
-    const replies = Math.min(1, (candidate.live.replyCount ?? 0) / 60);
+    // The crowd signal the feed gives away for free: pump.fun's reply count on Solana,
+    // GeckoTerminal's distinct five-minute buyers here. Both saturate around sixty.
+    const crowd = candidate.live.replyCount ?? candidate.live.buyers5m ?? 0;
+    const replies = Math.min(1, crowd / 60);
     // A coin already well below its own high is a late look, not an early one.
     const ath = candidate.live.athMarketCap;
     const nearHigh = ath > 0 && candidate.pair.marketCap > 0
@@ -123,25 +131,27 @@ export function ignitionScore(momentum, { band } = {}) {
  * Returns every candidate it scored, ranked, plus the raw counts — a caller that wants
  * only the top few can slice, and the counts are what makes the lane auditable in a log.
  */
-export async function ignitionSweep({ solUsd = null, freshPages = 2, tradedPages = 4,
-  tapes = 40, tapeMinutes = 40, concurrency = 8, now = Date.now() } = {}) {
-  const [fresh, traded] = await Promise.all([
+export async function ignitionSweep({ freshPages = 2, tradedPages = 1, padPages = 1,
+  tapes = 40, tapeMinutes = 40, concurrency = 4, now = Date.now() } = {}) {
+  const [fresh, traded, pad] = await Promise.all([
     newLaunches({ pages: freshPages }).catch(() => []),
     recentlyTraded({ pages: tradedPages }).catch(() => []),
+    padPools({ pages: padPages }).catch(() => []),
   ]);
   const seen = new Map();
-  for (const row of [...traded, ...fresh]) {
-    const c = asCandidate(row, { solUsd, now });
+  for (const row of [...traded, ...fresh, ...pad]) {
+    const c = asCandidate(row, { now });
     if (c && !seen.has(c.mint)) seen.set(c.mint, c);
   }
   const all = [...seen.values()];
   const picked = shortlist(all, { now, limit: tapes });
-  const momentum = await momentumFor(picked.map((c) => c.mint),
+  // The tape is keyed by POOL: GeckoTerminal serves candles per pool, not per token.
+  const momentum = await momentumFor(picked.map((c) => c.pool),
     { limit: tapeMinutes, concurrency, now });
 
   const ranked = [];
   for (const c of picked) {
-    const mo = momentum.get(c.mint) ?? null;
+    const mo = momentum.get(c.pool) ?? null;
     const scored = ignitionScore(mo, { band: c.live.band });
     if (!scored) continue;
     ranked.push({ ...c, momentum: mo, ignition: scored });

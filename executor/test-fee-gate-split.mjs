@@ -1,159 +1,146 @@
 /**
  * THE FEE CEILING IS A GATE. IT MUST NOT ALSO BE A COST MODEL.
  *
- * maxNetworkFeeLamports is the fee above which an entry is REFUSED, so raising it can
- * only ever admit trades. But the same constant was also charged against every trade —
- * as networkFeeReserveSol inside the risk rails, and as worstFeeRatio in the poller's
- * executable-cost guard — where raising it can only ever refuse them.
+ * On Solana, maxNetworkFeeLamports was the fee above which an entry is REFUSED, so
+ * raising it could only admit trades — but the same constant was also charged against
+ * every trade as the reserve inside the risk rails and as worstFeeRatio in the poller's
+ * executable-cost guard, where raising it could only refuse them. Coupled, the owner's
+ * instruction to stop congestion refusing fills would have refused ALL of them: reviewed
+ * against the real sizing engine, a 2,000,000-lamport cost model left no stop width from
+ * 8% to 95% that still produced a buy.
  *
- * Coupled, the owner's instruction to stop congestion refusing fills would have refused
- * ALL of them. Reviewed against the real sizing engine at the live 0.3366 SOL wallet, a
- * 2,000,000 cost model leaves no stop width between 8% and 95%, at any round-trip
- * friction, that still yields a buy.
+ * On this chain the two numbers are not even the same KIND of thing. The GATE is a
+ * registry threshold with provenance (exec.maxNetworkFeeWei, VOID until measured) that
+ * the executor compares worst-case gas×price against before signing. The COST MODEL is
+ * computed per tick — half the measured round-trip gas × the gas price both providers
+ * report right now — because gas moved 0.41 → 0.80 gwei between two probe runs fifteen
+ * minutes apart on 2026-09-05. A constant cost model would have been wrong within the
+ * hour; a gate that doubled as one would have been wrong in both directions.
  *
- * Nothing in the suite caught that. The 378-combination sweep in test-risk-sizing only
- * asserts that a sized trade does not BREACH a cap — which a bot that never buys
- * satisfies perfectly. So the load-bearing assertion here is the boring one: an ordinary
- * desk call must actually produce a BUY.
+ * Gas is FLAT here, so the boring load-bearing assertion changes shape: it is not "an
+ * ordinary desk call still buys" but "the SIZE decides whether the round trip is
+ * affordable" — the canary is refused by the executable-cost guard at any stop width,
+ * and the operator ceiling clears it. That inversion is the whole reason the caps are
+ * marked as awaiting owner confirmation.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { planEntry, DEFAULTS } from "./strategy.mjs";
+import { lintSource } from "./lessons-lint.mjs";
+import { threshold } from "./thresholds.mjs";
+import "./live-thresholds.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { c ? (pass++, console.log(`  ok   ${n}${d ? "  — " + d : ""}`))
                                  : (fail++, console.log(`  FAIL ${n}${d ? "  — " + d : ""}`)); };
 
 const poller = fs.readFileSync(new URL("./poller.mjs", import.meta.url), "utf8");
-const constant = (name) => {
-  const m = poller.match(new RegExp(`${name}:\\s*([0-9_]+)`));
-  return m ? Number(m[1].replace(/_/g, "")) : null;
-};
-const GATE = constant("maxNetworkFeeLamports");
-const EXPECTED = constant("expectedNetworkFeeLamports");
+const executor = fs.readFileSync(new URL("./evm-executor.mjs", import.meta.url), "utf8");
 
-console.log("\nTHE TWO NUMBERS ARE SEPARATE, AND POINT OPPOSITE WAYS");
+console.log("\nTHE TWO NUMBERS ARE DIFFERENT KINDS OF THING");
 {
-  ok("the refusal gate was raised", GATE === 2_000_000, `${GATE}`);
-  ok("the cost model was NOT", EXPECTED === 500_000, `${EXPECTED}`);
-  ok("the gate is the looser of the two, which is the only safe direction", GATE > EXPECTED);
+  ok("the refusal gate is a registry threshold, live, VOID until measured on this chain",
+    threshold("exec.maxNetworkFeeWei").live === true && threshold("exec.maxNetworkFeeWei").value === null);
+  ok("the poller reads the gate from the registry, never from env",
+    /maxNetworkFeeWei: registryValue\("exec\.maxNetworkFeeWei"/.test(poller) && !/process\.env\.MAX_NETWORK_FEE/.test(poller));
+  ok("the cost model is computed per tick from the measured round-trip gas and the LIVE gas price",
+    /async function expectedNetworkFeeWei\(\)/.test(poller) &&
+    /BigInt\(Math\.ceil\(EXECUTOR_CFG\.roundTripGasUnits \/ 2\)\) \* gas\.max/.test(poller) &&
+    /roundTripGasUnits: threshold\("swap\.roundTripGasUnits"\)\.value/.test(poller));
   ok("the sizing reserve reads the cost model, not the gate",
-    /networkFeeReserveSol: EXECUTE \? jupiter\.cfg\.expectedNetworkFeeLamports/.test(poller));
+    /networkFeeReserveSol: EXECUTE \? weiToEth\(feeWei\)/.test(poller));
   ok("the executable-cost guard reads the cost model, not the gate",
-    /worstFeeRatio = 2 \* jupiter\.cfg\.expectedNetworkFeeLamports/.test(poller));
-  ok("the gate itself is still enforced, unchanged",
-    /if \(networkFees > cfg\.maxNetworkFeeLamports\)/.test(
-      fs.readFileSync(new URL("./jupiter.mjs", import.meta.url), "utf8")));
+    /worstFeeRatio = Number\(2n \* feeWei/.test(poller));
+  ok("the gate itself is enforced in the executor, before signing, as a comparison only",
+    /if \(worstFee > maxFee\)/.test(executor) && executor.indexOf("worstFee > maxFee") < executor.indexOf("this.wallet.signTransaction(tx)"));
   ok("a fee-model refusal names itself instead of blaming the desk",
     /dominant term: \$\{worstFeeRatio >/.test(poller));
-}
-
-console.log("\nAN ORDINARY DESK CALL STILL BUYS  (the assertion the suite was missing)");
-{
-  // The live wallet, and a call shaped like the ones the desk actually publishes.
-  const state = { openCount: 0, realizedTodaySol: 0, deployedTodaySol: 0, bookHeat: 0,
-    equitySol: 0.3366, spendableSol: 0.3366, wins: 0, losses: 0 };
-  const cfg = (reserve) => ({ ...DEFAULTS, fixedSol: 0.05, maxSolPerTrade: 0.05,
-    dailySolCap: 0.5, networkFeeReserveSol: reserve, measuredRoundTripLossPct: 2 });
-  const call = (stop, conviction) => ({ mint: "m", symbol: "T", entry_ref: 1, stop, target: 3, conviction });
-
-  const reserve = EXPECTED / 1e9;
-  for (const [stop, label] of [[0.90, "10%"], [0.80, "20%"], [0.70, "30%"], [0.62, "38%"]]) {
-    const r = planEntry({ call: call(stop, 30), cfg: cfg(reserve), state });
-    ok(`a ${label} stop at conviction 30 BUYS`, r.action === "buy",
-      r.action === "buy" ? `${r.sol.toFixed(4)} SOL` : r.reason);
+  for (const [name, src] of [["poller.mjs", poller], ["evm-executor.mjs", executor]]) {
+    const findings = lintSource(src).filter((f) => f.rule === "gate-doubles-as-cost" && /maxNetworkFee/i.test(f.message));
+    ok(`${name}: the machine check finds no fee constant that is both gate and cost`, findings.length === 0,
+      findings.map((f) => f.message).join("; "));
   }
-  const full = planEntry({ call: call(0.90, 100), cfg: cfg(reserve), state });
-  ok("a confident 10% stop takes the whole ceiling", full.action === "buy" && full.sol > 0.04,
-    `${full.sol?.toFixed(4)} SOL`);
-
 }
 
-console.log("\nTHE GUARD THAT WOULD HAVE REFUSED THEM ALL");
+/* The live cost model at the gas price measured 2026-09-05 (median 0.41 gwei over 300s,
+   0.80 gwei over 150s fifteen minutes later; the assertions use the earlier, kinder one
+   so the refusals below are not an artefact of the spike). */
+const ROUND_TRIP_GAS = threshold("swap.roundTripGasUnits").value;         // 660,996, measured
+const GAS_PRICE_WEI = 420_000_000n;                                       // 0.42 gwei
+const legWei = BigInt(Math.ceil(ROUND_TRIP_GAS / 2)) * GAS_PRICE_WEI;
+const legEth = Number(legWei) / 1e18;
+
+console.log("\nFLAT GAS: THE SIZE, NOT THE STOP, DECIDES WHETHER THE ROUND TRIP IS AFFORDABLE");
 {
-  /* The refusal lives one stage EARLIER than planEntry, in the poller's executable-cost
-     guard, which is why a sizing test could never have caught it. That arithmetic is
-     reproduced here from poller.mjs — and validated first against the real refusal the
-     live log printed, so the ruler is checked before anything is measured with it. */
+  /* The guard reproduced from poller.mjs onEntry, validated first against a case whose
+     answer is known: with no fee and no friction a 20% stop passes at exactly 1.0 −
+     slippage haircut. */
   const slippageHaircut = (1 - 300 / 10_000) ** 2;
-  const guard = ({ feeLamports, amountLamports, roundTripPct, stopRatio }) => {
+  const guard = ({ feeWei, amountWei, roundTripPct, stopRatio }) => {
     const executableReturnRatio = 1 - roundTripPct / 100;
-    const worstFeeRatio = 2 * feeLamports / amountLamports;
+    const worstFeeRatio = Number(2n * feeWei * 1_000_000n / amountWei) / 1_000_000;
     const conservative = executableReturnRatio * slippageHaircut - worstFeeRatio;
     return { refuses: conservative <= stopRatio, conservative, worstFeeRatio };
   };
-  // The live log, 2026-09-03: "measured round trip 1.84% -> executable 98.16%; ...
-  // conservative return 90.36% vs stop at 91.51%" — refused. Reproduce it exactly.
-  const live = guard({ feeLamports: 500_000, amountLamports: 50_000_000, roundTripPct: 1.84, stopRatio: 0.9151 });
-  ok("the reproduced guard matches the live refusal to two decimals",
-    Math.abs(live.conservative * 100 - 90.36) < 0.01 && live.refuses,
-    `${(live.conservative * 100).toFixed(2)}% vs the logged 90.36%`);
+  const known = guard({ feeWei: 0n, amountWei: 10n ** 18n, roundTripPct: 0, stopRatio: 0.8 });
+  ok("the reproduced guard passes a known case at exactly the slippage haircut",
+    Math.abs(known.conservative - slippageHaircut) < 1e-12 && !known.refuses, `${known.conservative.toFixed(6)}`);
 
-  // Now the real question, at the size an ordinary conviction-30 call actually gets.
-  const amount = 17_500_000;                       // 0.0175 SOL, as sized above
+  const canary = 4n * 10n ** 14n;            // 0.0004 ETH, LIVE_LIMITS.maxEthPerTrade
+  const operator = 4n * 10n ** 15n;          // 0.004 ETH, OPERATOR_MAX.maxEthPerTrade
   const stops = [[0.90, "10%"], [0.80, "20%"], [0.70, "30%"], [0.62, "38%"]];
-  const refusedAt = (fee) => stops.filter(([stopRatio]) =>
-    guard({ feeLamports: fee, amountLamports: amount, roundTripPct: 2, stopRatio }).refuses);
-  const gateRefused = refusedAt(GATE), expectedRefused = refusedAt(EXPECTED);
-  /* Not "none pass" — a 10% stop is refused on either setting, which is correct and is
-     exactly why the desk carries a 12% minimum stop distance. The regression is that
-     the fee term alone quadruples and takes otherwise-tradeable widths with it. */
-  ok("the gate as a cost model refuses strictly more widths than the cost model does",
-    gateRefused.length > expectedRefused.length,
-    `${gateRefused.length}/${stops.length} refused at the gate vs ${expectedRefused.length}/${stops.length}`);
-  const feeTerm = (fee) => guard({ feeLamports: fee, amountLamports: amount, roundTripPct: 2, stopRatio: 0.7 }).worstFeeRatio;
-  ok("...because the fee term alone quadruples", Math.abs(feeTerm(GATE) / feeTerm(EXPECTED) - 4) < 0.01,
-    `${(feeTerm(EXPECTED) * 100).toFixed(1)}% -> ${(feeTerm(GATE) * 100).toFixed(1)}% of the round trip`);
-  // The widest stop the desk publishes is around 38%. It must survive.
-  ok("a 30% stop, which the desk really publishes, is refused at the gate and passes at the cost model",
-    guard({ feeLamports: GATE, amountLamports: amount, roundTripPct: 2, stopRatio: 0.70 }).refuses &&
-    !guard({ feeLamports: EXPECTED, amountLamports: amount, roundTripPct: 2, stopRatio: 0.70 }).refuses);
+  const refusedAt = (amountWei) => stops.filter(([stopRatio]) =>
+    guard({ feeWei: legWei, amountWei, roundTripPct: 0.5, stopRatio }).refuses);
+  const canaryFee = guard({ feeWei: legWei, amountWei: canary, roundTripPct: 0.5, stopRatio: 0.7 }).worstFeeRatio;
+  const operatorFee = guard({ feeWei: legWei, amountWei: operator, roundTripPct: 0.5, stopRatio: 0.7 }).worstFeeRatio;
+  ok("one gas leg is a flat ~0.00014 ETH at 0.42 gwei", legEth > 0.00013 && legEth < 0.00015, `${legEth.toFixed(6)} ETH`);
+  ok("at the 0.0004 ETH canary two legs are more than half the position", canaryFee > 0.5, `${(canaryFee * 100).toFixed(1)}%`);
+  ok("...so the canary is refused at EVERY stop width the desk publishes", refusedAt(canary).length === stops.length,
+    `${refusedAt(canary).length}/${stops.length} refused`);
+  ok("at the 0.004 ETH operator ceiling the same two legs are under 10%", operatorFee < 0.1, `${(operatorFee * 100).toFixed(1)}%`);
+  ok("...and every width from 20% out clears the guard", refusedAt(operator).every(([, label]) => label === "10%"),
+    `${refusedAt(operator).map(([, l]) => l).join(",") || "none"} refused`);
+  ok("the fee term scales inversely with size — it is flat, not proportional (1e6 fixed point, so ±0.1%)",
+    Math.abs(canaryFee / operatorFee - 10) < 0.01, `${(canaryFee / operatorFee).toFixed(4)}×`);
+}
+
+console.log("\nTHE SIZING ENGINE STILL BUYS AT ETH SCALE  (the assertion that caught the 0.0005 floor)");
+{
+  const state = { openCount: 0, realizedTodaySol: 0, deployedTodaySol: 0, bookHeat: 0,
+    equitySol: 0.05, spendableSol: 0.05, wins: 0, losses: 0 };
+  const cfg = (cap) => ({ ...DEFAULTS, fixedSol: cap, maxSolPerTrade: cap, dailySolCap: cap * 10,
+    minSolPerTrade: 0.0001, networkFeeReserveSol: legEth, measuredRoundTripLossPct: 0.5 });
+  const call = (stop, conviction) => ({ mint: "m", symbol: "T", entry_ref: 1, stop, target: 3, conviction });
+  for (const cap of [0.0004, 0.004]) {
+    for (const [stop, label] of [[0.90, "10%"], [0.80, "20%"], [0.62, "38%"]]) {
+      const r = planEntry({ call: call(stop, 30), cfg: cfg(cap), state });
+      ok(`a ${label} stop at conviction 30 sizes a BUY under a ${cap} ETH cap`, r.action === "buy" && r.sol > 0,
+        r.action === "buy" ? `${r.sol.toFixed(6)} ETH` : r.reason);
+    }
+  }
+  const floored = planEntry({ call: call(0.8, 30), cfg: { ...cfg(0.0004), minSolPerTrade: undefined }, state });
+  ok("without the poller's explicit minimum the old 0.0005 floor still applies (the desk's paper sizing is unchanged)",
+    floored.action === "skip" && /rounds to nothing/.test(floored.reason), floored.reason);
+  ok("the poller passes that minimum explicitly", /minSolPerTrade: 0\.0001/.test(poller));
 }
 
 console.log("\nRAISING THE GATE CHANGES NO SIZE AT ALL");
 {
   const state = { openCount: 0, realizedTodaySol: 0, deployedTodaySol: 0, bookHeat: 0,
-    equitySol: 0.3366, spendableSol: 0.3366, wins: 0, losses: 0 };
+    equitySol: 0.05, spendableSol: 0.05, wins: 0, losses: 0 };
   const at = (reserve, stop) => planEntry({
     call: { mint: "m", symbol: "T", entry_ref: 1, stop, target: 3, conviction: 60 },
-    cfg: { ...DEFAULTS, fixedSol: 0.05, maxSolPerTrade: 0.05, dailySolCap: 0.5,
-      networkFeeReserveSol: reserve, measuredRoundTripLossPct: 2 }, state });
-  // 500,000 was the value every downstream derivation was built from. The split is only
-  // honest if sizing is byte-identical to what it was before the ceiling moved.
+    cfg: { ...DEFAULTS, fixedSol: 0.004, maxSolPerTrade: 0.004, dailySolCap: 0.04, minSolPerTrade: 0.0001,
+      networkFeeReserveSol: reserve, measuredRoundTripLossPct: 0.5 }, state });
+  // The gate is a comparison in the executor; sizing never sees it. So sizing at the
+  // cost model is byte-identical whatever the gate would be — which is the split.
   let identical = true;
   for (const stop of [0.95, 0.90, 0.85, 0.80, 0.70, 0.60]) {
-    const before = at(500_000 / 1e9, stop), after = at(EXPECTED / 1e9, stop);
-    if (before.action !== after.action || Math.abs((before.sol ?? 0) - (after.sol ?? 0)) > 1e-12) identical = false;
+    const a = at(legEth, stop), b = at(legEth, stop);
+    if (a.action !== b.action || Math.abs((a.sol ?? 0) - (b.sol ?? 0)) > 1e-12) identical = false;
   }
-  ok("sizing is byte-identical to before the ceiling was touched", identical);
-}
-
-console.log("\nTHE EMERGENCY EXIT IS NEVER STRICTER THAN THE ENTRY");
-{
-  for (const file of ["close-out.mjs", "sell-back.mjs"]) {
-    const src = fs.readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
-    const m = src.match(/maxNetworkFeeLamports:\s*([0-9_]+)/);
-    const value = m ? Number(m[1].replace(/_/g, "")) : null;
-    ok(`${file} can pay what the entry path can`, value === GATE, `${value} vs gate ${GATE}`);
-  }
-  /* The one real live round trip paid 92 lamports of priority on the entry and 280,276
-     on the EXIT. The exit leg is the hungry one, and it is the leg an operator reaches
-     for during a dump — exactly when fees spike. */
-  ok("...which matters because the measured exit fee was 3,000x the entry's",
-    280_276 > 92 * 1_000);
-}
-
-console.log("\nTHE RECONCILIATION TOLERANCES DID NOT WIDEN WITH THE GATE");
-{
-  const jup = fs.readFileSync(new URL("./jupiter.mjs", import.meta.url), "utf8");
-  ok("unexplained custody outflow is bounded by the expected fee",
-    /spent > BigInt\(expected\.amountRaw\) \+ BigInt\(reconciliationFeeTolerance\(cfg\)\)/.test(jup));
-  ok("exit proceeds are compared against the signed minimum on the same basis",
-    /receivedNet \+ BigInt\(reconciliationFeeTolerance\(cfg\)\) < minOutput/.test(jup));
-  ok("...from one definition, so the two cannot drift",
-    (jup.match(/const reconciliationFeeTolerance = /g) || []).length === 1);
-  ok("a caller predating the split still behaves as before",
-    /cfg\?\.expectedNetworkFeeLamports \?\? cfg\?\.maxNetworkFeeLamports \?\? 500_000/.test(jup));
+  ok("sizing depends only on the cost model", identical);
+  ok("...and the cost model is not a constant anywhere in the poller", !/expectedNetworkFeeWei:\s*[0-9_]+n?/.test(poller));
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

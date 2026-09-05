@@ -103,6 +103,18 @@ export function classifyFromBeaconWord(word, { address = null } = {}) {
  * Class A Common Stock • Robinhood Token", 283 bytes on the same beacon, and SpaceX is
  * private too. Robinhood tokenizes private companies; it simply has not tokenized this
  * one. That is an absence, not an impossibility, so re-measure before assuming. */
+/* THE DESK'S OWN ACCESS TOKEN IS NEVER A POSITION. $CLAUDECO (Robinhood edition,
+ * launched 2026-09-04 on PONS V2 paired to NVDA) opens a floor and pays rent; the desk
+ * trading it would be the house marking its own paper. Refused here by address, before
+ * any beacon or name is read, so no upstream mistake can route it to the router. */
+export const NEVER_POSITIONS = Object.freeze(new Map([
+  ["0x7039986cac6c7885b53f10c7492e653055470ab9", "CLAUDECO (the access token)"],
+]));
+export function assertNotAccessToken(address) {
+  const why = NEVER_POSITIONS.get(String(address ?? "").toLowerCase());
+  if (why) throw new Error(`scope guard: ${address} is ${why} — it opens a floor and is never a position`);
+}
+
 export const ALLOWED_PAIR_EQUITIES = Object.freeze(new Map([
   ["0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3", "GOOGL"],
   ["0x12f190a9f9d7d37a250758b26824b97ce941bf54", "AMZN"],

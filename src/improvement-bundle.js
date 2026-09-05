@@ -25,6 +25,11 @@ import {
   IMPROVEMENT_MIN_COVERAGE_PCT,
   IMPROVEMENT_SAMPLE_GATE,
 } from "./improvement-constants.js";
+// The desk's numbers and where each came from. live-thresholds.mjs registers them on
+// import; thresholds() reads the registry. Only the registry is imported — no swap,
+// signing or RPC code enters the office process through this line.
+import "../executor/live-thresholds.mjs";
+import { thresholds as thresholdRegistry } from "../executor/thresholds.mjs";
 
 export { IMPROVEMENT_BUNDLE_VERSION, IMPROVEMENT_MIN_COVERAGE_PCT,
   IMPROVEMENT_SAMPLE_GATE } from "./improvement-constants.js";
@@ -34,6 +39,30 @@ const all = (sql, ...args) => db.prepare(sql).all(...args);
 const scalar = (sql, ...args) => Number(db.prepare(sql).get(...args)?.n ?? 0);
 
 const rounded = (value, digits = 4) => Number(Number(value || 0).toFixed(digits));
+
+/**
+ * name / value / provenance / at — and nothing else. The method and note strings are
+ * free prose written by whoever measured the number, and prose does not cross this
+ * boundary. A non-scalar value (a band table, a window list) is carried as its canonical
+ * JSON so the reviewer can still see WHAT is set; past 400 characters only its digest
+ * travels, which is enough to notice that it changed. Sorted by name so the bundle
+ * digest does not depend on registration order.
+ */
+export function thresholdSummary(registry = thresholdRegistry()) {
+  const scalar = (v) => v === null || ["number", "string", "boolean"].includes(typeof v);
+  return [...registry]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((t) => {
+      let value = t.value;
+      if (!scalar(value)) {
+        const json = canonicalJson(value);
+        value = json.length <= 400 ? json : `sha256:${sha256(json)}`;
+      } else if (typeof value === "number" && !Number.isFinite(value)) {
+        value = String(value);
+      }
+      return { name: t.name, value, provenance: t.provenance, at: t.at ?? null };
+    });
+}
 
 /**
  * A narrow, aggregate-only interface between the trading service and a separate Codex
@@ -96,6 +125,10 @@ export function buildImprovementBundle({ nowMs = Date.now(), sourceCommit = depl
       decisionManifest: decision,
       testManifest: tests,
     },
+    // Every number the executor trades on, with its provenance, so the reviewer can see
+    // which are still `inherited` from Solana (void on this chain) and propose the
+    // measurement — instead of tuning a threshold that assertLiveReady() would refuse.
+    thresholds: thresholdSummary(),
     privacy: {
       scope: "house-aggregate-only",
       tenantDataIncluded: false,

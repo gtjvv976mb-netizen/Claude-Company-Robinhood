@@ -194,7 +194,11 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
     `rolling 24h deploy cap (${state.deployedTodaySol.toFixed(3)}/${c.dailySolCap} SOL)`);
   if (state.spendableSol != null) bind(state.spendableSol - feeReserve, "spendable balance after the fee reserve");
 
-  const minSize = Math.max(0.0005, Number(c.minSolPerTrade) || 0);
+  /* The floor is the configured minimum, not a hard-coded 0.0005. That literal was a
+     SOL-scale number (about a dollar); the Robinhood Chain executor sizes in ETH where
+     the canary cap is 0.0004, and a floor above the cap made every entry "round to
+     nothing" (measured 2026-09-05). Callers that pass nothing keep the old floor. */
+  const minSize = Number(c.minSolPerTrade) > 0 ? Number(c.minSolPerTrade) : 0.0005;
   if (!(want >= minSize))
     return { action: "skip",
       reason: boundBy

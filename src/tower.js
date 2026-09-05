@@ -1,4 +1,5 @@
 import db, { ensureColumn } from "./lib/store.js";
+import { normalise, ZERO_ADDRESS } from "./lib/address.js";
 
 /**
  * CLAUDE TOWER — fifty floors, one desk each.
@@ -47,27 +48,35 @@ if (seeded === 0) {
  *
  * The constant fallback exists so this can never lock the owner out of their own
  * building: if the deed is ever blank, it answers instead. Changing who owns the HQ is
- * then deliberate (HQ_OWNER_WALLET) rather than accidental.
+ * then deliberate (HQ_OWNER_WALLET_RH) rather than accidental.
+ *
+ * ROBINHOOD EDITION: the deed is an EVM address, stored LOWERCASE — wallets return the
+ * same address in two spellings and the deed is a plain TEXT compare. The Solana
+ * edition's dev wallet cannot hold this deed; until HQ_OWNER_WALLET_RH is set the deed
+ * is the zero address, which no wallet can sign in as, so the penthouse simply has no
+ * signed-in owner rather than a wrong one.
  */
 export const HQ_OWNER_WALLET =
-  (process.env.HQ_OWNER_WALLET || "3J57tqAJqRmSBn1ZYDu9JpMMyTfBHdcGGwECiPQeiji3").trim();
+  normalise((process.env.HQ_OWNER_WALLET_RH || process.env.HQ_OWNER_WALLET || "").trim()) || ZERO_ADDRESS;
 
 db.prepare("UPDATE floors SET state='hq', owner=? WHERE n=? AND (owner IS NULL OR owner <> ?)")
   .run(HQ_OWNER_WALLET, HQ_FLOOR, HQ_OWNER_WALLET);
 
 /** The single wallet that owns the HQ — not the treasury, not a list. */
 export function hqOwnerWallet() {
-  return db.prepare("SELECT owner FROM floors WHERE n=?").get(HQ_FLOOR)?.owner || HQ_OWNER_WALLET;
+  return normalise(db.prepare("SELECT owner FROM floors WHERE n=?").get(HQ_FLOOR)?.owner) || HQ_OWNER_WALLET;
 }
 /* The penthouse answers to the HOUSE: the dev wallet on the deed AND the
    treasury. The owner asked for both; a later refactor narrowed it to one, and
    the treasury quietly lost its own floor. Read the treasury from env directly
-   rather than importing leasing — tower is imported by it. */
+   rather than importing leasing — tower is imported by it. Both sides of every
+   compare are normalised: a checksummed deed and a lowercase session are one wallet. */
 export const isHqOwner = (w) => {
-  if (!w) return false;
-  if (w === hqOwnerWallet()) return true;
-  const t = (process.env.TREASURY_OWNER || "").trim();
-  return !!t && w === t;
+  const me = normalise(w);
+  if (!me || me === ZERO_ADDRESS) return false;
+  if (me === hqOwnerWallet()) return true;
+  const t = normalise((process.env.TREASURY_OWNER_RH || "").trim());
+  return !!t && me === t;
 };
 
 export function listFloors() {

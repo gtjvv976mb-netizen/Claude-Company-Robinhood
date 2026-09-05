@@ -28,18 +28,18 @@ assert.ok(!JSON.stringify(health).includes("must-not-cross"));
 const now = Date.now();
 const ready = sanitizeExecutorHealth({ state: "entries-paused", feedRollback: false,
   executionReadiness: { ready: true, lastSuccessAt: now - 1000, observedAt: now - 1200,
-    route: "wsol-usdc", providers: 2, amountLamports: 50_000_000,
+    route: "eth-usdg", providers: 2, amountWei: "4000000000000000",
     secret: "readiness-secret-must-not-cross" },
-  caps: { maxSolPerTrade: 0.05, dailySolCap: 0.5,
-    dailyLossLimitSol: 0.15, maxOpenPositions: 4, secret: "cap-secret-must-not-cross" } });
+  caps: { maxEthPerTrade: 0.004, dailyEthCap: 0.04,
+    dailyLossLimitEth: 0.012, maxOpenPositions: 4, secret: "cap-secret-must-not-cross" } });
 assert.equal(ready.state, "entries-paused");
 assert.equal(ready.feedRollback, false);
 assert.deepEqual(ready.executionReadiness, {
   ready: true, lastSuccessAt: now - 1000, observedAt: now - 1200,
-  route: "wsol-usdc", providers: 2, amountLamports: 50_000_000, lastError: null,
+  route: "eth-usdg", providers: 2, amountWei: "4000000000000000", lastError: null,
 });
 assert.deepEqual(ready.caps, {
-  maxSolPerTrade: 0.05, dailySolCap: 0.5, dailyLossLimitSol: 0.15, maxOpenPositions: 4,
+  maxEthPerTrade: 0.004, dailyEthCap: 0.04, dailyLossLimitEth: 0.012, maxOpenPositions: 4,
 });
 assert.ok(!JSON.stringify(ready).includes("readiness-secret-must-not-cross"));
 assert.ok(!JSON.stringify(ready).includes("cap-secret-must-not-cross"));
@@ -58,13 +58,13 @@ assert.equal(failedReadiness.state, "degraded",
 const malformed = sanitizeExecutorHealth({ state: "healthy", feedRollback: "false",
   executionReadiness: { ready: true, lastSuccessAt: String(now), observedAt: now,
     route: { secret: "nested-route-secret" }, providers: "2",
-    amountLamports: "5000000", endpoint: "https://rpc.invalid/private" },
-  caps: { maxSolPerTrade: "0.005", dailySolCap: 0.01,
-    dailyLossLimitSol: 0.01, maxOpenPositions: 4 } });
+    amountWei: 400000000000000, endpoint: "https://rpc.invalid/private" },
+  caps: { maxEthPerTrade: "0.0004", dailyEthCap: 0.0008,
+    dailyLossLimitEth: 0.0008, maxOpenPositions: 4 } });
 assert.equal(malformed.feedRollback, false, "only a literal boolean is retained");
 assert.deepEqual(malformed.executionReadiness, {
   ready: false, lastSuccessAt: 0, observedAt: now, route: null, providers: 0,
-  amountLamports: 0, lastError: null,
+  amountWei: "0", lastError: null,
 });
 
 /* THE REASON IS SANITISED LIKE EVERYTHING ELSE ON THIS SURFACE. It exists so an
@@ -73,7 +73,7 @@ assert.deepEqual(malformed.executionReadiness, {
    is nothing, and control bytes never survive it. */
 const reasoned = sanitizeExecutorHealth({ state: "degraded",
   executionReadiness: { ready: false, lastSuccessAt: 0, observedAt: now,
-    route: "wsol-usdc", providers: 0, amountLamports: 5_000_000,
+    route: "eth-usdg", providers: 0, amountWei: "400000000000000",
     lastError: "execution-readiness wallet reserve is insufficient\u0000 on one or both RPC providers" } });
 assert.match(reasoned.executionReadiness.lastError, /wallet reserve is insufficient/);
 assert.ok(!/\u0000/.test(reasoned.executionReadiness.lastError), "control bytes are stripped");
@@ -87,9 +87,28 @@ assert.equal(malformed.state, "degraded",
 assert.ok(!JSON.stringify(malformed).includes("nested-route-secret"));
 assert.ok(!JSON.stringify(malformed).includes("rpc.invalid"));
 
+/* A heartbeat from a bot still on the Solana wire names — the executor lane's own
+   heartbeat-health.mjs still emits them — carries no ETH caps and no 4663 rehearsal. */
+const solanaNamed = sanitizeExecutorHealth({ state: "healthy",
+  executionReadiness: { ready: true, lastSuccessAt: now - 1000, observedAt: now - 1200,
+    route: "wsol-usdc", providers: 2, amountLamports: 50_000_000 },
+  caps: { maxSolPerTrade: 0.05, dailySolCap: 0.5, dailyLossLimitSol: 0.15, maxOpenPositions: 4 } });
+assert.equal(solanaNamed.caps, null, "Solana cap names are not aliases for the ETH caps");
+assert.equal(solanaNamed.executionReadiness.route, null);
+assert.equal(solanaNamed.executionReadiness.amountWei, "0");
+assert.equal(solanaNamed.executionReadiness.ready, false);
+assert.equal(solanaNamed.state, "degraded");
+console.log(`  solana-named heartbeat → caps=${solanaNamed.caps} route=${solanaNamed.executionReadiness.route} state=${solanaNamed.state}`);
+// A rehearsal above the operator ceiling (0.004 ETH) is not a size this building admits.
+const oversized = sanitizeExecutorHealth({ state: "healthy",
+  executionReadiness: { ready: true, lastSuccessAt: now - 1000, observedAt: now - 1200,
+    route: "eth-usdg", providers: 2, amountWei: "4000000000000001" } });
+assert.equal(oversized.executionReadiness.amountWei, "0");
+assert.equal(oversized.state, "degraded");
+
 const subminimumCaps = sanitizeExecutorHealth({ state: "healthy", caps: {
-  maxSolPerTrade: 0.0000009, dailySolCap: 0.01,
-  dailyLossLimitSol: 0.01, maxOpenPositions: 4,
+  maxEthPerTrade: 0.0000009, dailyEthCap: 0.0008,
+  dailyLossLimitEth: 0.0008, maxOpenPositions: 4,
 } });
 assert.equal(subminimumCaps.caps, null);
 assert.equal(subminimumCaps.state, "degraded",

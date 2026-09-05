@@ -5,7 +5,8 @@
  * it matters WHICH whales; an X trend; an active account with a real following; and a
  * $100k-$500k market cap. This file checks that the arithmetic says what a person
  * reading that sentence would say, and — more importantly — that it never pretends to
- * know something it was not told.
+ * know something it was not told. On this chain the whale term is exactly that case:
+ * there is no roster, so it must score nothing and SAY so, not penalise every coin.
  */
 import { convictionScore, whaleRoster, whalesOn, convictionBoard,
   CONVICTION_WEIGHTS, HIT_MULTIPLE, MIN_CALLS_FOR_RECORD } from "./src/conviction.js";
@@ -20,14 +21,14 @@ const whale = (proven, username = "w") => ({ caller: username + "-wallet", usern
 const hot = { trend_stage: "emerging", velocity: "accelerating", mentions_level: "high",
   dev_followers: 24_000, dev_engaging_now: true };
 
-console.log("\nTHE OWNER'S FIVE CHARACTERISTICS, EACH ONE COUNTING");
+console.log("\nTHE OWNER'S FIVE CHARACTERISTICS, EACH ONE COUNTING — EXCEPT THE ONE THIS CHAIN CANNOT MEASURE");
 {
   const base = convictionScore({ marketCapUsd: 250_000 });
   const withWhales = convictionScore({ marketCapUsd: 250_000, whales: [whale(true), whale(true, "b")] });
-  ok("whales raise the score", withWhales.score > base.score, `${base.score} -> ${withWhales.score}`);
-  ok("...and a PROVEN whale counts for more than an unrated one",
-    convictionScore({ whales: [whale(true)] }).score > convictionScore({ whales: [whale(false)] }).score,
-    `${convictionScore({ whales: [whale(true)] }).score} vs ${convictionScore({ whales: [whale(false)] }).score}`);
+  ok("whales add nothing while there is no roster", withWhales.score === base.score, `${base.score} -> ${withWhales.score}`);
+  ok("...because the cap is zero, not because the weights are", CONVICTION_WEIGHTS.whaleCap === 0 && CONVICTION_WEIGHTS.provenWhale > 0,
+    `cap ${CONVICTION_WEIGHTS.whaleCap}, proven ${CONVICTION_WEIGHTS.provenWhale}`);
+  ok("...and the score says why", withWhales.missing.includes("no whale roster on this chain yet"), withWhales.missing.join("; "));
   ok("the sweet-spot band beats every other band",
     convictionScore({ marketCapUsd: 250_000 }).score > convictionScore({ marketCapUsd: 80_000 }).score &&
     convictionScore({ marketCapUsd: 250_000 }).score > convictionScore({ marketCapUsd: 9_000 }).score &&
@@ -52,11 +53,13 @@ console.log("\nTHE COIN THE OWNER DESCRIBED SCORES ABOVE EVERYTHING ELSE");
   const wrongBand = convictionScore({ marketCapUsd: 6_000_000, whales: [whale(true), whale(true, "b"), whale(false, "c")], xRead: hot });
   const dead = convictionScore({ marketCapUsd: 250_000, whales: [],
     xRead: { trend_stage: "fading", dev_followers: 30, deleted_history: true } });
-  ok("the full picture scores highest", ideal.score > noWhales.score && ideal.score > wrongBand.score && ideal.score > dead.score,
+  ok("the full picture scores highest", ideal.score >= noWhales.score && ideal.score > wrongBand.score && ideal.score > dead.score,
     `ideal ${ideal.score}, no whales ${noWhales.score}, wrong band ${wrongBand.score}, dead ${dead.score}`);
+  ok("...and with no roster, whales cannot separate two otherwise identical coins",
+    ideal.score === noWhales.score, `${ideal.score} == ${noWhales.score}`);
   ok("a rug-shaped coin scores below zero", dead.score < 0, `${dead.score}`);
-  ok("every point is explained", ideal.reasons.length >= 5, ideal.reasons.slice(0, 3).join(" | "));
-  ok("whale count is reported honestly", ideal.whaleCount === 3 && ideal.provenWhaleCount === 2);
+  ok("every point is explained", ideal.reasons.length >= 4, ideal.reasons.slice(0, 3).join(" | "));
+  ok("whale count is still reported honestly", ideal.whaleCount === 3 && ideal.provenWhaleCount === 2);
 }
 
 console.log("\nIT NEVER PRETENDS TO KNOW WHAT IT WAS NOT TOLD");
@@ -68,14 +71,18 @@ console.log("\nIT NEVER PRETENDS TO KNOW WHAT IT WAS NOT TOLD");
     blind.missing.some((m) => /whale/.test(m)), blind.missing.join("; "));
   ok("a coin scored without an X read admits it",
     convictionScore({ marketCapUsd: 250_000, whales: [whale(true)] }).missing.includes("X read"));
-  ok("no whales is stated rather than silently scored as good",
-    convictionScore({ marketCapUsd: 250_000, xRead: hot }).missing.some((m) => /no verified whale/.test(m)));
+  ok("the missing roster is stated as the DESK's gap, not the coin's",
+    convictionScore({ marketCapUsd: 250_000, xRead: hot }).missing.some((m) => /no whale roster on this chain yet/.test(m)) &&
+    !convictionScore({ marketCapUsd: 250_000, xRead: hot }).missing.some((m) => /no verified whale seen/.test(m)));
   ok("whale credit is capped, so headcount alone cannot carry a coin",
     convictionScore({ whales: Array.from({ length: 40 }, (_, i) => whale(true, `w${i}`)) }).score
       === CONVICTION_WEIGHTS.whaleCap, `cap ${CONVICTION_WEIGHTS.whaleCap}`);
 }
 
-console.log("\nTHE ROSTER IS BUILT FROM WHAT THE DESK ACTUALLY WATCHED");
+/* The reader is KEPT so a future roster (an on-chain proven-address source writing the
+   same columns — docs/HANDOFF-agents.md) turns the term on by raising the cap. Its
+   arithmetic is still checked here against rows with known answers. */
+console.log("\nTHE ROSTER READER STILL WORKS, FOR THE DAY THERE IS A ROSTER");
 {
   db.exec("DELETE FROM verified_callouts");
   const now = Date.now();
@@ -110,9 +117,11 @@ console.log("\nTHE ROSTER IS BUILT FROM WHAT THE DESK ACTUALLY WATCHED");
   ok("a coin nobody called lists nobody", whalesOn("never-called", { now }).length === 0);
 
   const board = convictionBoard({ now, marketCaps: new Map([["m1", 250_000], ["m5", 250_000]]) });
-  ok("the board ranks the whale-backed coin above the dead one",
-    board.findIndex((b) => b.mint === "m1") < board.findIndex((b) => b.mint === "m5"),
-    board.slice(0, 3).map((b) => `${b.mint}:${b.score}`).join(" "));
+  const m1 = board.find((b) => b.mint === "m1"), m5 = board.find((b) => b.mint === "m5");
+  ok("with the cap at zero the board cannot rank the whale-backed coin above the dead one — and says so",
+    m1 && m5 && m1.score === m5.score && m1.missing.includes("no whale roster on this chain yet"),
+    `${m1?.mint}:${m1?.score} ${m5?.mint}:${m5?.score}`);
+  ok("...while still reporting who was on it", m1.whales.length === 2 && m5.whales.length === 1);
   db.exec("DELETE FROM verified_callouts");
 }
 

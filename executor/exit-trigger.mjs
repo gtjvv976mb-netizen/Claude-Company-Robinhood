@@ -11,14 +11,14 @@ const raw = (value, label) => {
 const breached = (trigger, mark) => trigger.direction === "below"
   ? mark <= trigger.threshold : mark >= trigger.threshold;
 
-/** Price a held token only from the chain-simulated executable SOL delta. */
+/** Price a held token only from the chain-simulated executable ETH delta. */
 export function executableExitMark(position, actualOutputRaw, currentSolUsd) {
   const output = raw(actualOutputRaw, "chain-simulated exit output");
-  const entryLamports = raw(position?.entryInputLamports, "position entry input");
-  const solUsdRatio = positive(currentSolUsd, "current SOL/USD") /
-    positive(position?.solUsdAtEntry, "entry SOL/USD");
-  const scale = 1_000_000_000n;
-  const mark = Number(output * scale / entryLamports) / Number(scale) * solUsdRatio;
+  const entryWei = raw(position?.entryInputWei, "position entry input");
+  const ethUsdRatio = positive(currentSolUsd, "current ETH/USD") /
+    positive(position?.ethUsdAtEntry, "entry ETH/USD");
+  const scale = 1_000_000_000n; // fixed-point precision for the ratio, not a unit
+  const mark = Number(output * scale / entryWei) / Number(scale) * ethUsdRatio;
   if (!Number.isFinite(mark) || mark <= 0) throw new Error("chain-simulated executable exit mark is invalid");
   return mark;
 }
@@ -32,7 +32,7 @@ export class ExitTriggerNotMetError extends Error {
 }
 
 /** Convert a shared price-policy sell into a durable, executable threshold. */
-export function priceExitTrigger(position, decision, mark, solUsd, nowMs = Date.now()) {
+export function priceExitTrigger(position, decision, mark, ethUsd, nowMs = Date.now()) {
   const reason = String(decision?.reason || "");
   let direction = null;
   let threshold = null;
@@ -48,7 +48,7 @@ export function priceExitTrigger(position, decision, mark, solUsd, nowMs = Date.
   if (!breached({ direction, threshold }, observedMark))
     throw new Error(`price policy requested ${reason} without a breached threshold`);
   return { kind: "price", direction, threshold, observedMark,
-    solUsd: positive(solUsd, "exit SOL/USD"), observedAt: Number(nowMs), reason };
+    ethUsd: positive(ethUsd, "exit ETH/USD"), observedAt: Number(nowMs), reason };
 }
 
 /** A price-only exit needs two distinct, consecutive observations. */
@@ -126,15 +126,15 @@ export function validateExecutableExitOrder(intent, order, {
   const heldRaw = raw(position?.qtyRaw, "position quantity");
   const sellRaw = raw(intent?.amountRaw, "exit amount");
   if (sellRaw > heldRaw) throw new Error("exit amount exceeds its durable position");
-  const entryLamports = raw(position?.entryInputLamports, "position entry input");
-  const proportionalBasis = sellRaw === heldRaw ? entryLamports : entryLamports * sellRaw / heldRaw;
+  const entryWei = raw(position?.entryInputWei, "position entry input");
+  const proportionalBasis = sellRaw === heldRaw ? entryWei : entryWei * sellRaw / heldRaw;
   if (proportionalBasis <= 0n) throw new Error("proportional exit basis rounded to zero");
-  const solUsdRatio = positive(trigger.solUsd, "exit SOL/USD") /
-    positive(position?.solUsdAtEntry, "entry SOL/USD");
+  const ethUsdRatio = positive(trigger.ethUsd, "exit ETH/USD") /
+    positive(position?.ethUsdAtEntry, "entry ETH/USD");
   const markFor = (outputRaw) => {
-    const scale = 1_000_000_000n;
+    const scale = 1_000_000_000n; // fixed-point precision for the ratio, not a unit // fixed-point precision for the ratio, not a unit
     const ratio = raw(outputRaw, "exit output") * scale / proportionalBasis;
-    const mark = Number(ratio) / Number(scale) * solUsdRatio;
+    const mark = Number(ratio) / Number(scale) * ethUsdRatio;
     if (!Number.isFinite(mark) || mark <= 0) throw new Error("executable exit mark is invalid");
     return mark;
   };

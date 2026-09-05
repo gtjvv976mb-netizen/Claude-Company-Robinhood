@@ -1,9 +1,11 @@
-<title>Claude Company</title>
+<title>Claude Company — Robinhood</title>
 <meta charset="utf-8">
 <script>
 /* GitHub Pages serves files, not routes. The Node server's /floor/50 and /tower
    paths live on in bookmarks and old links — catch them here and land them on
-   the real files instead of a dead end. */
+   the real files instead of a dead end. Every target is relative on purpose: this
+   page is served at robinhood.claudedotcompany.com and must never bounce a visitor
+   to the Solana tower's apex. */
 (function () {
   var m = location.pathname.match(/\/floor\/(\d+)/);
   if (m) { location.replace("/floor.html?floor=" + m[1]); return; }
@@ -11,4 +13,4 @@
   location.replace("/");
 })();
 </script>
-<p style="font-family:sans-serif">Redirecting to <a href="/">Claude Company</a>…</p>
+<p style="font-family:sans-serif">Redirecting to <a href="/">Claude Company — Robinhood</a>…</p>

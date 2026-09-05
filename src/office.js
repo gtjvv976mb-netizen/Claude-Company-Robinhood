@@ -7,7 +7,7 @@ import http from "node:http";
    grant standing it no longer carries. */
 const HQ_OWNER_LIST_RETIRED = [
   ...(process.env.HQ_OWNER || "").split(",").map((w) => w.trim()).filter(Boolean),
-  "3J57tqAJqRmSBn1ZYDu9JpMMyTfBHdcGGwECiPQeiji3",   // the dev wallet — standing owner (owner-stated)
+  // The Solana edition listed its dev wallet here; an ed25519 key holds nothing on 4663.
 ];
 import fs from "node:fs";
 import path from "node:path";
@@ -36,14 +36,15 @@ import * as perf from "./perf.js";
 import * as alerts from "./alerts.js";
 import * as identity from "./identity.js";
 import { latestCandidateBoard } from "./candidate-board.js";
-import { walletSolBalance } from "./data/solana.js";
-import { buildExecutorDashboard } from "./executor-dashboard.js";
+import { walletEthBalance, walletEthBalances } from "./treasury-evm.js";
+import { buildExecutorDashboard, EXECUTOR_OPERATOR_MAXIMA, EXECUTOR_READINESS_ROUTE, weiString }
+  from "./executor-dashboard.js";
 import * as passes from "./passes.js";
 import { callouts, WHALE_USD } from "./whales.js";
 import { verifiedWhaleCallouts, verifiedHolderCallouts, CALLOUT_WHALE_MIN_USD,
   CALLOUT_MIN_WALLET_USD, CALLOUT_BOARD_HOURS, rememberVerifiedCallouts,
   verifiedCalloutBoard, evidenceBackedPumpfunCallouts } from "./callouts.js";
-import { isAddress } from "./lib/base58.js";
+import { isEvmAddress, normalise, isOurChain, CHAIN_ID, CHAIN_NAMESPACE } from "./lib/address.js";
 import { retiredBrowserRpcResponse } from "./execution-gates.js";
 import { providerCreditHealth, providerErrorForViewer } from "./provider-health.js";
 import { currentImprovementBundle, improvementServiceStatus } from "./improvement-bundle.js";
@@ -81,7 +82,7 @@ export function executorFeedPayload(floorNo, rawAfter = 0) {
                      ORDER BY e.id DESC LIMIT 1), c.entry_ref) AS current_mark,
            COALESCE((SELECT MAX(e.ts) FROM call_events e
                      WHERE e.call_id=c.id AND e.mark IS NOT NULL), c.opened_at) AS current_mark_at,
-           (SELECT size_sol FROM deliveries d WHERE d.call_id=a.call_id AND d.floor_no=a.floor_no) AS size_sol
+           (SELECT size_eth FROM deliveries d WHERE d.call_id=a.call_id AND d.floor_no=a.floor_no) AS size_eth
     FROM alerts a LEFT JOIN calls c ON c.id=a.call_id
     WHERE a.floor_no=? AND a.id > ? AND a.kind IN ('entry','exit')
       -- Never hand a bot an ENTRY for a call that has already closed. After any
@@ -108,20 +109,28 @@ export function executorFeedPayload(floorNo, rawAfter = 0) {
    * verdict, reason, size — floor-scoped and secret-free, so "not offered because
    * conviction 38 is under this floor's bar of 40" is one log line, not a day. */
   const decisions = db.prepare(`
-    SELECT d.call_id, c.symbol, d.verdict, d.reason, d.size_sol, d.delivered_at
+    SELECT d.call_id, c.symbol, d.verdict, d.reason, d.size_eth, d.delivered_at
     FROM deliveries d LEFT JOIN calls c ON c.id=d.call_id
     WHERE d.floor_no=? ORDER BY d.id DESC LIMIT 12`).all(floorNo);
-  return { cluster: "mainnet-beta", latest_id: latestId,
+  /* THE FEED NAMES ITS CHAIN. The poller asserts payload.chain === 4663 before it acts on
+   * a single event — the Solana edition's bot pointed at this API would otherwise read
+   * 0x token addresses as mints and try to buy them on the wrong chain. Sizes are ETH
+   * DECIMAL STRINGS under the contract names (fixed_eth, size_eth): a string because the
+   * poller compares sizes it did not author, and 0.016 must arrive as "0.016". */
+  const fixedEth = String(floorSettings.fixed_eth ?? 0);
+  return { chain: CHAIN_ID, cluster: `robinhood-${CHAIN_ID}`, latest_id: latestId,
     next_cursor: rows.length ? rows[rows.length - 1].id : after,
-    decisions,
+    decisions: decisions.map((d) => ({ call_id: d.call_id, symbol: d.symbol, verdict: d.verdict,
+      reason: d.reason, size_eth: d.size_eth == null ? null : String(d.size_eth),
+      delivered_at: d.delivered_at })),
     rules: { take_profit_x: floorSettings.take_profit_x ?? 0,
-             fixed_sol: floorSettings.fixed_sol ?? 0,
+             fixed_eth: fixedEth,
              mcap_tier: floorSettings.mcap_tier ?? "any" },
     events: rows.map((r) => ({
       id: r.id, event_id: `${floorNo}:${r.kind}:${r.id}`, call_id: r.call_id,
       type: r.kind, mint: r.mint, symbol: r.symbol,
       side: r.kind === "entry" ? "buy" : "sell",
-      size_sol: r.size_sol ?? null, entry_ref: r.entry_ref,
+      size_eth: r.size_eth == null ? null : String(r.size_eth), entry_ref: r.entry_ref,
       entry_lo: r.entry_lo, entry_hi: r.entry_hi, stop: r.stop, target: r.target,
       current_mark: r.current_mark, current_mark_at: r.current_mark_at,
       conviction: r.conviction, category: r.category, launchpad: r.launchpad,
@@ -133,7 +142,7 @@ export function executorFeedPayload(floorNo, rawAfter = 0) {
       hold_max_ms: r.hold_max_ms ?? null,
       policy_version: r.policy_version,
       take_profit_x: floorSettings.take_profit_x ?? 0,
-      fixed_sol: floorSettings.fixed_sol ?? 0,
+      fixed_eth: fixedEth,
       code: r.close_reason ?? null, urgency: r.urgency, ts: r.created_at,
     })) };
 }
@@ -166,7 +175,7 @@ export function floorFeedSettingsForViewer(settings, { isOwner = false } = {}) {
  * is projected field-by-field and the private feed credential never enters the
  * payload. The optional balance reader makes this contract deterministic in tests. */
 export async function executorStatusPayload(floorNo, {
-  balanceReader = walletSolBalance,
+  balanceReader = walletEthBalance,
   nowMs = Date.now(),
 } = {}) {
   const stored = executorHeartbeatPayload(floorNo).heartbeat;
@@ -182,9 +191,9 @@ export async function executorStatusPayload(floorNo, {
   } : null;
   const raw = copy.settingsFor(floorNo);
   let balanceResult = null;
-  if (isAddress(heartbeat?.wallet)) {
+  if (isEvmAddress(heartbeat?.wallet)) {
     try {
-      balanceResult = await balanceReader(heartbeat.wallet);
+      balanceResult = await balanceReader(normalise(heartbeat.wallet));
       if (balanceResult?.ok && !balanceResult.observedAt)
         balanceResult = { ...balanceResult, observedAt: nowMs };
     } catch {
@@ -205,13 +214,13 @@ export async function executorStatusPayload(floorNo, {
     settings: {
       feedCredentialReady: Boolean(raw.executor_secret),
       appetite: raw.appetite,
-      bankrollSol: raw.bankroll_sol,
+      bankrollSol: raw.bankroll_eth,   // ETH; the dashboard's key name is the executor lane's (HANDOFF §3)
       instantDelivery: raw.auto === true,
       categories: raw.categories,
       launchpads: raw.launchpads,
       minLiquidityUsd: raw.min_liq_usd,
       takeProfitX: raw.take_profit_x,
-      fixedSol: raw.fixed_sol,
+      fixedSol: raw.fixed_eth,
       marketCapTier: raw.mcap_tier,
       updatedAt: raw.updated_at,
     },
@@ -243,19 +252,22 @@ export function sanitizeExecutorHealth(value) {
   if (readinessObject) {
     const lastSuccessAt = strictTimestamp(readinessObject.lastSuccessAt);
     const observedAt = strictTimestamp(readinessObject.observedAt);
-    const route = readinessObject.route === "wsol-usdc" ? "wsol-usdc" : null;
+    // "eth-usdg" is the 4663 rehearsal pair (executor/evm-executor.mjs). The Solana
+    // "wsol-usdc" is NOT accepted: a probe that rehearsed a Solana route says nothing about
+    // this chain, and sanitising it to a name would let a stale Solana build read as
+    // rehearsed here. It sanitises to null, and null readiness is degraded, below.
+    const route = readinessObject.route === EXECUTOR_READINESS_ROUTE ? EXECUTOR_READINESS_ROUTE : null;
     const providers = readinessObject.providers === 2 ? 2 : 0;
-    const amountLamports = Number.isSafeInteger(readinessObject.amountLamports) &&
-      readinessObject.amountLamports >= 1 && readinessObject.amountLamports <= 50_000_000
-      ? readinessObject.amountLamports : 0;
+    // wei as a decimal STRING (the executor's contract); bounded to the operator ceiling.
+    const amountWei = weiString(readinessObject.amountWei);
     const ready = readinessObject.ready === true && lastSuccessAt > 0 && observedAt > 0 &&
-      route === "wsol-usdc" && providers === 2 && amountLamports > 0;
+      route != null && providers === 2 && amountWei !== "0";
     /* The bot's own reason, carried through so the dashboard can say more than 0/2.
        Bounded and sanitised like everything else on this self-reported surface: it is an
        error string about a route and a balance, never a secret or a key path. */
     const lastError = typeof readinessObject.lastError === "string"
       ? readinessObject.lastError.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 300) : null;
-    executionReadiness = { ready, lastSuccessAt, observedAt, route, providers, amountLamports, lastError };
+    executionReadiness = { ready, lastSuccessAt, observedAt, route, providers, amountWei, lastError };
     readinessFailed = !ready;
   }
   const rawCaps = value.caps;
@@ -264,18 +276,21 @@ export function sanitizeExecutorHealth(value) {
   let capsFailed = rawCaps != null && !capsObject;
   let caps = null;
   if (capsObject) {
-    const maxSolPerTrade = capsObject.maxSolPerTrade;
-    const dailySolCap = capsObject.dailySolCap;
-    const dailyLossLimitSol = capsObject.dailyLossLimitSol;
+    // The executor's wire names (poller.mjs sendHeartbeat); the ceilings are its OPERATOR_MAX,
+    // pinned to the poller source by test-executor-dashboard.mjs.
+    const M = EXECUTOR_OPERATOR_MAXIMA;
+    const maxEthPerTrade = capsObject.maxEthPerTrade;
+    const dailyEthCap = capsObject.dailyEthCap;
+    const dailyLossLimitEth = capsObject.dailyLossLimitEth;
     const maxOpenPositions = capsObject.maxOpenPositions;
-    const valid = typeof maxSolPerTrade === "number" && Number.isFinite(maxSolPerTrade) &&
-      maxSolPerTrade >= 0.000001 && maxSolPerTrade <= 0.05 &&
-      typeof dailySolCap === "number" && Number.isFinite(dailySolCap) &&
-      dailySolCap >= 0.000001 && dailySolCap >= maxSolPerTrade && dailySolCap <= 0.5 &&
-      typeof dailyLossLimitSol === "number" && Number.isFinite(dailyLossLimitSol) &&
-      dailyLossLimitSol >= 0.000001 && dailyLossLimitSol <= 0.15 &&
-      Number.isInteger(maxOpenPositions) && maxOpenPositions >= 1 && maxOpenPositions <= 4;
-    caps = valid ? { maxSolPerTrade, dailySolCap, dailyLossLimitSol, maxOpenPositions } : null;
+    const valid = typeof maxEthPerTrade === "number" && Number.isFinite(maxEthPerTrade) &&
+      maxEthPerTrade >= 0.000001 && maxEthPerTrade <= M.maxEthPerTrade &&
+      typeof dailyEthCap === "number" && Number.isFinite(dailyEthCap) &&
+      dailyEthCap >= 0.000001 && dailyEthCap >= maxEthPerTrade && dailyEthCap <= M.rolling24hDeployEth &&
+      typeof dailyLossLimitEth === "number" && Number.isFinite(dailyLossLimitEth) &&
+      dailyLossLimitEth >= 0.000001 && dailyLossLimitEth <= M.rolling24hRealizedLossBrakeEth &&
+      Number.isInteger(maxOpenPositions) && maxOpenPositions >= 1 && maxOpenPositions <= M.maxOpenPositions;
+    caps = valid ? { maxEthPerTrade, dailyEthCap, dailyLossLimitEth, maxOpenPositions } : null;
     capsFailed = !valid;
   }
   // Health is self-reported, but malformed or failed safety evidence can only make
@@ -312,7 +327,7 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
     // every response needs these — not just the /api/ ones. /events did not have them,
     // which silently dropped every floor back to the demo feed.
     res.setHeader("access-control-allow-origin", "*");
-    res.setHeader("access-control-allow-headers", "content-type,authorization,solana-client");
+    res.setHeader("access-control-allow-headers", "content-type,authorization");
     res.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
     if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
@@ -390,7 +405,7 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
       const json = (code, body) => {
         res.writeHead(code, { "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store", "access-control-allow-origin": "*",
-          "access-control-allow-headers": "content-type,authorization,solana-client" });
+          "access-control-allow-headers": "content-type,authorization" });
         res.end(JSON.stringify(body));
       };
       if (req.method === "OPTIONS") { json(204, {}); return; }
@@ -516,7 +531,9 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
           if (!body || typeof body !== "object") return json(400, { error: "malformed heartbeat" });
           const hb = {
             mode: String(body.mode ?? "").slice(0, 16),
-            wallet: String(body.wallet ?? "").slice(0, 64),
+            // An EVM address is stored lowercase (the dashboard compares it); anything
+            // else is kept as the bounded string it arrived as, and shows as "not reported".
+            wallet: isEvmAddress(body.wallet) ? normalise(body.wallet) : String(body.wallet ?? "").slice(0, 64),
             cursor: Number(body.cursor) || 0,
             open: Number(body.open) || 0,
             // Bounded and sanitised: a floor's own bot reporting which mints it holds.
@@ -562,51 +579,32 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
           return json(retired.status, retired.body);
         }
 
-        /* One fixed, cheap RPC read for the one-signature buy: the public
-           mainnet RPC 403s browsers, so the page gets its blockhash here,
-           through the server's own RPC. Nothing user-controlled reaches the
-           RPC; 5s memo-cache keeps a click-storm at one upstream call. */
+        /* RETIRED. A Solana transaction needed a recent blockhash from a server-side
+           RPC; an EVM wallet fetches its own nonce and gas from the chain it is
+           connected to. The path stays so an old cached page gets an answer that
+           says why, not a 404 it will retry. */
         if (url.pathname === "/api/pay/blockhash") {
-          const now = Date.now();
-          if (!globalThis.__bh || now - globalThis.__bh.at > 5000) {
-            const { readRpc } = await import("./lib/http.js");
-            const { cfg: cfg3 } = await import("./config.js");
-            const r = await readRpc(cfg3.rpc, "getLatestBlockhash", [{ commitment: "confirmed" }]);
-            if (!r.ok) return json(502, { error: "rpc unavailable" });
-            globalThis.__bh = { at: now, blockhash: r.data?.value?.blockhash };
-          }
-          return json(200, { blockhash: globalThis.__bh.blockhash });
+          return json(410, { error: `no blockhash on ${CHAIN_NAMESPACE}: the wallet builds the ERC-20 transfer itself`, chain: CHAIN_ID });
         }
 
         if (url.pathname === "/api/lease/config") {
-          // One-signature leasing: the client builds the SPL transfer itself,
-          // so it needs the treasury's token account and the mint's program.
-          try {
-            if (!globalThis.__leasePayInfo) {
-              const { treasuryTokenAccount } = await import("./scanner.js");
-              const { readRpc } = await import("./lib/http.js");
-              const { cfg: cfg2 } = await import("./config.js");
-              const acct = await treasuryTokenAccount().catch(() => null);
-              let program = null;
-              if (acct) {
-                const mi = await readRpc(cfg2.rpc, "getAccountInfo", [leasing.MINT, { encoding: "jsonParsed" }]);
-                program = mi.ok ? mi.data?.value?.owner ?? null : null;
-              }
-              if (acct && program) globalThis.__leasePayInfo = { treasuryTokenAccount: acct, tokenProgram: program };
-            }
-          } catch {}
-          return json(200, { ...leasing.config(), floors: tower.FLOORS, hq: tower.HQ_FLOOR, pay: globalThis.__leasePayInfo ?? null });
+          // One-signature leasing: the client ABI-encodes transfer(treasury, amount)
+          // itself, so it needs only the chain, the token, its decimals and the
+          // treasury. `pay` is null until the token is launched — the page then
+          // says so instead of composing a call to the zero address.
+          return json(200, { ...leasing.config(), floors: tower.FLOORS, hq: tower.HQ_FLOOR, pay: leasing.payConfig() });
         }
         if (url.pathname === "/api/auth/nonce" && req.method === "POST") {
           const body = await readBody();
           if (!body?.wallet) return json(400, { error: "wallet required" });
-          try { return json(200, auth.issueNonce(body.wallet)); }
+          try { return json(200, auth.issueNonce(body.wallet, { chain: body.chain ?? null })); }
           catch (e) { return json(400, { error: e.message }); }
         }
         if (url.pathname === "/api/auth/verify" && req.method === "POST") {
           const body = await readBody();
           if (!body?.wallet || !body?.nonce || !body?.signature) return json(400, { error: "wallet, nonce, signature required" });
-          const r = auth.verifySignature({ wallet: body.wallet, nonce: body.nonce, signatureB58: body.signature });
+          const r = await auth.verifySignature({ wallet: body.wallet, nonce: body.nonce,
+            signature: body.signature, chain: body.chain ?? null });
           return json(r.ok ? 200 : 401, r);
         }
         if (url.pathname === "/api/auth/signout" && req.method === "POST") {
@@ -618,12 +616,13 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
         if (url.pathname === "/api/budget") {
           const cfgL = leasing.config();
           return json(200, {
-            treasury: cfgL.treasury, mint: cfgL.mint, decimals: cfgL.decimals,
+            chain: CHAIN_ID, treasury: cfgL.treasury, token: cfgL.token, mint: cfgL.mint, decimals: cfgL.decimals,
+            launched: cfgL.launched,
             floorPriceTokens: cfgL.priceTokens,
             runPriceTokens: rooms.RUN_PRICE_TOKENS,
             freeRunsWithLease: rooms.FREE_RUNS_WITH_LEASE,
             balanceBaseUnits: me ? leasing.balanceOf(me).toString() : "0",
-            onchainBaseUnits: me ? await leasing.walletBalanceOf(me).then(String).catch(() => null) : null,
+            onchainBaseUnits: me ? await leasing.walletBalanceOf(me).then((v) => (v == null ? null : String(v))).catch(() => null) : null,
             credits: me ? leasing.creditsFor(me) : [],
             wallet: me ?? null,
           });
@@ -640,14 +639,17 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
              appended afterwards — so an owner read "Looking inside costs 250,000
              $CLAUDECO" and "This floor is yours" one under the other. The page cannot
              tell the truth about a thing it was never told, so it is told here. */
+          // Base units are wei-style integers as decimal strings: 10^decimals per token.
           return json(200, {
             wallet: me,
+            chain: CHAIN_ID, chainNamespace: CHAIN_NAMESPACE,
+            token: leasing.TOKEN, launched: leasing.launched(),
             onchainBaseUnits: onchain == null ? null : onchain.toString(),
             balanceBaseUnits: leasing.balanceOf(me).toString(),
             priceBaseUnits: leasing.PRICE_BASE_UNITS.toString(),
             decimals: leasing.DECIMALS,
             lease, credits: leasing.creditsFor(me),
-            isHqOwner: me === tower.hqOwnerWallet(),
+            isHqOwner: normalise(me) === tower.hqOwnerWallet(),
             hqFloor: tower.HQ_FLOOR,
           });
         }
@@ -1081,11 +1083,11 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
                outside this floor's sleeve" — so the owner can see the gate
                without a tenant token. */
             houseDeliveries: !hqViewer ? [] : (() => { try {
-              return db.prepare(`SELECT c.symbol, d.verdict, d.reason, d.size_sol, d.delivered_at
+              return db.prepare(`SELECT c.symbol, d.verdict, d.reason, d.size_eth, d.delivered_at
                 FROM deliveries d LEFT JOIN calls c ON c.id = d.call_id
                 WHERE d.floor_no = ? ORDER BY d.id DESC LIMIT 5`).all(tower.HQ_FLOOR)
                 .map((r) => ({ symbol: r.symbol, verdict: r.verdict, reason: r.reason,
-                  sizeSol: r.size_sol, minutesAgo: Math.round((now - r.delivered_at) / 60000) }));
+                  sizeEth: r.size_eth, minutesAgo: Math.round((now - r.delivered_at) / 60000) }));
             } catch (e) { return [{ error: String(e.message) }]; } })(),
             // The house's billing state, and therefore the operator's business alone.
             providerCredit: hqViewer ? {
@@ -1259,12 +1261,37 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
            * so the scan now reads pump.fun's own recently-traded listing. Free, and it
            * covers a couple of hundred coins instead of three. Measured 2026-09-03: of
            * 70 coins, 22 carried callouts. */
-          const live = await import("./data/pumpfun-live.js");
-          const pf = await import("./data/pumpfun.js");
-          const sol = await import("./data/solana.js");
-          const jup = await import("./data/jupiter.js");
+          /* The callout SOURCE is the data lane's: on 4663 the launchpad is PONS, not
+             pump.fun, and until that lane ships a PONS-side reader these imports may be
+             parked or gone. A missing source is reported as an empty, honest board —
+             never a 500 that takes the Calls tab with it. */
+          let live, pf;
+          try {
+            live = await import("./data/pumpfun-live.js");
+            pf = await import("./data/pumpfun.js");
+          } catch (e) {
+            return json(200, { coins: [], generatedAt: now, history: [],
+              source: `callout-source-unavailable-on-${CHAIN_NAMESPACE}`,
+              coverage: { attempted: 0, candidates: 0, succeeded: 0, failed: 0, coinsWithCallouts: 0,
+                verifiedCallers: 0, partialScans: 0, verifiedEmpty: 0, newThisSweep: 0, onBoard: 0,
+                boardHours: CALLOUT_BOARD_HOURS, incompleteEmpty: 0, complete: false,
+                failures: [{ reason: "callout-source-unavailable", count: 1, detail: String(e?.message || e).slice(0, 120) }] },
+              hidden: { unverified: 0, belowWhale: 0, unreadableWallet: 0 },
+              policy: { pumpfunVerifiedRequired: true, minimumWalletUsd: CALLOUT_MIN_WALLET_USD, ethUsd: null } });
+          }
+          /* ETH/USD is the data lane's src/data/eth-usd.js (CoinGecko cross-checked
+             against Kyber). Stubbed behind a try until it lands: no price means the bar
+             cannot be applied honestly, so nothing passes rather than everything. */
+          const ethUsdOf = async () => {
+            try { const m = await import("./data/eth-usd.js"); const v = await m.ethUsd(); return Number(v?.value ?? v?.usd ?? v) || null; }
+            catch { return null; }
+          };
 
-          const traded = await live.recentlyTraded({ pages: 3 }).catch(() => []);
+          /* The Solana sources are throwing shims on this fork and throw SYNCHRONOUSLY, so a
+             .catch() on their return never attaches; the board reports empty rather than
+             500ing the Calls tab (review, 2026-09-05). The PONS-side reader replaces this. */
+          let traded = [];
+          try { traded = await live.recentlyTraded({ pages: 3 }); } catch { traded = []; }
           const candidates = traded.filter((c) => c?.mint && !c.is_banned);
           const candidateCount = candidates.length;
           const scanLimit = Math.max(1, Math.min(120, Number(process.env.CALLOUT_SCAN_COINS || 60)));
@@ -1284,23 +1311,22 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
           const withCallouts = reachable.filter((t) => t.thread.callouts.length > 0);
 
           /* Every verified caller across the whole sweep, priced in one balance read and
-             one SOL quote rather than per coin. */
+             one ETH quote rather than per coin. */
           const verifiedRows = withCallouts.flatMap((t) =>
             t.thread.callouts.filter((row) => row?.verified === true)
               .map((row) => ({ ...row, mint: t.coin.mint, symbol: t.coin.pair?.baseSymbol ?? t.coin.symbol ?? null })));
           const wallets = [...new Set(verifiedRows.map((r) => r.user).filter(Boolean))];
-          const [balances, priceMap] = await Promise.all([
-            wallets.length ? sol.walletSolBalances(wallets).catch(() => new Map()) : new Map(),
-            jup.price(["So11111111111111111111111111111111111111112"]).catch(() => null),
+          const [balances, ethUsd] = await Promise.all([
+            wallets.length ? walletEthBalances(wallets).catch(() => new Map()) : new Map(),
+            ethUsdOf(),
           ]);
-          const solUsd = Number(priceMap?.["So11111111111111111111111111111111111111112"]?.usdPrice
-            ?? priceMap?.["So11111111111111111111111111111111111111112"]?.price) || null;
+          const solUsd = ethUsd;   // the gate below keeps its old variable name; the value is ETH/USD
           const walletUsdOf = (wallet) => {
-            const bal = balances.get(wallet);
-            // No SOL price means the bar cannot be applied honestly, so nothing passes
+            const bal = balances.get(normalise(wallet) ?? wallet);
+            // No ETH price means the bar cannot be applied honestly, so nothing passes
             // rather than everything passing on an assumed rate.
-            if (!bal || !(solUsd > 0)) return null;
-            return bal.sol * solUsd;
+            if (!bal || !(ethUsd > 0)) return null;
+            return bal.eth * ethUsd;
           };
 
           const gate = verifiedHolderCallouts(verifiedRows, {
@@ -1341,7 +1367,7 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
           const body2 = {
             coins: out,
             generatedAt: Date.now(),
-            source: "pump.fun-callouts+solana-wallet-sol-balance",
+            source: `callouts+wallet-eth-balance-on-${CHAIN_NAMESPACE}`,
             coverage: {
               attempted: mints.length,
               candidates: candidateCount,
@@ -1356,7 +1382,7 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
               boardHours: CALLOUT_BOARD_HOURS,
               incompleteEmpty: 0,
               complete: reachable.length === threads.length && solUsd > 0,
-              failures: solUsd > 0 ? [] : [{ reason: "sol-usd-price-unavailable", count: 1 }],
+              failures: solUsd > 0 ? [] : [{ reason: "eth-usd-price-unavailable", count: 1 }],
             },
             hidden: {
               unverified: unverifiedSeen,
@@ -1366,9 +1392,10 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
             policy: {
               unmatchedChatterIncluded: false,
               pumpfunVerifiedRequired: true,
-              minimumWalletSolUsd: CALLOUT_MIN_WALLET_USD,
-              valueBasis: "caller-wallet-sol-balance-at-current-mark",
-              solUsd,
+              minimumWalletSolUsd: CALLOUT_MIN_WALLET_USD,   // the viewer reads this key
+              minimumWalletUsd: CALLOUT_MIN_WALLET_USD,
+              valueBasis: "caller-wallet-eth-balance-at-current-mark",
+              ethUsd, solUsd: null,
               purchaseConsiderationProven: false,
               /* Say exactly what is claimed. This is a verified caller and what their
                  wallet holds — it is NOT evidence that they bought this coin. */
@@ -1390,8 +1417,8 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
         }
 
         // Whale callouts for one mint, read live off the pool.
-        const whaleMatch = url.pathname.match(/^\/api\/whales\/([1-9A-HJ-NP-Za-km-z]{32,44})$/);
-        if (whaleMatch) return json(200, await callouts(whaleMatch[1], { scan: 24 }));
+        const whaleMatch = url.pathname.match(/^\/api\/whales\/(0x[0-9a-fA-F]{40})$/);
+        if (whaleMatch) return json(200, await callouts(normalise(whaleMatch[1]), { scan: 24 }));
 
         const alertMatch = url.pathname.match(/^\/api\/floor\/(\d+)\/alerts(\/ack)?$/);
         if (alertMatch) {
@@ -1530,7 +1557,7 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
         }
       } catch (e) { perf = { error: String(e.message) }; }
       res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ ...summary, perf,
+      res.end(JSON.stringify({ ...summary, chain: CHAIN_ID, perf,
         prices: { leaseTokens: leasing.PRICE_TOKENS, rentTokens: leasing.RENT_TOKENS,
                   passTokens: passes.PASS_TOKENS, passDays: passes.PASS_DAYS } }));
       return;

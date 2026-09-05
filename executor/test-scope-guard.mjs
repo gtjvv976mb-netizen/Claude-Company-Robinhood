@@ -8,7 +8,8 @@
  * The live half runs against chain 4663 and is skipped without a network, because a
  * test that silently passes offline is worse than one that is honestly absent.
  */
-import { classifyFromBeaconWord, classifyToken, beaconFromSlotWord, classifyPairAsset,
+import { NEVER_POSITIONS, assertNotAccessToken,
+  classifyFromBeaconWord, classifyToken, beaconFromSlotWord, classifyPairAsset,
   classifyPairAssetOnChain, ALLOWED_PAIR_EQUITIES, classifyFromName, decodeAbiString,
   ROBINHOOD_TOKEN_MARKER, SELECTOR_NAME,
   KNOWN_STOCK_TOKEN_BEACON, ERC1967_BEACON_SLOT } from "./scope-guard.mjs";
@@ -147,6 +148,17 @@ console.log("\nTHE SECOND SIGNAL — A STOCK TOKEN SAYS SO IN ITS NAME");
   const hiddenPair = await classifyPairAssetOnChain(ADDR, async () => EMPTY, async () => abiStr("Anthropic • Robinhood Token"));
   ok("an equity refused by name is refused as a pair asset too", hiddenPair.allowedAsPair === false);
   ok("...with the name in the reason", /Anthropic/.test(hiddenPair.reason));
+}
+
+console.log("\nTHE DESK'S OWN TOKEN IS NEVER A POSITION");
+{
+  const ca = "0x7039986CaC6C7885b53f10c7492E653055470ab9";
+  let threw = null;
+  try { assertNotAccessToken(ca); } catch (e) { threw = e.message; }
+  ok("$CLAUDECO is refused as a position, by address, before any read", /access token/.test(threw ?? ""), threw);
+  ok("...case-insensitively", (() => { try { assertNotAccessToken(ca.toLowerCase()); return false; } catch { return true; } })());
+  ok("a memecoin is not on the list", (() => { try { assertNotAccessToken("0x020bfC650A365f8BB26819deAAbF3E21291018b4"); return true; } catch { return false; } })());
+  ok("the list is short and named", NEVER_POSITIONS.size === 1 && /CLAUDECO/.test([...NEVER_POSITIONS.values()][0]));
 }
 
 console.log("\nAGAINST THE LIVE CHAIN");

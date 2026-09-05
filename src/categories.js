@@ -20,13 +20,21 @@
  * hand — the expensive seats are spent only on what this narrows down to.
  */
 import { cfg } from "./config.js";
+import { canonicalLaunchpad } from "./canonical.js";
 
-/* What share of each cycle's paid attention goes to pump.fun. A floor, not a cap. */
-/* PUMP.FUN ONLY (owner, 2026-09-03). This was a 0.6 FLOOR — fill 60% of the paid seats
-   with pump.fun coins, then fill the rest from anywhere — and the desk was spending 40%
-   of its research on launchpads the owner does not want traded. At 1 it is the whole
-   board. Set PENTHOUSE_PAD_QUOTA below 1 to let other launchpads back in. */
+/* What share of each cycle's paid attention goes to the preferred launchpad. A floor, not a cap. */
+/* ONE PAD ONLY (owner, 2026-09-03, on pump.fun). This was a 0.6 FLOOR — fill 60% of the
+   paid seats with the pad's coins, then fill the rest from anywhere — and the desk was
+   spending 40% of its research on launchpads the owner does not want traded. At 1 it is
+   the whole board. Set PENTHOUSE_PAD_QUOTA below 1 to let other launchpads back in. */
 export const PAD_QUOTA = Math.min(1, Math.max(0, Number(process.env.PENTHOUSE_PAD_QUOTA ?? 1)));
+/* THE PAD THE QUOTA IS KEYED ON. On chain 4663 that is PONS V2 — 207,893 launches a
+   month, 1.55% graduating, the pad that carries the volume (Bitquery, Sep 2026). The
+   copy has promised a PONS preference since the port; until 2026-09-05 the code still
+   keyed the quota on "pump.fun", a pad no coin on this chain carries, so the quota pass
+   took nothing every cycle and the general pass filled — a preference that existed
+   only in prose. One constant, read by the board pick and the funnel pick alike. */
+export const PREFERRED_PAD = process.env.PENTHOUSE_PREFERRED_PAD || "pons-v2";
 
 /** Market-cap bands, as the owner specified them. */
 /* The bands live in their own leaf module so the screen can read the same numbers
@@ -123,7 +131,7 @@ export function buildBoard(scored, { perCell = 5, viable = () => true } = {}) {
  * is exactly the failure the board exists to prevent. Only once every cell has been
  * sampled does it come back for second-bests.
  */
-export function selectAcrossBoard(board, budget, { padQuota = PAD_QUOTA, pad = "pump.fun" } = {}) {
+export function selectAcrossBoard(board, budget, { padQuota = PAD_QUOTA, pad = PREFERRED_PAD } = {}) {
   const take = (c, cell) => ({ ...c, cellKey: cell.key, band: cell.band, coinType: cell.type });
   const seen = new Set();
   const picked = [];
@@ -153,12 +161,13 @@ export function selectAcrossBoard(board, budget, { padQuota = PAD_QUOTA, pad = "
     }
   };
 
-  /* PUMP.FUN FIRST, DELIBERATELY.
+  /* THE PREFERRED PAD FIRST, DELIBERATELY.
    *
-   * Measured on a live sweep: pump.fun is 41% of everything surfaced and 53% of what
-   * survives the free screen — already the largest pad, because it carries the volume.
-   * But 53% is a majority by accident, and an accident is not a policy: on a quiet
-   * hour the mix could just as easily come back mostly meteora.
+   * Measured on a live Solana sweep: pump.fun was 41% of everything surfaced and 53% of
+   * what survived the free screen — already the largest pad, because it carried the
+   * volume. But 53% is a majority by accident, and an accident is not a policy: on a
+   * quiet hour the mix could just as easily come back mostly another pad. On 4663 the
+   * same argument names PONS V2 (PREFERRED_PAD); the share here is UNMEASURED.
    *
    * So the quota is filled first, one per cell as always, and only then is the rest of
    * the budget spent on the whole board. It is a FLOOR, not a cap — if the other pads
@@ -166,14 +175,20 @@ export function selectAcrossBoard(board, budget, { padQuota = PAD_QUOTA, pad = "
    * in, because refusing to look at a good coin for being born on the wrong launchpad
    * would be a worse mistake than the one this fixes. */
   const quota = Math.min(budget, Math.ceil(budget * padQuota));
-  sweepBoard(quota, (c) => c.launchpad === pad);
+  // The sweep labels a PONS V2 coin "pons" (market.js PADS) and this constant says
+  // "pons-v2": compared raw, the quota pass can match nothing by construction — the
+  // same failure as keying on "pump.fun" here, with a different string (found by
+  // reading both vocabularies side by side, 2026-09-05; test-desk-loop-eth.mjs pins
+  // it). One alias table, both sides.
+  const onPad = (c) => canonicalLaunchpad(c.launchpad) === canonicalLaunchpad(pad);
+  sweepBoard(quota, onPad);
   const fromPad = picked.length;
   /* AT A FULL QUOTA THE FLOOR BECOMES A WALL. The owner's instruction is to search and
-     trade pump.fun coins only, so when the quota is the whole budget the general pass
+     trade the preferred pad's coins only, so when the quota is the whole budget the general pass
      is filtered too — otherwise a quiet hour on pump.fun silently spends the desk's
      research on the launchpads it was told to leave alone. Below 1 it behaves exactly
      as before: a floor, never a cap. */
-  if (padQuota >= 1) sweepBoard(budget, (c) => c.launchpad === pad);
+  if (padQuota >= 1) sweepBoard(budget, onPad);
   else sweepBoard(budget, () => true);
 
   if (picked.length) picked.padMix = { [pad]: fromPad, other: picked.length - fromPad };

@@ -103,12 +103,14 @@ ok("floorNo events retain tenant provenance and never enter another floor's back
   backlog(7).some((event) => event.type === "tenant:private-fixture") &&
   !backlog(8).some((event) => event.type === "tenant:private-fixture"));
 
-const priorRpc = process.env.SOLANA_RPC;
+// The desk's read endpoint is RH_RPC on this chain (src/config.js reads it for the
+// runtime profile's rpcOrigin); SOLANA_RPC no longer exists here.
+const priorRpc = process.env.RH_RPC;
 const priorXaiBase = process.env.XAI_BASE_URL;
-process.env.SOLANA_RPC = "https://account:password@rpc.example.test/private-key?api_key=secret";
+process.env.RH_RPC = "https://account:password@rpc.example.test/private-key?api_key=secret";
 process.env.XAI_BASE_URL = "https://xai-alt.example.test/v1/private-token";
 const endpointProfile = JSON.stringify(runtimeBehaviorProfile());
-if (priorRpc == null) delete process.env.SOLANA_RPC; else process.env.SOLANA_RPC = priorRpc;
+if (priorRpc == null) delete process.env.RH_RPC; else process.env.RH_RPC = priorRpc;
 if (priorXaiBase == null) delete process.env.XAI_BASE_URL; else process.env.XAI_BASE_URL = priorXaiBase;
 ok("runtime identity distinguishes endpoint origins without retaining URL credentials",
   endpointProfile.includes("https://rpc.example.test") &&

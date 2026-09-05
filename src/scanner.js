@@ -81,7 +81,18 @@ function readTransfer(tx, tokenAccount) {
   return feePayer ? { received, payer: feePayer } : null;
 }
 
+/* PARKED ON CHAIN 4663. Every read below is Solana JSON-RPC (getSignaturesForAddress,
+ * getTransaction, SPL pre/post token balances) against a treasury that was an SPL
+ * token account. On an EVM endpoint each tick would answer method-not-found every 20
+ * seconds and credit nobody. The ERC-20 replacement — replay Transfer logs to
+ * TREASURY_OWNER_RH for CLAUDECO_RH_TOKEN in ≤10k-block spans, crediting `from` — is
+ * the auth-leasing lane's; the exact shape is in docs/HANDOFF-data-sources.md. Until
+ * it lands the scanner is a no-op that says so once, and leasing stays closed. Set
+ * DESK_CHAIN=solana to run the old path against a Solana RPC (tests, archaeology). */
+export const SCANNER_ENABLED = (process.env.DESK_CHAIN || "robinhood") === "solana";
+
 export async function scanOnce({ limit = 40 } = {}) {
+  if (!SCANNER_ENABLED) return { ok: false, error: "treasury scanner parked on chain 4663 — ERC-20 Transfer-log scanner pending (HANDOFF-data-sources)", parked: true };
   if (!TREASURY) return { ok: false, error: "TREASURY_OWNER not set" };
 
   const tokenAccount = await treasuryTokenAccount();
@@ -152,6 +163,7 @@ export async function scanOnce({ limit = 40 } = {}) {
 
 let timer = null;
 export function startScanner({ intervalMs = 20000 } = {}) {
+  if (!SCANNER_ENABLED) { console.log("[scanner] parked on chain 4663 — the SPL treasury scanner does not run here; leasing credits are closed until the ERC-20 scanner lands"); return; }
   if (!TREASURY) { console.log("[scanner] TREASURY_OWNER not set — leasing is closed"); return; }
   if (timer) return;
   const tick = async () => {

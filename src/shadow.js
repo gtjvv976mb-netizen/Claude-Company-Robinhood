@@ -1,5 +1,6 @@
 import db from "./lib/store.js";
 import { emit } from "./lib/bus.js";
+import { canonicalAddress } from "./canonical.js";
 
 /**
  * THE SHADOW BOOK — grading the desk on what it REFUSED.
@@ -54,6 +55,7 @@ const seenRecently = (mint, withinMs = 6 * 3600e3) =>
  * — without that price the row is useless, so a refusal we cannot price is not stored.
  */
 export function recordRefusal({ mint, symbol, stage, reason, safety = true, priceUsd, mcapUsd }) {
+  mint = canonicalAddress(mint);
   if (!mint || !(priceUsd > 0)) return null;
   if (seenRecently(mint)) return null;
   db.prepare(`INSERT INTO shadow (mint,symbol,stage,reason,safety,price_at,mcap_at,refused_at)

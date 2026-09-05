@@ -20,12 +20,30 @@ export const AnalystOut = z.object({
 
 export const ScoutOut = z.object({
   picks: z.array(z.object({
-    mint: z.string(),
+    // Field name kept for every consumer that reads picks[].mint; the value is the
+    // ERC-20 contract address on chain 4663.
+    mint: z.string().describe("The token's contract address, exactly as it appears in the feed."),
     why_now: z.string().describe("The specific, time-sensitive reason this deserves attention today."),
     interest: z.number().min(0).max(100),
   })),
   discarded_reasoning: z.string(),
 });
+
+/**
+ * THE FACTS A REFUTATION MAY LAND ON. Each code is confirmed against the bundle by
+ * redteam-policy.js before a "refuted" is allowed to stand. The six EVM codes are the
+ * rug vectors this chain actually has — an EOA-held upgrade key, a pullable position
+ * NFT, a quote asset the bot cannot hold, bespoke bytecode nobody has verified, sells
+ * the sequencer or ArbOS voids, and an exempt list holding the float — none of which
+ * the Solana list could name, so a refutation on them was always downgraded.
+ */
+export const RED_TEAM_FACT_CODES = [
+  "wash_trading", "deployer_misconduct", "live_authority", "holder_control",
+  "exit_failure", "liquidity_collapse", "fake_social_proof", "false_identity", "unlock_risk",
+  "upgrade_key_live", "lp_unlocked", "pair_token_gate", "unverified_code",
+  "sequencer_exclusion", "insider_float",
+  "other",
+];
 
 export const RedTeamOut = z.object({
   headline: z.string().describe("The single strongest reason this trade loses money."),
@@ -35,8 +53,7 @@ export const RedTeamOut = z.object({
     attack: z.string(),
     severity: z.enum(["fatal", "serious", "minor"]),
     evidence: z.string(),
-    fact_code: z.enum(["wash_trading", "deployer_misconduct", "live_authority", "holder_control",
-      "exit_failure", "liquidity_collapse", "fake_social_proof", "false_identity", "unlock_risk", "other"]),
+    fact_code: z.enum(RED_TEAM_FACT_CODES),
     evidence_path: z.string().describe("Exact evidence-bundle path, or empty only when source_url supplies external proof."),
     observed_value: z.string(),
     threshold_or_comparison: z.string(),
@@ -87,10 +104,10 @@ export const TicketOut = z.object({
     trigger: z.string(),
   })),
   max_slippage_bps: z.number(),
-  suggested_route: z.string().describe("Venue/aggregator from the evidence route data."),
+  suggested_route: z.string().describe("From evidence.exitProbe: the KyberSwap route (aggregator-api.kyberswap.com/robinhood) or the single Uniswap V3/V4 pool, naming the pairToken leg when the pool is not WETH/native-quoted."),
   stop_price: z.number(),
   take_profit: z.array(z.object({ price: z.number(), pct_to_sell: z.number(), rationale: z.string() })),
-  execution_warnings: z.array(z.string()),
+  execution_warnings: z.array(z.string()).describe("Everything that would surprise a human placing this by hand — always including that a send with no receipt was dropped by the sequencer and must be reconciled by nonce, never assumed filled."),
 });
 
 /**
@@ -102,7 +119,9 @@ export const TicketOut = z.object({
  * one MAKES MONEY, and which would you regret.
  */
 export const BestPickOut = z.object({
-  pick_mint: z.string().describe("The mint address of the single coin to trade. Must be one of the candidates."),
+  // Field names kept (pick_mint / runner_up_mint) for every consumer downstream; the
+  // value is the contract address on chain 4663.
+  pick_mint: z.string().describe("The contract address of the single coin to trade. Must be one of the candidates."),
   pick_symbol: z.string(),
   why: z.string().describe("Why THIS one and not the others, in under 60 words. Compare, do not describe."),
   edge: z.string().describe("The specific thing that makes it likely to move — the trend, the lore, the endorsement, the flow."),

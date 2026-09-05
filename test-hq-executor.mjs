@@ -35,7 +35,7 @@ const targets = floors.filter((f) => f.state === "owned" || f.n === HQ_FLOOR).ma
 ok("the broadcast list includes the HQ", targets.includes(HQ_FLOOR), `targets=[${targets}]`);
 
 const s = settingsFor(HQ_FLOOR);
-ok("the HQ has copy settings of its own", !!s, `appetite=${s.appetite} bankroll=${s.bankroll_sol} SOL`);
+ok("the HQ has copy settings of its own", !!s, `appetite=${s.appetite} bankroll=${s.bankroll_eth} ETH`);
 // The HQ is the memecoin desk; a 'balanced' HQ would skip 100% of its own calls.
 ok("the HQ's appetite actually admits memecoins", s.categories.includes("memecoin"),
   `categories=${s.categories.join(",")}`);
@@ -48,7 +48,7 @@ ok("a feed secret exists without any webhook URL being set",
 // Publish a call the way the desk does, then broadcast it.
 for (const c of liveCalls()) closeCall(c.id, "test_reset", 1);
 const call = openCall({
-  mint: "HQtest1111111111111111111111111111111111111", symbol: "HOUSE",
+  mint: "0x0bd7d308f8e1639fab988df18a8011f41eacad73", symbol: "HOUSE",
   // Mandate picks may be published below every tenant preset's conviction bar. The
   // authoring house must still receive its own approved call; tenant preferences must
   // not be silently weakened to make that happen.
@@ -82,7 +82,7 @@ ok("the broadcast succeeded", res.ok, `offered=${res.offered} skipped=${res.skip
 
 const del = db.prepare("SELECT * FROM deliveries WHERE call_id=? AND floor_no=?").get(call.id, HQ_FLOOR);
 ok("the HQ received a delivery row for its own call", !!del,
-  del ? `verdict=${del.verdict} size=${del.size_sol ?? "n/a"} ${del.reason ?? ""}` : "no row");
+  del ? `verdict=${del.verdict} size=${del.size_eth ?? "n/a"} ETH ${del.reason ?? ""}` : "no row");
 ok("and it was OFFERED, not skipped", del?.verdict === "offered",
   del?.verdict === "offered" ? "the house may trade it" : `verdict=${del?.verdict} — ${del?.reason}`);
 

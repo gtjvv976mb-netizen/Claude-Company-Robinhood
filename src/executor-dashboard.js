@@ -5,23 +5,62 @@
  * public-chain balance lookup into a small UI payload. It deliberately contains no
  * command, signing, secret, RPC proxy, or cap-changing field: the website can observe
  * the tenant's machine, but it cannot operate it.
+ *
+ * ROBINHOOD EDITION. Addresses are EVM (0x, lowercase in storage); the balance is native
+ * ETH on chain 4663, carried as `wei` (decimal string) + `eth` (number). The heartbeat's
+ * wire names are the executor lane's (executor/poller.mjs sendHeartbeat, read 2026-09-05):
+ * caps.{maxEthPerTrade, dailyEthCap, dailyLossLimitEth, maxOpenPositions},
+ * executionReadiness.{route: "eth-usdg", amountWei: <decimal string>}, held[].eth.
+ * This reader and office.js sanitizeExecutorHealth changed together with them. A heartbeat
+ * still under the Solana names (maxSolPerTrade, amountLamports, "wsol-usdc") reads as
+ * "caps not reported" and "not rehearsed" — the honest state for a bot that has not been
+ * rebuilt for 4663, and the reason the old names are not accepted as aliases.
  */
-import { isAddress } from "./lib/base58.js";
+import { isEvmAddress, normalise } from "./lib/address.js";
 
 export const EXECUTOR_HEARTBEAT_STALE_MS = 150_000;
 export const EXECUTOR_READINESS_STALE_MS = 5 * 60_000;
+/* The executor's LIVE_LIMITS and OPERATOR_MAX (executor/poller.mjs): the ETH translation
+   of the owner's SOL canary at $2,450/ETH, MARKED THERE AS AWAITING OWNER CONFIRMATION.
+   test-executor-dashboard.mjs pins both sets to the poller source so they cannot drift
+   apart silently. */
 export const EXECUTOR_CANARY_DEFAULTS = Object.freeze({
-  maxSolPerTrade: 0.005,
-  rolling24hDeploySol: 0.01,
-  rolling24hRealizedLossBrakeSol: 0.01,
+  maxEthPerTrade: 0.0004,
+  rolling24hDeployEth: 0.0008,
+  rolling24hRealizedLossBrakeEth: 0.0008,
   maxOpenPositions: 4,
 });
+export const EXECUTOR_GAS_HEADROOM_ETH_PLACEHOLDER = 0.001;
 export const EXECUTOR_OPERATOR_MAXIMA = Object.freeze({
-  maxSolPerTrade: 0.05,
-  rolling24hDeploySol: 0.5,
-  rolling24hRealizedLossBrakeSol: 0.15,
+  maxEthPerTrade: 0.004,
+  rolling24hDeployEth: 0.04,
+  rolling24hRealizedLossBrakeEth: 0.012,
   maxOpenPositions: 4,
 });
+/** The 4663 rehearsal pair (executor/evm-executor.mjs EXECUTION_READINESS_ROUTE). */
+export const EXECUTOR_READINESS_ROUTE = "eth-usdg";
+
+/** The poller's own rounding (executor/poller.mjs ethToWei): a cap is rounded to six
+ *  decimals of ETH — a micro-ETH — and then scaled, exact in BigInt. Reproduced here
+ *  rather than multiplying by 1e18 because the readiness-covers-cap identity below
+ *  compares the rehearsal's wei to the cap's wei: a cap of 0.0004567 ETH rehearses at
+ *  457000000000000 wei, and cap * 1e18 is 456700000000000 — an honest bot would fail the
+ *  check. (For the shipped defaults both forms agree; measured 2026-09-05.) */
+export const ethToWei = (eth) => {
+  const n = Number(eth);
+  if (!Number.isFinite(n) || n <= 0) return 0n;
+  return BigInt(Math.floor(n * 1e6 + 1e-9)) * 10n ** 12n;   // floor, as the poller does: never UP past a cap
+};
+/** The largest rehearsal the operator ceiling allows, in wei. */
+export const READINESS_MAX_WEI = ethToWei(EXECUTOR_OPERATOR_MAXIMA.maxEthPerTrade);
+/** A rehearsal amount as a bounded decimal string of wei, or "0" for anything else. A
+ *  STRING by contract — the executor sends String(); a number would be exact below 2^53
+ *  wei (~9 ETH) but a typed field is one fewer thing for a reader to guess about. */
+export const weiString = (value) => {
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,30}$/.test(value)) return "0";
+  const v = BigInt(value);
+  return v >= 1n && v <= READINESS_MAX_WEI ? v.toString() : "0";
+};
 
 const finite = (value, fallback = null) => {
   const number = Number(value);
@@ -37,15 +76,13 @@ const timestamp = (value) => {
 
 const publicReadiness = (value) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const amountLamports = Number(value.amountLamports);
   return {
     ready: value.ready === true,
     lastSuccessAt: timestamp(value.lastSuccessAt),
     observedAt: timestamp(value.observedAt),
-    route: value.route === "wsol-usdc" ? "wsol-usdc" : null,
+    route: value.route === EXECUTOR_READINESS_ROUTE ? EXECUTOR_READINESS_ROUTE : null,
     providers: Number(value.providers) === 2 ? 2 : 0,
-    amountLamports: Number.isSafeInteger(amountLamports) && amountLamports >= 1 &&
-      amountLamports <= 50_000_000 ? amountLamports : 0,
+    amountWei: weiString(value.amountWei),
     // Why the rehearsal did not pass, as the bot reported it. "0/2" alone sent an
     // operator to the source to find out whether the probe even existed.
     lastError: typeof value.lastError === "string" ? value.lastError.slice(0, 300) : null,
@@ -55,18 +92,18 @@ const publicReadiness = (value) => {
 const publicCaps = (value) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const caps = {
-    maxSolPerTrade: finite(value.maxSolPerTrade),
-    rolling24hDeploySol: finite(value.dailySolCap),
-    rolling24hRealizedLossBrakeSol: finite(value.dailyLossLimitSol),
+    maxEthPerTrade: finite(value.maxEthPerTrade),
+    rolling24hDeployEth: finite(value.dailyEthCap),
+    rolling24hRealizedLossBrakeEth: finite(value.dailyLossLimitEth),
     maxOpenPositions: Number(value.maxOpenPositions),
   };
-  if (!(caps.maxSolPerTrade >= 0.000001 &&
-      caps.maxSolPerTrade <= EXECUTOR_OPERATOR_MAXIMA.maxSolPerTrade &&
-      caps.rolling24hDeploySol >= 0.000001 &&
-      caps.rolling24hDeploySol >= caps.maxSolPerTrade &&
-      caps.rolling24hDeploySol <= EXECUTOR_OPERATOR_MAXIMA.rolling24hDeploySol &&
-      caps.rolling24hRealizedLossBrakeSol >= 0.000001 &&
-      caps.rolling24hRealizedLossBrakeSol <= EXECUTOR_OPERATOR_MAXIMA.rolling24hRealizedLossBrakeSol &&
+  if (!(caps.maxEthPerTrade >= 0.000001 &&
+      caps.maxEthPerTrade <= EXECUTOR_OPERATOR_MAXIMA.maxEthPerTrade &&
+      caps.rolling24hDeployEth >= 0.000001 &&
+      caps.rolling24hDeployEth >= caps.maxEthPerTrade &&
+      caps.rolling24hDeployEth <= EXECUTOR_OPERATOR_MAXIMA.rolling24hDeployEth &&
+      caps.rolling24hRealizedLossBrakeEth >= 0.000001 &&
+      caps.rolling24hRealizedLossBrakeEth <= EXECUTOR_OPERATOR_MAXIMA.rolling24hRealizedLossBrakeEth &&
       Number.isInteger(caps.maxOpenPositions) && caps.maxOpenPositions >= 1 &&
       caps.maxOpenPositions <= EXECUTOR_OPERATOR_MAXIMA.maxOpenPositions)) return null;
   return caps;
@@ -100,7 +137,7 @@ const publicHealth = (value) => {
 
 const publicHeartbeat = (value) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const wallet = isAddress(value.wallet) ? value.wallet : null;
+  const wallet = isEvmAddress(value.wallet) ? normalise(value.wallet) : null;
   const mode = value.mode === "live" || value.mode === "paper" ? value.mode : "unknown";
   const health = publicHealth(value.health);
   return {
@@ -109,8 +146,8 @@ const publicHeartbeat = (value) => {
     cursor: count(value.cursor),
     open: count(value.open),
     held: Array.isArray(value.held) ? value.held.slice(0, 20).map((holding) => ({
-      mint: isAddress(holding?.mint) ? holding.mint : null,
-      sol: Math.max(0, finite(holding?.sol, 0)),
+      mint: isEvmAddress(holding?.mint) ? normalise(holding.mint) : null,
+      eth: Math.max(0, finite(holding?.eth, 0)),
       openedAt: timestamp(holding?.openedAt),
     })).filter((holding) => holding.mint) : [],
     health,
@@ -136,29 +173,35 @@ const publicSettings = (settings = {}) => ({
   updatedAt: timestamp(settings.updatedAt),
 });
 
-const publicBalance = (wallet, result, requiredForReadinessSol = null) => {
+export const BALANCE_SOURCE = "robinhood-4663-latest-read";
+
+/* wei arrives as a decimal STRING (a JS number loses wei precision above ~9 ETH). */
+const weiOf = (value) => {
+  try { const v = BigInt(String(value)); return v >= 0n ? v : null; } catch { return null; }
+};
+
+const publicBalance = (wallet, result, requiredForReadinessEth = null) => {
   if (!wallet) return {
-    address: null, balanceSol: null, balanceLamports: null,
+    address: null, balanceEth: null, balanceWei: null,
     state: "not-reported", source: null, observedAt: null,
-    requiredForReadinessSol: null,
+    requiredForReadinessEth: null,
   };
-  const lamports = Number(result?.lamports);
-  const sol = Number(result?.sol);
-  const ok = result?.ok === true && Number.isSafeInteger(lamports) && lamports >= 0 &&
-    Number.isFinite(sol) && sol >= 0;
+  const wei = weiOf(result?.wei);
+  const eth = Number(result?.eth);
+  const ok = result?.ok === true && wei != null && Number.isFinite(eth) && eth >= 0;
   if (!ok) return {
-    address: wallet, balanceSol: null, balanceLamports: null,
-    state: "unavailable", source: "solana-confirmed-read", observedAt: null,
-    requiredForReadinessSol,
+    address: wallet, balanceEth: null, balanceWei: null,
+    state: "unavailable", source: BALANCE_SOURCE, observedAt: null,
+    requiredForReadinessEth,
   };
-  const threshold = Number(requiredForReadinessSol);
-  const state = sol === 0 ? "empty" : !(Number.isFinite(threshold) && threshold > 0)
-    ? "active-caps-unavailable" : sol < threshold
+  const threshold = Number(requiredForReadinessEth);
+  const state = wei === 0n ? "empty" : !(Number.isFinite(threshold) && threshold > 0)
+    ? "active-caps-unavailable" : eth < threshold
       ? "below-readiness-reserve" : "ready-balance";
   return {
-    address: wallet, balanceSol: sol, balanceLamports: lamports,
-    state, source: "solana-confirmed-read", observedAt: timestamp(result.observedAt) || null,
-    requiredForReadinessSol: Number.isFinite(threshold) && threshold > 0 ? threshold : null,
+    address: wallet, balanceEth: eth, balanceWei: wei.toString(),
+    state, source: BALANCE_SOURCE, observedAt: timestamp(result.observedAt) || null,
+    requiredForReadinessEth: Number.isFinite(threshold) && threshold > 0 ? threshold : null,
   };
 };
 
@@ -176,11 +219,15 @@ export function buildExecutorDashboard({
   const connected = ageMs != null && ageMs <= EXECUTOR_HEARTBEAT_STALE_MS;
   const filters = publicSettings(settings);
   const activeCaps = pulse?.health?.caps ?? null;
-  // Mirrors the no-sign readiness reserve: active trade + network-fee ceiling +
-  // two-ATA rent ceiling + untouched SOL reserve. It is a display threshold only.
-  const requiredForReadinessSol = activeCaps
-    ? activeCaps.maxSolPerTrade + 0.0005 + 0.0042 + 0.01 : null;
-  const wallet = publicBalance(pulse?.wallet ?? null, balanceResult, requiredForReadinessSol);
+  /* A display threshold only: the active trade plus gas headroom. There is no rent on
+     an EVM chain; the gas figure is a PLACEHOLDER, not a measurement — eth_gasPrice on
+     4663 moved 0.02 → 0.7 gwei in two weeks and spikes >5 gwei, and the executor lane
+     owns the live number (executor/live-thresholds.mjs). 0.001 ETH covers ~200k gas at
+     5 gwei; it will be replaced by the executor's own reserve once the heartbeat
+     carries it. */
+  const requiredForReadinessEth = activeCaps
+    ? activeCaps.maxEthPerTrade + EXECUTOR_GAS_HEADROOM_ETH_PLACEHOLDER : null;
+  const wallet = publicBalance(pulse?.wallet ?? null, balanceResult, requiredForReadinessEth);
   const readiness = pulse?.health?.executionReadiness;
   const readinessLastSuccessAt = timestamp(readiness?.lastSuccessAt);
   const readinessObservedAt = timestamp(readiness?.observedAt);
@@ -188,10 +235,12 @@ export function buildExecutorDashboard({
     readinessLastSuccessAt <= now + 60_000 && readinessObservedAt <= now + 60_000 &&
     now - readinessLastSuccessAt <= EXECUTOR_READINESS_STALE_MS &&
     now - readinessObservedAt <= EXECUTOR_READINESS_STALE_MS;
+  // The rehearsal must be the SAME size as the active cap, in the poller's own wei
+  // rounding: a raised executor cannot inherit readiness from the smaller default probe.
   const readinessCoversActiveCap = Boolean(activeCaps && readiness &&
-    readiness.amountLamports === Math.floor(activeCaps.maxSolPerTrade * 1_000_000_000));
+    readiness.amountWei !== "0" && BigInt(readiness.amountWei) === ethToWei(activeCaps.maxEthPerTrade));
   const executionReadinessReady = Boolean(readinessFresh && readiness?.ready === true &&
-    readiness.route === "wsol-usdc" && readiness.providers === 2 && readinessCoversActiveCap);
+    readiness.route === EXECUTOR_READINESS_ROUTE && readiness.providers === 2 && readinessCoversActiveCap);
   // The monitor treats every missing, stale, incomplete, or wrong-size live rehearsal
   // as critical. Preserve the poller's higher-severity states, but do not let the
   // human-facing status contradict that same evidence by displaying healthy/paused.

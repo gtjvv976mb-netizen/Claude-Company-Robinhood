@@ -17,7 +17,7 @@
  * hunting spree eating tomorrow morning.
  */
 import db from "./src/lib/store.js";
-import { assertDailyBudget, BudgetExhausted, HOURLY_BURST, OPPORTUNISTIC_SHARE } from "./src/lib/llm.js";
+import { assertDailyBudget, BudgetExhausted, HOURLY_BURST, OPPORTUNISTIC_SHARE, CYCLE_BUDGET_USD } from "./src/lib/llm.js";
 import { bookState, MAX_LIVE_CALLS } from "./src/mandate.js";
 import { openCall, closeCall, liveCalls } from "./src/calls.js";
 
@@ -35,8 +35,13 @@ const charge = (usd, minsAgo) => db.prepare(
 const reset = () => db.prepare("DELETE FROM llm_spend").run();
 
 const CAP = 40;
-const hourCap = (CAP / 24) * HOURLY_BURST;
-console.log(`\nCAP $${CAP}/day · burst x${HOURLY_BURST} · hourly allowance $${hourCap.toFixed(2)}`);
+/* DERIVED FROM THE SOURCE OF TRUTH. The pace has a floor under it — one cycle's own
+ * allowance times 1.25, so a pace can never deadlock the cycle it is pacing — and since
+ * 2026-09-05 that floor reads the ONE exported CYCLE_BUDGET_USD (default 8, so $10)
+ * rather than a private default of 4. This test computed the cap with only the first
+ * term and went red the day the budget was unified; it now reproduces llm.js's own max. */
+const hourCap = Math.max((CAP / 24) * HOURLY_BURST, CYCLE_BUDGET_USD * 1.25);
+console.log(`\nCAP $${CAP}/day · burst x${HOURLY_BURST} · cycle $${CYCLE_BUDGET_USD} · hourly allowance $${hourCap.toFixed(2)}`);
 console.log(`concurrency ${MAX_LIVE_CALLS} · scanner share ${(OPPORTUNISTIC_SHARE * 100).toFixed(0)}%\n`);
 
 console.log("CONCURRENCY — the desk no longer idles behind one trade");

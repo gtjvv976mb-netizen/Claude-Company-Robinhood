@@ -1,4 +1,28 @@
-# Claude Company — $CLAUDECO
+# Claude Company — $CLAUDECO (Robinhood Chain edition)
+
+**This edition is not launched.** `metadata.json` carries the all-zero placeholder address
+and `"addressStatus"` says so; the launch itself — PONS V2, paired to native ETH, the
+exempt-list decision, and the three files that change in the same commit — is
+`docs/LAUNCH-CHECKLIST.md`. The name, symbol, socials and image are the same as the Solana
+edition's, by the owner's decision ("the socials, image will be the same"); only the chain
+and the address differ.
+
+| Field | Value |
+|---|---|
+| Name | `Claude Company` |
+| Symbol | `CLAUDECO` |
+| Standard | ERC-20 on Robinhood Chain, chainId 4663 (`0x1237`) |
+| Decimals | 18 (`CLAUDECO_RH_DECIMALS`; PONS launches are 18-decimal ERC-20s) |
+| Address | `0x0000000000000000000000000000000000000000` — placeholder until launch |
+| Solana edition | `HRkkxgaFDDmZ3qZX8xP5SiMRBNvFNVUUv4FJUjPCpump`, https://claudedotcompany.com |
+
+The Solana notes below (Metaplex limits, mint/freeze authority) describe the ORIGINAL
+edition and are kept for the art pipeline they document; the EVM equivalents of "mint it
+plain" — no owner, no pause, no blocklist, no transfer tax, no insider exempt list — are
+in the launch checklist, and they are exactly what `executor/scope-guard.mjs` and the
+Forensics seat refuse in other people's tokens.
+
+## The Solana edition's field limits (kept for reference)
 
 | Field | Value | Limit |
 |---|---|---|

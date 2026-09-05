@@ -7,7 +7,7 @@ import { classifyProcessTopology, inspectExecutor, readExecutorEnv } from "./mon
 
 const SOURCE_COMMIT = "a".repeat(40);
 const RUNTIME_FINGERPRINT = "b".repeat(32);
-const WALLET = "PublicWallet111111111111111111111111111111";
+const WALLET = "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A";
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "wallste-monitor-"));
 const makeDb = (file, { cursor = 12, positions = [], intents = [] } = {}) => {
   const db = new DatabaseSync(file);
@@ -31,8 +31,8 @@ const writeConfig = (dir, extraLines = []) => {
   fs.writeFileSync(file, [
     "CC_API='https://example.invalid'", "CC_FLOOR=50", "CC_SECRET=TOP_SECRET_NEVER_PRINT",
     "EXECUTE=1", `STATE_DB=${path.join(dir, ".cc-executor.sqlite")}`,
-    "SOLANA_RPC=https://primary.invalid/key/PRIMARY_SECRET",
-    "SOLANA_RPC_SECONDARY=https://secondary.invalid/key/SECONDARY_SECRET",
+    "RH_RPC=https://primary.invalid/key/PRIMARY_SECRET",
+    "RH_RPC_SECONDARY=https://secondary.invalid/key/SECONDARY_SECRET",
     `EXECUTOR_SOURCE_COMMIT=${SOURCE_COMMIT}`,
     ...extraLines,
   ].join("\n"), { mode: 0o600 });
@@ -44,9 +44,13 @@ const response = (body, status = 200) => new Response(JSON.stringify(body), {
 const processProbe = async () => ({ alive: true, commandMatches: true,
   cwdMatches: true, identityVerified: true, supervisor: "launchd" });
 const runtimeFingerprintFn = () => RUNTIME_FINGERPRINT;
-const oracleProbe = async () => ({ source: "pyth-sol-usd-shard0-v1", price: 102,
-  publishTime: 999, confidencePct: 0.01, divergencePct: 0.1 });
-const inspect = (options = {}) => inspectExecutor({ requireSleepAssertion: false, ...options });
+const oracleProbe = async () => ({ source: "chainlink-eth-usd-4663-v1", price: 2455.22,
+  publishTime: 999, confidencePct: 0.5, divergencePct: 0 });
+/* The registry is VOID on this chain by design (live-thresholds.mjs); the monitor
+   mirrors the poller's refusal. Scenarios about OTHER checks inject a passing gate so
+   they assert one thing each; the last scenario asserts the real gate refuses. */
+const liveReady = () => true;
+const inspect = (options = {}) => inspectExecutor({ requireSleepAssertion: false, assertLiveReadyFn: liveReady, ...options });
 const heartbeat = (now, extra = {}) => ({
   mode: "live", wallet: WALLET, cursor: 12, open: 0, seenAt: now - 1_000,
   health: {
@@ -56,11 +60,11 @@ const heartbeat = (now, extra = {}) => ({
     feedRollback: false,
     executionReadiness: {
       ready: true, lastSuccessAt: now - 1_000, observedAt: now - 1_000,
-      route: "wsol-usdc", providers: 2, amountLamports: 5_000_000,
+      route: "weth-usdg", providers: 2, amountWei: "400000000000000",
     },
     caps: {
-      maxSolPerTrade: 0.005, dailySolCap: 0.01,
-      dailyLossLimitSol: 0.01, maxOpenPositions: 4,
+      maxEthPerTrade: 0.0004, dailyEthCap: 0.0008,
+      dailyLossLimitEth: 0.0008, maxOpenPositions: 4,
     },
   },
   ...extra,
@@ -68,32 +72,35 @@ const heartbeat = (now, extra = {}) => ({
 
 {
   const source = fs.readFileSync(new URL("./monitor.mjs", import.meta.url), "utf8");
-  const boundedOracleConnections = source.match(
-    /new Connection\((?:primaryUrl|secondaryUrl), solanaRpcConnectionConfig\(\)\)/g,
+  const boundedOracleProviders = source.match(
+    /createRpc\((?:primaryUrl|secondaryUrl), \{ label: "(?:primary|secondary) RPC" \}\)/g,
   ) || [];
-  assert.equal(boundedOracleConnections.length, 2,
-    "both recurring monitor oracle providers must use the shared aborting RPC transport");
+  assert.equal(boundedOracleProviders.length, 2,
+    "both recurring monitor oracle providers must use the shared aborting RPC transport, labelled and never logged by URL");
+  assert.ok(/independentEthUsdPrice\(\[primary, secondary\]/.test(source), "the oracle is read through BOTH providers");
+  assert.ok(!/@solana|Pyth|mainnet-beta|lamports/i.test(source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "")),
+    "no Solana residue in the monitor's code");
 }
 
 {
   const dir = tmp();
-  writeConfig(dir, ["MAX_SOL_PER_TRADE=0.05", "DAILY_SOL_CAP=0.5",
-    "DAILY_LOSS_LIMIT_SOL=0.15", "MAX_OPEN_POSITIONS=4"]);
+  writeConfig(dir, ["MAX_ETH_PER_TRADE=0.004", "DAILY_ETH_CAP=0.04",
+    "DAILY_LOSS_LIMIT_ETH=0.012", "MAX_OPEN_POSITIONS=4"]);
   makeDb(path.join(dir, ".cc-executor.sqlite"));
   fs.writeFileSync(path.join(dir, ".cc-executor.sqlite.lock"), `${process.pid}\n`, { mode: 0o600 });
   const now = 1_000_000;
   const raisedHealth = {
     ...heartbeat(now).health,
-    caps: { maxSolPerTrade: 0.05, dailySolCap: 0.5,
-      dailyLossLimitSol: 0.15, maxOpenPositions: 4 },
+    caps: { maxEthPerTrade: 0.004, dailyEthCap: 0.04,
+      dailyLossLimitEth: 0.012, maxOpenPositions: 4 },
     executionReadiness: { ...heartbeat(now).health.executionReadiness,
-      amountLamports: 50_000_000 },
+      amountWei: "4000000000000000" },
   };
   const report = await inspect({
     executorDir: dir, environment: {}, now, processProbe, runtimeFingerprintFn, oracleProbe,
     fetchFn: async (url) => url.endsWith("/heartbeat")
       ? response({ heartbeat: heartbeat(now, { health: raisedHealth }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.status, "healthy");
   assert.ok(!report.issues.some((item) =>
@@ -130,7 +137,7 @@ const heartbeat = (now, extra = {}) => ({
       assert.equal(options.headers.authorization, "Bearer TOP_SECRET_NEVER_PRINT");
       seen.push(url);
       if (url.endsWith("/heartbeat")) return response({ heartbeat: heartbeat(1_000_000) });
-      return response({ cluster: "mainnet-beta", latest_id: 12, events: [] });
+      return response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] });
     },
   });
   assert.equal(report.status, "healthy");
@@ -156,7 +163,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { cursor: 11, open: 1, health: {
           ...heartbeat(1_000_000).health, runtimeFingerprint: "c".repeat(32),
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.status, "critical");
   assert.equal(report.safeToUnpause, false);
@@ -181,7 +188,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.status, "entries-paused");
   assert.equal(report.safeToUnpause, true,
@@ -205,7 +212,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.safeToUnpause, false);
   assert.equal(report.process.supervisor, "manual");
@@ -226,7 +233,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.safeToUnpause, false);
   assert.equal(report.sleepAssertion.ok, false);
@@ -246,7 +253,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 11, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 11, events: [] }),
   });
   assert.equal(report.safeToUnpause, false);
   assert.equal(report.feed.ok, false);
@@ -264,13 +271,15 @@ const heartbeat = (now, extra = {}) => ({
   const cases = [
     [null, "execution_readiness_missing"],
     [{ ready: false, lastSuccessAt: now - 1_000, observedAt: now - 1_000,
-      route: "wsol-usdc", providers: 2, amountLamports: 5_000_000 }, "execution_readiness_failed"],
+      route: "weth-usdg", providers: 2, amountWei: "400000000000000" }, "execution_readiness_failed"],
     [{ ready: true, lastSuccessAt: now - 300_001, observedAt: now - 300_001,
-      route: "wsol-usdc", providers: 2, amountLamports: 5_000_000 }, "execution_readiness_stale"],
+      route: "weth-usdg", providers: 2, amountWei: "400000000000000" }, "execution_readiness_stale"],
     [{ ready: true, lastSuccessAt: now - 1_000, observedAt: now - 1_000,
-      route: "unsafe-route", providers: 1 }, "execution_readiness_invalid"],
+      route: "wsol-usdc", providers: 2, amountWei: "400000000000000" }, "execution_readiness_invalid"],
     [{ ready: true, lastSuccessAt: now - 1_000, observedAt: now - 1_000,
-      route: "wsol-usdc", providers: 2, amountLamports: 4_999_999 },
+      route: "weth-usdg", providers: 1, amountWei: "400000000000000" }, "execution_readiness_invalid"],
+    [{ ready: true, lastSuccessAt: now - 1_000, observedAt: now - 1_000,
+      route: "weth-usdg", providers: 2, amountWei: "399999999999999" },
     "execution_readiness_size_mismatch"],
   ];
   for (const [executionReadiness, expectedCode] of cases) {
@@ -281,7 +290,7 @@ const heartbeat = (now, extra = {}) => ({
             ...heartbeat(now).health, state: "entries-paused", entriesPaused: true,
             executionReadiness,
           } }) })
-        : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+        : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
     });
     assert.equal(report.safeToUnpause, false);
     assert.ok(report.issues.some((item) => item.code === expectedCode), `missing ${expectedCode}`);
@@ -302,7 +311,7 @@ const heartbeat = (now, extra = {}) => ({
           ...heartbeat(now).health, state: "entries-paused", entriesPaused: true,
           feedRollback: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.feed.cursorLag, 0);
   assert.equal(report.safeToUnpause, false);
@@ -326,7 +335,7 @@ const heartbeat = (now, extra = {}) => ({
     runtimeFingerprintFn, oracleProbe,
     fetchFn: async (url) => url.endsWith("/heartbeat")
       ? response({ heartbeat: { mode: "live", cursor: 12, open: 1, seenAt: now - 600_000 } })
-      : response({ cluster: "mainnet-beta", latest_id: 14,
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 14,
           events: [{ id: 13, ts: now - 120_000 }, { id: 14, ts: now - 110_000 }] }),
   });
   assert.equal(report.status, "critical");
@@ -349,11 +358,11 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.status, "critical");
   assert.equal(report.safeToUnpause, false);
-  assert.ok(report.issues.some((item) => item.code === "sol_usd_oracle_unavailable"));
+  assert.ok(report.issues.some((item) => item.code === "eth_usd_oracle_unavailable"));
   assert.ok(!JSON.stringify(report).includes("MUST_NOT_PRINT"));
   assert.ok(!JSON.stringify(report).includes("PRIMARY_SECRET"));
   fs.rmSync(dir, { recursive: true, force: true });
@@ -390,7 +399,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.process.alive, true, "the lock owner remains available for exits on battery");
   assert.equal(report.controls.entriesPaused, true);
@@ -415,7 +424,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.controls.entriesPaused, true,
     "a dangling pause symlink is active rather than misreported as absent");
@@ -439,7 +448,7 @@ const heartbeat = (now, extra = {}) => ({
       ? response({ heartbeat: heartbeat(1_000_000, { health: {
           ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
         } }) })
-      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
   assert.equal(report.controls.entriesPaused, true,
     "the canonical sleep fault latch is an entry pause even without the configured pause file");
@@ -451,4 +460,46 @@ const heartbeat = (now, extra = {}) => ({
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("\n14 monitor scenarios passed\n");
+{
+  // A poller wired to the Solana desk's API (or the reverse) is caught by the feed contract.
+  const dir = tmp(); writeConfig(dir);
+  makeDb(path.join(dir, ".cc-executor.sqlite"));
+  fs.writeFileSync(path.join(dir, ".cc-executor.sqlite.lock"), `${process.pid}\n`, { mode: 0o600 });
+  const report = await inspect({
+    executorDir: dir, environment: {}, now: 1_000_000, processProbe, runtimeFingerprintFn, oracleProbe,
+    fetchFn: async (url) => url.endsWith("/heartbeat")
+      ? response({ heartbeat: heartbeat(1_000_000) })
+      : response({ cluster: "mainnet-beta", latest_id: 12, events: [] }),
+  });
+  assert.equal(report.feed.ok, false);
+  assert.ok(report.issues.some((item) => item.code === "feed_unavailable" && /non-4663/.test(item.message)),
+    "a feed that does not say chain 4663 is refused");
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+{
+  // The real registry: VOID live thresholds make "safe to unpause" impossible, exactly
+  // as they make the poller refuse to arm — the monitor may not certify a boot the
+  // executor will refuse.
+  const dir = tmp(); writeConfig(dir);
+  makeDb(path.join(dir, ".cc-executor.sqlite"));
+  fs.writeFileSync(path.join(dir, ".cc-executor.sqlite.lock"), `${process.pid}\n`, { mode: 0o600 });
+  fs.writeFileSync(path.join(dir, ".cc-executor.sqlite.pause-entries"), "", { mode: 0o600 });
+  const report = await inspectExecutor({
+    executorDir: dir, environment: {}, now: 1_000_000, processProbe, runtimeFingerprintFn, oracleProbe,
+    requireSleepAssertion: false,
+    fetchFn: async (url) => url.endsWith("/heartbeat")
+      ? response({ heartbeat: heartbeat(1_000_000, { health: {
+          ...heartbeat(1_000_000).health, state: "entries-paused", entriesPaused: true,
+        } }) })
+      : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
+  });
+  assert.equal(report.safeToUnpause, false);
+  const gate = report.issues.find((item) => item.code === "thresholds_unmeasured");
+  assert.ok(gate, "the registry gate is mirrored");
+  assert.match(gate.message, /not measured on this chain/);
+  assert.equal(report.chain, 4663);
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+console.log("\n16 monitor scenarios passed\n");

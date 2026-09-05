@@ -130,6 +130,18 @@ export function eligibility(rec) {
   // thesis the PM did NOT propose is one where the refutation stood, and it is out.
   if (rec.redteam?.verdict === "refuted" && rec.pm?.decision !== "PROPOSE")
     return decline(`the red team refuted the thesis and the PM did not answer it: ${rec.redteam?.headline ?? "refuted"}`, true);
+  /* THE PHASE GATE. A coin still on its PONS / hood.fun / pools.trade curve is never a
+   * call. The edge on 4663 is SELECTION AMONG GRADUATES (Bitquery, Sep 2026: 207,893
+   * launches a month, 1.55% graduate, median 4 minutes to do so; block-0 is a 99%
+   * snipe tax and there is no auction to buy ordering) — so a curve coin may be
+   * WATCHED, and the funnel holds it at `watch`, but it cannot be published. This is a
+   * safety fact, not an opinion: the curve's exit is the curve's own quote, the V4
+   * position that will hold the real liquidity does not exist yet, and the
+   * graduation itself is a discontinuity no stop survives. `unknown` is refused too —
+   * unverified is not graduated. Only an explicit "graduated" passes. */
+  const phase = rec.ev?.launch?.phase ?? null;
+  if (phase != null && phase !== "graduated")
+    return decline(`still on its bonding curve (launch.phase = ${phase}) — the desk trades graduates; a curve coin may only be watched`, true);
 
   /* ---- THE TEAM'S EXPLICIT NO. Not a safety fact, but not rankable either. ---- */
   // PASS is reserved by the PM's own charter for "a NAMED flaw in the trade itself,

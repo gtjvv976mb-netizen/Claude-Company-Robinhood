@@ -20,7 +20,7 @@ import { consensus } from "./src/data/dexscreener.js";
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { c ? (pass++, console.log(`  ok   ${n}${d ? "  — " + d : ""}`))
                                  : (fail++, console.log(`  FAIL ${n}${d ? "  — " + d : ""}`)); };
-const pool = (dexId, priceUsd, usd) => ({ chainId: "solana", dexId, priceUsd: String(priceUsd), liquidity: { usd } });
+const pool = (dexId, priceUsd, usd) => ({ chainId: "robinhood", dexId, priceUsd: String(priceUsd), liquidity: { usd } });
 
 console.log("\nTHE GRADUATED COIN, EXACTLY AS MEASURED");
 {
@@ -70,8 +70,8 @@ console.log("\nA COIN WHOSE VENUES REPORT NO LIQUIDITY IS PRICED, NOT BLINDED");
   ok("all-zero liquidity still produces a mark", r.ok === true && r.priceUsd === 10.5, `$${r.priceUsd}`);
   ok("...and none are counted as drained, because none were set aside",
     r.drainedPoolsIgnored === 0, `${r.drainedPoolsIgnored}`);
-  const missing = consensus([{ chainId: "solana", dexId: "a", priceUsd: "7" },
-    { chainId: "solana", dexId: "b", priceUsd: "7.2" }]);
+  const missing = consensus([{ chainId: "robinhood", dexId: "a", priceUsd: "7" },
+    { chainId: "robinhood", dexId: "b", priceUsd: "7.2" }]);
   ok("a pool with no liquidity field at all is still priced", missing.ok === true, `$${missing.priceUsd}`);
 }
 
@@ -81,7 +81,9 @@ console.log("\nTHE OLD RULE WOULD HAVE FAILED EVERY ONE OF THESE");
      graduated coin. Without this the test above proves only that the new code works,
      not that it fixed anything. */
   const oldConsensus = (pairs, tolerancePct = 25) => {
-    const sol = pairs.filter((p) => p.chainId === "solana" && Number(p.priceUsd) > 0);
+    // The old RULE is what is being rebuilt, not the old chain: the vote shape is the
+    // mutation under test, so it reads this chain's pairs like the new one does.
+    const sol = pairs.filter((p) => p.chainId === "robinhood" && Number(p.priceUsd) > 0);
     const byLiq = [...sol].sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
     const prices = byLiq.slice(0, 8).map((p) => Number(p.priceUsd)).sort((a, b) => a - b);
     const median = prices.length % 2 ? prices[(prices.length - 1) / 2]

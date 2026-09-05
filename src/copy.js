@@ -4,11 +4,15 @@ import { emit } from "./lib/bus.js";
 import { CATEGORY_RISK } from "./market.js";
 import { cfg } from "./config.js";
 import { CAP_BANDS } from "./categories.js";
-
-/** The pads a floor can choose between. `other` covers established coins with no pad. */
-export const LAUNCHPADS = ["pump.fun", "letsbonk.fun", "bags.fm", "moonshot", "boop.fun", "meteora-dbc", "trix", "other"];
-import { liveCalls, getCall } from "./calls.js";
+import { liveCalls, getCall, CURVE_LAUNCHPADS, canonicalLaunchpad } from "./calls.js";
 import { inArrears } from "./leasing.js";
+
+/** The pads a floor can choose between, on Robinhood Chain (4663). `pons-v2` is the
+ * current PONS factory, `pons` its V1 (WETH-paired, V3); `uniswap` is a coin that was
+ * simply listed; `other` covers established coins with no pad. The set is the executor
+ * scope-guard's and the sweep's vocabulary — one list, built from the pads that carry a
+ * creator (calls.js) plus the two that do not. */
+export const LAUNCHPADS = [...CURVE_LAUNCHPADS, "uniswap", "other"];
 
 /**
  * COPY TRADING — how one house call becomes fifty different decisions.
@@ -34,11 +38,43 @@ export const APPETITES = {
     note: "Takes memecoins. The base rate on those is brutal — size accordingly." },
 };
 
+/* THE UNITS CHANGED UNDER THE COLUMNS (2026-09-05).
+ *
+ * The Solana desk sized tenants in SOL: bankroll_sol, fixed_sol, size_sol. On chain
+ * 4663 the gas token is ETH and the executor's caps are ETH, so the feed contract now
+ * speaks bankroll_eth / fixed_eth and the delivery carries size_eth. The rename is
+ * done as NEW columns beside the old ones rather than in place, for one reason that
+ * matters more than tidiness: a number declared in SOL is not a number in ETH, and a
+ * migration that copied 5 across would have turned a $1,000 bankroll into a $12,000
+ * one without anybody typing it. So:
+ *
+ *   - the ETH columns are the ones READ; a row whose ETH column is NULL (an existing
+ *     database gains them empty) is read from its SOL column for exactly one release,
+ *     with `legacy_units` set so the UI and the feed can say so — the value is taken
+ *     as declared, never converted, because converting it would be the desk
+ *     re-deriving a number the tenant chose;
+ *   - the SOL-named columns STAY in the schema for that release as MIRRORS: every
+ *     write lands in both, so office.js (`SELECT d.size_sol`), alerts.js and the
+ *     dashboard keep working on a fresh database until they move to the ETH names
+ *     (docs/HANDOFF-desk-loop.md). Once a row's ETH column is set, its SOL column is a
+ *     copy of the ETH number and nothing more;
+ *   - the first save writes the ETH columns and the row stops being legacy;
+ *   - the house floor is the one exception, seeded below from the owner's own ETH
+ *     instruction rather than read from its SOL one.
+ *
+ * `DEFAULT_BANKROLL_ETH` is the ETH translation of the old 5 SOL default at the same
+ * rate the house seed uses (0.6 SOL -> 0.05 ETH, i.e. $2,450/ETH and ~$204/SOL):
+ * 5 x 204 / 2450 = 0.417, rounded to 0.4. AWAITING OWNER CONFIRMATION, like the seed. */
+export const DEFAULT_BANKROLL_ETH = 0.4;
+
 db.exec(`
 CREATE TABLE IF NOT EXISTS copy_settings (
   floor_no    INTEGER PRIMARY KEY REFERENCES floors(n),
   appetite    TEXT NOT NULL DEFAULT 'balanced',
-  bankroll_sol REAL NOT NULL DEFAULT 5,        -- SOL, held in the tenant own wallet
+  bankroll_eth REAL NOT NULL DEFAULT ${DEFAULT_BANKROLL_ETH},   -- ETH, held in the tenant own wallet
+  fixed_eth   REAL NOT NULL DEFAULT 0,         -- 0 = auto, else the same ETH on every trade
+  bankroll_sol REAL NOT NULL DEFAULT ${DEFAULT_BANKROLL_ETH},   -- MIRROR of bankroll_eth for one release (see above)
+  fixed_sol   REAL NOT NULL DEFAULT 0,         -- MIRROR of fixed_eth for one release
   auto        INTEGER NOT NULL DEFAULT 0,     -- deliver instantly with a ready ticket
   categories  TEXT,                            -- JSON override of the appetite default
   launchpads  TEXT,                            -- JSON allow-list of pads; null = every pad
@@ -52,7 +88,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
   floor_no    INTEGER NOT NULL,
   verdict     TEXT NOT NULL,        -- offered | skipped
   reason      TEXT,
-  size_sol    REAL,
+  size_eth    REAL,
+  size_sol    REAL,                 -- MIRROR of size_eth for one release
   taken       INTEGER NOT NULL DEFAULT 0,
   taken_at    INTEGER,
   delivered_at INTEGER NOT NULL,
@@ -67,14 +104,21 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_floor ON deliveries(floor_no, id DESC)
  *
  *   BUDGET   — $CLAUDECO. The access token, and nothing else: it pays the lease and
  *              the rent. It is never traded and buys no exposure.
- *   BANKROLL — SOL. The trading capital, which stays in the tenant own wallet. The
+ *   BANKROLL — ETH. The trading capital, which stays in the tenant own wallet. The
  *              desk never holds it, never sees it, and never signs for it. It exists
  *              here only as a declared number so calls can be sized.
  *
  * The desk can spend the first and only ever sizes against the second.
  */
 // Migrations for databases that predate these columns — production is always one of them.
+// The ETH columns are added EMPTY on an old database: see the units note above. The
+// SOL mirrors are added with their historical defaults on a database old enough to
+// lack even those (they existed on the Solana desk since 2026-08-30).
+ensureColumn("copy_settings", "bankroll_eth", "REAL");
+ensureColumn("copy_settings", "fixed_eth", "REAL");
 ensureColumn("copy_settings", "bankroll_sol", "REAL NOT NULL DEFAULT 5");
+ensureColumn("copy_settings", "fixed_sol", "REAL NOT NULL DEFAULT 0");
+ensureColumn("deliveries", "size_sol", "REAL", "size_usd");
 ensureColumn("copy_settings", "webhook_url", "TEXT");
 ensureColumn("copy_settings", "executor_url", "TEXT");
 ensureColumn("copy_settings", "executor_secret", "TEXT");
@@ -86,7 +130,7 @@ ensureColumn("copy_settings", "executor_heartbeat", "TEXT");
 ensureColumn("copy_settings", "executor_heartbeat_log", "TEXT");
 ensureColumn("copy_settings", "launchpads", "TEXT");
 ensureColumn("copy_settings", "min_liq_usd", "REAL");   // per-floor liquidity floor; null = no floor
-ensureColumn("deliveries", "size_sol", "REAL", "size_usd");
+ensureColumn("deliveries", "size_eth", "REAL");
 
 /* THE THREE DIALS A TENANT OWNS.
  *
@@ -97,14 +141,13 @@ ensureColumn("deliveries", "size_sol", "REAL", "size_usd");
  *
  *   take_profit_x  0 = auto (the execution seat's authored target), else a hard
  *                  multiple: 2 sells at a double, 10 rides for a ten-bagger.
- *   fixed_sol      0 = auto (Kelly sizing on the record), else the same size every
+ *   fixed_eth      0 = auto (Kelly sizing on the record), else the same size every
  *                  trade. Overrides how MUCH, never WHETHER.
  *   mcap_tier      which end of the market this floor wants: micro, low, mid, any.
  *
  * A tenant who sets nothing gets auto on all three, which is exactly the desk's own
  * behaviour — so the dials add choice without changing the default experience. */
 ensureColumn("copy_settings", "take_profit_x", "REAL NOT NULL DEFAULT 0");
-ensureColumn("copy_settings", "fixed_sol", "REAL NOT NULL DEFAULT 0");
 ensureColumn("copy_settings", "mcap_tier", "TEXT NOT NULL DEFAULT 'any'");
 
 /* One-time data migrations need their own ledger. ALTER TABLE keeps schemas current,
@@ -154,7 +197,7 @@ migrateData("2026-08-31-hq-memecoin-appetite", () => {
 /* THE AUTO SIZE, for a tenant who states funds but no per-trade number: a percentage of
  * their own bankroll, scaled by the category's risk and the call's conviction. One desk
  * number, because sizing policy is the team's job too — the tenant's lever is the
- * explicit per-trade SOL amount, which overrides this entirely. */
+ * explicit per-trade ETH amount, which overrides this entirely. */
 export const AUTO_RISK_PCT_PER_TRADE = Number(process.env.DESK_AUTO_RISK_PCT || 3);
 
 export const MCAP_TIERS = {
@@ -162,14 +205,15 @@ export const MCAP_TIERS = {
   any: { lo: 0, hi: Infinity, note: "every band the desk calls" },
 };
 
-/* ONE-TIME CORRECTION FOR THE HOUSE FLOOR (2026-09-02). Floor 50's declared
-   bankroll sat at 0.05 SOL, so aggressive 3% sized every position at 0.0015 —
-   under the fee floor — and every call the desk published was skipped at
-   delivery. Twelve hours, six calls, a silent bot. The owner asked for a fixed
-   0.2 SOL per trade on a 0.6 SOL wallet; this seeds exactly that, only while
-   the floor is in the starved state, and only for the house floor. Anything
-   set afterwards in the Team tab wins. */
-const HOUSE_SEED = { floor: 50, bankrollSol: 0.6, fixedSol: 0.2 };
+/* THE HOUSE FLOOR'S SIZE, IN ETH (2026-09-05).
+   On the Solana desk the owner asked for a fixed 0.2 SOL per trade on a 0.6 SOL wallet
+   (2026-09-02, after floor 50 sat starved for twelve hours at 0.05 SOL x 3%). This is
+   the ETH translation of exactly that instruction at $2,450/ETH: 0.6 SOL -> 0.05 ETH
+   bankroll, 0.2 SOL -> 0.016 ETH fixed. AWAITING OWNER CONFIRMATION — the numbers are
+   a currency conversion of the owner's words, not new words from the owner. It seeds
+   only the house floor, only while that floor is in the starved state or has never
+   been sized in ETH at all; anything set afterwards in the Team tab wins. */
+const HOUSE_SEED = { floor: 50, bankrollEth: 0.05, fixedEth: 0.016 };
 
 /* ONE-TIME CORRECTION FOR THE HOUSE FLOOR (2026-09-03). Floor 50 sat on the `micro`
    sleeve, so it refused every call above $100k — and after the sleeves were rebuilt
@@ -189,18 +233,60 @@ function widenHouseFloorSleeve() {
 
 function seedStarvedHouseFloor() {
   try {
-    const cur = db.prepare("SELECT bankroll_sol, fixed_sol FROM copy_settings WHERE floor_no=?").get(HOUSE_SEED.floor);
-    if (!cur) return;
-    const starved = Number(cur.bankroll_sol) < 0.2 && !(Number(cur.fixed_sol) > 0);
-    if (!starved) return;
-    db.prepare("UPDATE copy_settings SET bankroll_sol=?, fixed_sol=?, updated_at=? WHERE floor_no=?")
-      .run(HOUSE_SEED.bankrollSol, HOUSE_SEED.fixedSol, Date.now(), HOUSE_SEED.floor);
-    console.log(`[copy] house floor ${HOUSE_SEED.floor} was starved (bankroll ${cur.bankroll_sol} SOL, fixed ${cur.fixed_sol}); ` +
-      `seeded bankroll ${HOUSE_SEED.bankrollSol} SOL, fixed ${HOUSE_SEED.fixedSol} SOL per trade`);
+    const cur = db.prepare("SELECT * FROM copy_settings WHERE floor_no=?").get(HOUSE_SEED.floor);
+    if (!cur) {
+      /* A FRESH DATABASE has no house row, and settingsFor() would create one at the
+         tenant default (0.4 ETH, auto) — not the owner's instruction. The house floor is
+         born seeded (measured on the first Robinhood boot, 2026-09-05: the feed showed
+         bankroll_eth 0.4 for floor 50 until this branch existed). */
+      db.prepare("INSERT INTO copy_settings (floor_no, appetite, bankroll_eth, fixed_eth, bankroll_sol, fixed_sol, updated_at) VALUES (?,?,?,?,?,?,?)")
+        .run(HOUSE_SEED.floor, "aggressive", HOUSE_SEED.bankrollEth, HOUSE_SEED.fixedEth, HOUSE_SEED.bankrollEth, HOUSE_SEED.fixedEth, Date.now());
+      console.log(`[copy] house floor ${HOUSE_SEED.floor} created seeded: bankroll ${HOUSE_SEED.bankrollEth} ETH, fixed ${HOUSE_SEED.fixedEth} ETH per trade (awaiting owner confirmation)`);
+      return;
+    }
+    /* Two ways in. NEVER SIZED IN ETH: the row predates the unit change, so its SOL
+       numbers are the owner's Solana instruction and the seed is that instruction in
+       this chain's currency — reading 0.6 SOL as 0.6 ETH would size the house at
+       twelve times what was asked. STARVED: the same trap as 2026-09-02, in ETH. */
+    const neverSizedInEth = cur.bankroll_eth == null && cur.fixed_eth == null;
+    const starved = Number(cur.bankroll_eth) < HOUSE_SEED.bankrollEth && !(Number(cur.fixed_eth) > 0);
+    if (!neverSizedInEth && !starved) return;
+    db.prepare("UPDATE copy_settings SET bankroll_eth=?, fixed_eth=?, bankroll_sol=?, fixed_sol=?, updated_at=? WHERE floor_no=?")
+      .run(HOUSE_SEED.bankrollEth, HOUSE_SEED.fixedEth, HOUSE_SEED.bankrollEth, HOUSE_SEED.fixedEth, Date.now(), HOUSE_SEED.floor);
+    console.log(`[copy] house floor ${HOUSE_SEED.floor} was ${neverSizedInEth ? "never sized in ETH" : "starved"} ` +
+      `(bankroll ${cur.bankroll_eth ?? `${cur.bankroll_sol ?? "?"} SOL-era`}, fixed ${cur.fixed_eth ?? cur.fixed_sol ?? "?"}); ` +
+      `seeded bankroll ${HOUSE_SEED.bankrollEth} ETH, fixed ${HOUSE_SEED.fixedEth} ETH per trade (awaiting owner confirmation)`);
   } catch (e) { console.error("[copy] house seed skipped:", e.message); }
 }
 seedStarvedHouseFloor();
 widenHouseFloorSleeve();
+
+/** The ETH view of a stored row, with the one-release fallback to its SOL columns. */
+function ethView(s) {
+  const legacy = s.bankroll_eth == null && s.bankroll_sol != null;
+  /* A SOL-era row's NUMBER is never read as ETH: 2 SOL (~$300) sized as 2 ETH (~$4,900)
+     is a 12x rescale of the tenant's stated risk, delivered as "the size you set". A
+     legacy row has NO bankroll until the tenant re-enters one; legacy_units says why
+     (review, 2026-09-05). The mirror columns still let an old reader see its old value. */
+  const bankrollEth = s.bankroll_eth != null ? Number(s.bankroll_eth) : legacy ? 0 : DEFAULT_BANKROLL_ETH;
+  const fixedEth = s.fixed_eth != null ? Number(s.fixed_eth) : 0;
+  return { bankrollEth, fixedEth, legacy };
+}
+
+/* A stored allow-list, in this chain's vocabulary. A row carried over from the Solana
+ * desk may hold ["pump.fun","bags.fm"] — pads no coin here carries — and read literally
+ * that is a floor that never receives another call, with no explanation. Foreign names
+ * are dropped on read (through the alias table, so "pons" and "hood.fun" survive as
+ * "pons-v2" and "hoodit"); a list with nothing left means "no preference", every pad,
+ * exactly as an empty list does on save. The row itself is rewritten on its next save. */
+function storedPads(json) {
+  if (!json) return LAUNCHPADS;
+  let list;
+  try { list = JSON.parse(json); } catch { return LAUNCHPADS; }
+  if (!Array.isArray(list)) return LAUNCHPADS;
+  const kept = [...new Set(list.map(canonicalLaunchpad).filter((p) => LAUNCHPADS.includes(p)))];
+  return kept.length ? kept : LAUNCHPADS;
+}
 
 export function settingsFor(floorNo) {
   let s = db.prepare("SELECT * FROM copy_settings WHERE floor_no=?").get(floorNo);
@@ -214,8 +300,10 @@ export function settingsFor(floorNo) {
      * seeded with the appetite that matches what this desk actually publishes;
      * existing rows are never rewritten, and every tenant can still choose. */
     const appetite = "aggressive";
-    db.prepare("INSERT INTO copy_settings (floor_no, appetite, updated_at) VALUES (?,?,?)")
-      .run(floorNo, appetite, Date.now());
+    // The ETH columns are written explicitly: on a migrated database they are
+    // nullable and a bare INSERT would create a "legacy" row with no legacy value.
+    db.prepare("INSERT INTO copy_settings (floor_no, appetite, bankroll_eth, fixed_eth, bankroll_sol, fixed_sol, updated_at) VALUES (?,?,?,?,?,?,?)")
+      .run(floorNo, appetite, DEFAULT_BANKROLL_ETH, 0, DEFAULT_BANKROLL_ETH, 0, Date.now());
     s = db.prepare("SELECT * FROM copy_settings WHERE floor_no=?").get(floorNo);
   }
   /* THE FEED SECRET IS MINTED ON DEMAND, NOT AS A SIDE EFFECT OF A WEBHOOK.
@@ -229,23 +317,37 @@ export function settingsFor(floorNo) {
     s = db.prepare("SELECT * FROM copy_settings WHERE floor_no=?").get(floorNo);
   }
   const preset = APPETITES[s.appetite] ?? APPETITES.balanced;
+  const { bankrollEth, fixedEth, legacy } = ethView(s);
   return { ...s, auto: !!s.auto, preset,
+    bankroll_eth: bankrollEth, fixed_eth: fixedEth,
+    /* Read-compat, ONE release: the SOL-named keys carry the ETH number so a reader
+     * that has not moved yet (the feed route, the alerts, the viewer form) keeps
+     * working, and `legacy_units` says whether that number came from a SOL column. */
+    bankroll_sol: bankrollEth, fixed_sol: fixedEth,
+    legacy_units: legacy ? "sol_column" : null,
+    units: "ETH",
     categories: s.categories ? JSON.parse(s.categories) : preset.categories,
     // null means every pad — a floor that has expressed no preference should not
     // silently miss calls when a new launchpad is added.
-    launchpads: s.launchpads ? JSON.parse(s.launchpads) : LAUNCHPADS };
+    launchpads: storedPads(s.launchpads) };
 }
 
 export function saveSettings(floorNo, patch) {
   const cur = settingsFor(floorNo);
   const appetite = APPETITES[patch.appetite] ? patch.appetite : cur.appetite;
+  // The ETH key is canonical; the SOL-named key is accepted for one release from a
+  // viewer that has not been rebuilt. Same number, same meaning: a declaration to
+  // THIS desk, in this desk's currency.
+  const bankPatch = patch.bankrollEth ?? patch.bankrollSol;
   // NaN survives both clamps and binds as NULL into a NOT NULL column, throwing away
   // the ENTIRE settings save; and a bankroll of 0 sizes every call to nothing, muting
   // the floor with no explanation. Fall back to the stored value in both cases.
-  const bankRaw = Number(patch.bankrollSol ?? cur.bankroll_sol);
+  const bankRaw = Number(bankPatch ?? cur.bankroll_eth);
+  /* The 100,000 clamp is inherited from the SOL column unchanged: it exists to catch a
+     typo, and 100,000 ETH is as much of one as 100,000 SOL was. */
   const bankroll = Number.isFinite(bankRaw) && bankRaw > 0
     ? Math.min(100_000, bankRaw)
-    : (Number(cur.bankroll_sol) > 0 ? Number(cur.bankroll_sol) : 5);
+    : (Number(cur.bankroll_eth) > 0 ? Number(cur.bankroll_eth) : DEFAULT_BANKROLL_ETH);
   const auto = patch.auto == null ? (cur.auto ? 1 : 0) : (patch.auto ? 1 : 0);
   // The column is an EXPLICIT override and nothing else. The first version wrote the
   // previous appetite's list back whenever the appetite changed, so switching to
@@ -281,7 +383,8 @@ export function saveSettings(floorNo, patch) {
   // Same empty-selection footgun the categories column already guards against: an
   // empty allow-list is stored literally and the floor never receives another call.
   // Empty means "no preference" (every pad), never "no pads".
-  const padList = Array.isArray(patch.launchpads) ? patch.launchpads.filter((l) => LAUNCHPADS.includes(l)) : null;
+  const padList = Array.isArray(patch.launchpads)
+    ? [...new Set(patch.launchpads.map(canonicalLaunchpad).filter((l) => LAUNCHPADS.includes(l)))] : null;
   const pads = "launchpads" in patch
     ? (padList && padList.length ? JSON.stringify(padList) : null)
     : raw.launchpads ?? null;
@@ -293,20 +396,23 @@ export function saveSettings(floorNo, patch) {
   /* THE TENANT'S THREE DIALS. Each accepts 0 / "auto" meaning "the desk decides",
    * which is the default — a number someone had to invent before ever watching this
    * run is worse than the team's own judgement. Clamped, because a take-profit of
-   * 0.5x is an instruction to sell at a 50% loss and a 900 SOL "fixed fund" on a
-   * 5 SOL bankroll is a typo, not a strategy. */
+   * 0.5x is an instruction to sell at a 50% loss and a 900 ETH "fixed fund" on a
+   * 0.4 ETH bankroll is a typo, not a strategy. */
   const takeProfitX = "takeProfitX" in patch
     ? (patch.takeProfitX == null || patch.takeProfitX === "auto" ? 0
        : Math.min(100, Math.max(1.05, Number(patch.takeProfitX) || 0)))
     : (cur.take_profit_x ?? 0);
-  const fixedSol = "fixedSol" in patch
-    ? (patch.fixedSol == null || patch.fixedSol === "auto" ? 0
-       : Math.min(bankroll, Math.max(0, Number(patch.fixedSol) || 0)))
-    : (cur.fixed_sol ?? 0);
+  const fixedKey = "fixedEth" in patch ? "fixedEth" : "fixedSol" in patch ? "fixedSol" : null;
+  const fixedEth = fixedKey
+    ? (patch[fixedKey] == null || patch[fixedKey] === "auto" ? 0
+       : Math.min(bankroll, Math.max(0, Number(patch[fixedKey]) || 0)))
+    : (cur.fixed_eth ?? 0);
   const mcapTier = "mcapTier" in patch && MCAP_TIERS[patch.mcapTier] ? patch.mcapTier : (cur.mcap_tier ?? "any");
 
-  db.prepare("UPDATE copy_settings SET appetite=?, bankroll_sol=?, auto=?, categories=?, launchpads=?, min_liq_usd=?, webhook_url=?, executor_url=?, executor_secret=?, take_profit_x=?, fixed_sol=?, mcap_tier=?, updated_at=? WHERE floor_no=?")
-    .run(appetite, bankroll, auto, cats, pads, minLiq, hook, execUrl, execSecret, takeProfitX, fixedSol, mcapTier, Date.now(), floorNo);
+  // The ETH columns are the record; the SOL columns are written as mirrors of the same
+  // ETH number for one release. A legacy row stops being legacy on its first save.
+  db.prepare("UPDATE copy_settings SET appetite=?, bankroll_eth=?, bankroll_sol=?, auto=?, categories=?, launchpads=?, min_liq_usd=?, webhook_url=?, executor_url=?, executor_secret=?, take_profit_x=?, fixed_eth=?, fixed_sol=?, mcap_tier=?, updated_at=? WHERE floor_no=?")
+    .run(appetite, bankroll, bankroll, auto, cats, pads, minLiq, hook, execUrl, execSecret, takeProfitX, fixedEth, fixedEth, mcapTier, Date.now(), floorNo);
   return settingsFor(floorNo);
 }
 
@@ -319,10 +425,28 @@ const openCount = (floorNo) => db.prepare(`
  * own band's clock — and not a taste the customer should have to have. */
 export const MAX_OPEN_POSITIONS = Number(process.env.DESK_MAX_OPEN_POSITIONS || 8);
 
+/* THE SMALLEST CLIP GAS DOES NOT EAT.
+ *
+ * The Solana number was 0.02 SOL, chosen so that two worst-case 500k-lamport fees
+ * ($0.20) were 5% of the clip. Same policy here — gas at or under 5% of the position —
+ * but gas on 4663 is FLAT and MOVING: a round trip is 660,996 gas both legs
+ * (live-thresholds.mjs, measured 2026-09-04), $1.15 at the 0.706 gwei base fee of that
+ * day and ~$8 at the >5 gwei intraday spikes. $1.15 / 5% = $23 = 0.0094 ETH at
+ * $2,450, rounded to 0.01. The constant is the floor for a floor that cannot read gas
+ * live; `minExecutableEth()` recomputes it from a live reading when the call carries
+ * one, because a constant tuned on a 0.7 gwei day is wrong by 8x on a 5 gwei one. */
+export const MIN_EXECUTABLE_ETH = Number(process.env.MIN_EXECUTABLE_ETH || 0.01);
+export const GAS_SHARE_OF_CLIP_MAX = 0.05;
+export function minExecutableEth({ gasUsdRoundTrip = null, ethUsd = null } = {}) {
+  const gas = Number(gasUsdRoundTrip), eth = Number(ethUsd);
+  if (!(gas > 0) || !(eth > 0)) return MIN_EXECUTABLE_ETH;
+  return Math.max(MIN_EXECUTABLE_ETH, Number(((gas / GAS_SHARE_OF_CLIP_MAX) / eth).toFixed(4)));
+}
+
 /**
  * What should THIS floor do about THIS call?
  *
- * THE TENANT CHOOSES TWO NUMBERS: how much money their bot has, and how much SOL goes
+ * THE TENANT CHOOSES TWO NUMBERS: how much money their bot has, and how much ETH goes
  * into each trade. Nothing else (owner, 2026-09-03). Every other question — which
  * launchpad, which category, which market-cap sleeve, what liquidity is enough, what
  * conviction clears the bar — is the trading team's job, and the team answers it once,
@@ -334,7 +458,7 @@ export const MAX_OPEN_POSITIONS = Number(process.env.DESK_MAX_OPEN_POSITIONS || 
  *
  * So what remains here is only what is genuinely per-floor: whether the rent is paid,
  * how much of the tenant's own money to put in, and whether that money is enough to
- * clear Solana's fees.
+ * clear the chain's gas.
  */
 export function decide(floorNo, call) {
   const s = settingsFor(floorNo);
@@ -350,82 +474,88 @@ export function decide(floorNo, call) {
   if (open >= MAX_OPEN_POSITIONS)
     return { verdict: "skipped", reason: `already holding ${open} of a maximum ${MAX_OPEN_POSITIONS}` };
 
-  /* SIZE. Two ways, and the tenant picks: a FIXED fund — the same SOL on every trade,
+  /* SIZE. Two ways, and the tenant picks: a FIXED fund — the same ETH on every trade,
    * which makes a young record legible because every outcome is comparable — or auto,
    * where the desk sizes from the floor's bankroll, the category's risk and the call's
    * own conviction. Fixed overrides how MUCH; it never overrides the refusals above. */
   const convScale = call.conviction != null ? Math.min(1, Math.max(0.4, call.conviction / 100)) : 0.6;
-  const autoSize = s.bankroll_sol * (AUTO_RISK_PCT_PER_TRADE / 100) * risk.sizeMultiplier * convScale;
-  const fixed = Number(s.fixed_sol) > 0 ? Number(s.fixed_sol) : null;
+  const autoSize = s.bankroll_eth * (AUTO_RISK_PCT_PER_TRADE / 100) * risk.sizeMultiplier * convScale;
+  const fixed = Number(s.fixed_eth) > 0 ? Number(s.fixed_eth) : null;
   // NULL is a legacy call with no portable desk cap. Zero is an explicit refusal
   // and must stay zero all the way downstream; treating both as falsy would revive
   // a trade the team authorized at no size.
   const hasDeskCap = call.desk_size_usd != null && Number(call.desk_equity_usd) > 0;
   const deskRatio = hasDeskCap
     ? Math.max(0, Number(call.desk_size_usd) || 0) / Number(call.desk_equity_usd) : null;
-  const teamCapSol = deskRatio != null ? s.bankroll_sol * deskRatio : Infinity;
+  const teamCapEth = deskRatio != null ? s.bankroll_eth * deskRatio : Infinity;
   const uncapped = fixed ?? autoSize;
   /* A SIZE THAT CANNOT BE EXECUTED IS NOT AN OFFER.
    *
-   * Solana's fixed network fees do not scale with trade size, so below a certain
-   * notional they eat the trade: two worst-case 500k-lamport fees are 66% of a
-   * 0.0015 SOL position and 20% of a 0.005 one. An executor applying any honest
-   * cost check must refuse those, and it did — measured on this desk, every call
-   * for a day was offered between 0.0015 and 0.0092 SOL and every one was correctly
-   * refused as "costs eat the target". The floor was publishing trades that were
-   * arithmetically impossible to take.
+   * Gas does not scale with trade size, so below a certain notional it eats the
+   * trade — and on this chain that is the WHOLE cost model, not a footnote: a round
+   * trip is a flat ~$1.15 at 0.7 gwei whether the clip is $6 or $6,000. An executor
+   * applying any honest cost check must refuse the small end, and on the Solana desk
+   * it did — measured, every call for a day was offered between 0.0015 and 0.0092 SOL
+   * and every one was correctly refused as "costs eat the target". The floor was
+   * publishing trades that were arithmetically impossible to take.
    *
-   * teamCapSol caused it: a tenant's size is scaled to the same fraction-of-book the
-   * desk uses, and the desk's paper book trades ~0.03% per position. On a 5 SOL
-   * bankroll that is 0.0017 SOL. The cap's intent — never outrun the desk's
+   * teamCapEth caused it: a tenant's size is scaled to the same fraction-of-book the
+   * desk uses, and the desk's paper book trades ~0.03% per position. On a 0.4 ETH
+   * bankroll that is 0.00012 ETH. The cap's intent — never outrun the desk's
    * conviction — is right, but a cap that produces unexecutable sizes is a refusal
    * dressed as an offer.
    *
-   * So: below MIN_EXECUTABLE_SOL the call is lifted to it when the bankroll can
+   * So: below the executable floor the call is lifted to it when the bankroll can
    * genuinely afford that (the risk stays inside the appetite's per-trade budget),
-   * and otherwise refused honestly — saying the bankroll is too small for the fees,
+   * and otherwise refused honestly — saying the bankroll is too small for the gas,
    * which is a fact the tenant can act on, rather than offering a trade their bot
    * will silently decline. */
-  const MIN_EXECUTABLE_SOL = Number(process.env.MIN_EXECUTABLE_SOL || 0.02);
+  // From the call row (calls.gas_usd_at_call / eth_usd_at_call, written at publication),
+  // or from an in-memory call that carries the bundle's names; absent, the constant.
+  const floorEth = minExecutableEth({
+    gasUsdRoundTrip: call.gas_usd_at_call ?? call.gas_usd_round_trip ?? call.gasUsdRoundTrip,
+    ethUsd: call.eth_usd_at_call ?? call.eth_usd ?? call.ethUsd });
   /* A FIXED SIZE IS THE OPERATOR'S NUMBER. The team's book-allocation cap
      exists to keep AUTO sizing in proportion to the desk's own conviction; it
      was also shrinking an explicit fixed order (0.2 SOL) to 0.0006 and then
-     "lifting" it to the 0.02 fee floor — so the operator asked for 0.2 and got
-     0.02 on every trade, with the reason string cheerfully saying both. Fixed
+     "lifting" it to the fee floor — so the operator asked for 0.2 and got the
+     floor on every trade, with the reason string cheerfully saying both. Fixed
      means fixed; the refusals above still apply. */
   const raw = fixed != null
     ? (deskRatio === 0 ? 0 : fixed)   // an explicit ZERO authorization is never revived by a fixed size
-    : Math.min(uncapped, teamCapSol);
-  let sizeSol = Number(raw.toFixed(4));
+    : Math.min(uncapped, teamCapEth);
+  let sizeEth = Number(raw.toFixed(4));
   let liftedForFees = false;
-  if (sizeSol > 0 && sizeSol < MIN_EXECUTABLE_SOL) {
+  if (sizeEth > 0 && sizeEth < floorEth) {
     /* The lift is bounded by the risk the tenant actually chose. An EXPLICIT fixed
-     * size is that choice, stated in SOL; the appetite percentage is the AUTO rule
+     * size is that choice, stated in ETH; the appetite percentage is the AUTO rule
      * for tenants who did not state one. This branch used to read only the
-     * percentage, so a floor with fixed_sol = 0.2 was refused with the advice
-     * "...or set a fixed size" — the house floor sat on that contradiction for a day
-     * while an armed bot polled an empty feed. */
-    const perTradeBudget = fixed != null ? fixed : s.bankroll_sol * (AUTO_RISK_PCT_PER_TRADE / 100);
-    if (MIN_EXECUTABLE_SOL <= perTradeBudget) {
-      sizeSol = MIN_EXECUTABLE_SOL;
+     * percentage, so a floor with a fixed size was refused with the advice "...or set
+     * a fixed size" — the house floor sat on that contradiction for a day while an
+     * armed bot polled an empty feed. */
+    const perTradeBudget = fixed != null ? fixed : s.bankroll_eth * (AUTO_RISK_PCT_PER_TRADE / 100);
+    if (floorEth <= perTradeBudget) {
+      sizeEth = floorEth;
       liftedForFees = true;
     } else {
       return { verdict: "skipped",
-        reason: `a tradeable position needs ~${MIN_EXECUTABLE_SOL} SOL (below that, network fees eat the trade) ` +
-          `but this floor's per-trade budget is ${perTradeBudget.toFixed(4)} SOL — raise the bankroll or set a fixed size` };
+        reason: `a tradeable position needs ~${floorEth} ETH (below that, gas eats the trade) ` +
+          `but this floor's per-trade budget is ${perTradeBudget.toFixed(4)} ETH — raise the bankroll or set a fixed size` };
     }
   }
-  if (sizeSol < 0.001) return { verdict: "skipped", reason: "the sized position rounds to nothing on this bankroll" };
+  if (sizeEth < 0.0001) return { verdict: "skipped", reason: "the sized position rounds to nothing on this bankroll" };
 
   const baseHow = fixed
-    ? `${fixed} SOL a trade, the size you set`
+    ? `${fixed} ETH a trade, the size you set`
     : `auto · ${risk.sizeMultiplier}x for ${call.category} · conviction ${Math.round(call.conviction ?? 0)}`;
-  const how = fixed == null && Number.isFinite(teamCapSol) && teamCapSol < uncapped
+  const how = fixed == null && Number.isFinite(teamCapEth) && teamCapEth < uncapped
     ? `${baseHow} · capped to the team's ${(deskRatio * 100).toFixed(3)}% book allocation`
     : baseHow;
-  return { verdict: "offered", sizeSol,
+  return { verdict: "offered", sizeEth,
+    // One-release read-compat for callers that have not moved off the SOL name.
+    sizeSol: sizeEth,
     reason: liftedForFees
-      ? `${how} · lifted to ${sizeSol} SOL so network fees do not eat the trade`
+      ? `${how} · lifted to ${sizeEth} ETH so gas does not eat the trade`
       : how };
 }
 
@@ -437,9 +567,10 @@ export function broadcast(callId, leasedFloors) {
   for (const floorNo of leasedFloors) {
     const d = decide(floorNo, call);
     try {
-      db.prepare(`INSERT INTO deliveries (call_id,floor_no,verdict,reason,size_sol,delivered_at)
-                  VALUES (?,?,?,?,?,?)`)
-        .run(callId, floorNo, d.verdict, d.reason, d.sizeSol ?? null, Date.now());
+      // size_eth is the record; size_sol mirrors it for the readers that have not moved.
+      db.prepare(`INSERT INTO deliveries (call_id,floor_no,verdict,reason,size_eth,size_sol,delivered_at)
+                  VALUES (?,?,?,?,?,?,?)`)
+        .run(callId, floorNo, d.verdict, d.reason, d.sizeEth ?? null, d.sizeEth ?? null, Date.now());
       d.verdict === "offered" ? offered++ : skipped++;
     } catch (e) { if (!/UNIQUE/i.test(String(e.message))) throw e; }
   }
@@ -450,11 +581,18 @@ export function broadcast(callId, leasedFloors) {
   return { ok: true, offered, skipped };
 }
 
+/* `deliveries.size_sol` is read through COALESCE for one release, so a delivery row
+ * written by the Solana build (size_eth NULL) still reports a size; `size_eth` is the
+ * name every new reader takes. */
+const SIZE_EXPR = "COALESCE(d.size_eth, d.size_sol)";
+
 export const feedFor = (floorNo, limit = 25) => db.prepare(`
-  SELECT d.*, c.mint, c.symbol, c.category, c.launchpad, c.conviction, c.status,
+  SELECT d.*, ${SIZE_EXPR} AS size_eth, ${SIZE_EXPR} AS size_sol,
+         c.mint, c.symbol, c.category, c.launchpad, c.conviction, c.status,
          c.entry_ref, c.entry_lo, c.entry_hi, c.stop, c.target, c.opened_at, c.closed_at,
          c.thesis, c.invalidation, c.close_reason, c.close_mark, c.image_url,
          c.mcap_at_call, c.liq_at_call, c.rt_loss_at_call, c.hold_band, c.hold_min_ms, c.hold_max_ms,
+         c.gas_usd_at_call, c.eth_usd_at_call,
          (SELECT e.mark FROM call_events e WHERE e.call_id = c.id AND e.mark IS NOT NULL
           ORDER BY e.id DESC LIMIT 1) AS last_mark,
          (SELECT MAX(e.ts) FROM call_events e WHERE e.call_id = c.id AND e.mark IS NOT NULL) AS last_mark_ts

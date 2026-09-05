@@ -6,7 +6,7 @@ on:
       bundle_url:
         description: Aggregate review bundle from the live API
         required: true
-        default: https://claude-company-api.onrender.com/api/improvements/review-bundle
+        default: https://claude-company-robinhood-api.onrender.com/api/improvements/review-bundle
         type: string
       model:
         description: Optional Codex model override
@@ -61,7 +61,10 @@ jobs:
           CODEX_REVIEW_TOKEN: ${{ secrets.CODEX_REVIEW_TOKEN }}
           BUNDLE_URL: ${{ inputs.bundle_url }}
           CODEX_MODEL: ${{ inputs.model }}
-          CODEX_BUNDLE_HOSTS: claude-company-api.onrender.com
+          # This fork's own API host. The bearer below is the fork's own CODEX_REVIEW_TOKEN;
+          # pointing this at the Solana desk's host would review the wrong desk's evidence
+          # against this checkout and fail the manifest check anyway.
+          CODEX_BUNDLE_HOSTS: claude-company-robinhood-api.onrender.com
         run: |
           args=(--bundle-url "$BUNDLE_URL" --output-dir "$RUNNER_TEMP/codex-improvement")
           if [[ -n "$CODEX_MODEL" ]]; then args+=(--model "$CODEX_MODEL"); fi

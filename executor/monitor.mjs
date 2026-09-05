@@ -9,9 +9,11 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { Connection } from "@solana/web3.js";
 import { executorRuntimeFingerprint } from "./heartbeat-health.mjs";
-import { independentSolUsdPrice, solanaRpcConnectionConfig } from "./sol-usd-oracle.mjs";
+import { createRpc } from "./evm-rpc.mjs";
+import { independentEthUsdPrice } from "./eth-usd-oracle.mjs";
+import "./live-thresholds.mjs";
+import { assertLiveReady } from "./thresholds.mjs";
 import {
   inspectOwnerControlFile, sleepAssertionFaultPath, verifyMacSleepAssertion,
 } from "./sleep-assertion.mjs";
@@ -165,10 +167,12 @@ function issue(list, code, severity, message) {
   list.push({ code, severity, message: String(message).slice(0, 500) });
 }
 
+/* Both providers through the aborting transport (evm-rpc.mjs createRpc), labelled and
+   never logged by URL — the URLs carry credentials. */
 async function defaultOracleProbe({ primaryUrl, secondaryUrl, now }) {
-  const primary = new Connection(primaryUrl, solanaRpcConnectionConfig());
-  const secondary = new Connection(secondaryUrl, solanaRpcConnectionConfig());
-  return independentSolUsdPrice(primary, secondary, { nowMs: now });
+  const primary = createRpc(primaryUrl, { label: "primary RPC" });
+  const secondary = createRpc(secondaryUrl, { label: "secondary RPC" });
+  return independentEthUsdPrice([primary, secondary], { nowMs: now });
 }
 
 function readJournal(stateDb, now, issues) {
@@ -222,8 +226,9 @@ function readJournal(stateDb, now, issues) {
       primed: Boolean(meta.primed), openPositions: positions.length,
       blockingIntents, positionBlocks,
       risk: meta.risk_state && typeof meta.risk_state === "object" ? {
-        deployed24hSol: Number(meta.risk_state.deployedTodaySol || 0),
-        realized24hSol: Number(meta.risk_state.realizedTodaySol || 0),
+        // The shared strategy vocabulary still says *Sol; on this chain the value is ETH.
+        deployed24hEth: Number(meta.risk_state.deployedTodaySol || 0),
+        realized24hEth: Number(meta.risk_state.realizedTodaySol || 0),
         wins: Number(meta.risk_state.wins || 0), losses: Number(meta.risk_state.losses || 0),
       } : null,
     };
@@ -254,9 +259,12 @@ async function probeFeed({
     result.httpStatus = response.status;
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const body = await response.json();
-    if (body?.cluster !== "mainnet-beta" || !Number.isSafeInteger(Number(body?.latest_id)) ||
-        !Array.isArray(body?.events)) throw new Error("malformed or non-mainnet feed response");
-    result.cluster = body.cluster;
+    /* The feed contract pins the chain on both ends: { chain: 4663, cluster:
+       "robinhood-4663" }. A poller pointed at the Solana desk's API is caught here. */
+    if (body?.chain !== 4663 || !Number.isSafeInteger(Number(body?.latest_id)) ||
+        !Array.isArray(body?.events)) throw new Error("malformed or non-4663 feed response");
+    result.chain = body.chain;
+    result.cluster = body.cluster ?? null;
     result.latestId = Number(body.latest_id);
     result.eventCount = body.events.length;
     result.cursorLag = result.latestId - Number(cursor || 0);
@@ -323,12 +331,13 @@ async function probeFeed({
             observedAt: Number(rawExecutionReadiness.observedAt || 0),
             route: String(rawExecutionReadiness.route || "").slice(0, 32),
             providers: Number(rawExecutionReadiness.providers || 0),
-            amountLamports: Number(rawExecutionReadiness.amountLamports || 0),
+            // wei as a decimal string: 4e14 wei is already past 2^53 territory for larger caps
+            amountWei: /^\d+$/.test(String(rawExecutionReadiness.amountWei ?? "")) ? String(rawExecutionReadiness.amountWei) : "0",
           } : null,
           caps: rawCaps ? {
-            maxSolPerTrade: Number(rawCaps.maxSolPerTrade),
-            dailySolCap: Number(rawCaps.dailySolCap),
-            dailyLossLimitSol: Number(rawCaps.dailyLossLimitSol),
+            maxEthPerTrade: Number(rawCaps.maxEthPerTrade),
+            dailyEthCap: Number(rawCaps.dailyEthCap),
+            dailyLossLimitEth: Number(rawCaps.dailyLossLimitEth),
             maxOpenPositions: Number(rawCaps.maxOpenPositions),
           } : null,
         } : null,
@@ -384,7 +393,7 @@ async function probeFeed({
         if (!reportedCaps)
           issue(issues, "heartbeat_caps_missing", "critical",
             "heartbeat has no sanitized active-cap report");
-        else if (["maxSolPerTrade", "dailySolCap", "dailyLossLimitSol", "maxOpenPositions"]
+        else if (["maxEthPerTrade", "dailyEthCap", "dailyLossLimitEth", "maxOpenPositions"]
           .some((name) => reportedCaps[name] !== expectedCaps?.[name]))
           issue(issues, "heartbeat_caps_mismatch", "critical",
             "heartbeat active caps do not match the protected local configuration");
@@ -394,10 +403,10 @@ async function probeFeed({
         else if (!readiness.ready)
           issue(issues, "execution_readiness_failed", "critical",
             "the latest no-sign execution-readiness probe did not succeed");
-        else if (readiness.route !== "wsol-usdc" || readiness.providers !== 2)
+        else if (readiness.route !== "weth-usdg" || readiness.providers !== 2)
           issue(issues, "execution_readiness_invalid", "critical",
-            "execution readiness did not verify the fixed WSOL/USDC route through both RPC providers");
-        else if (readiness.amountLamports !== expectedCaps?.maxSolPerTradeLamports)
+            "execution readiness did not verify the fixed WETH/USDG route through both RPC providers");
+        else if (readiness.amountWei !== expectedCaps?.maxEthPerTradeWei)
           issue(issues, "execution_readiness_size_mismatch", "critical",
             "execution readiness did not rehearse the active per-trade cap");
         else {
@@ -432,6 +441,7 @@ export async function inspectExecutor({
   runtimeFingerprintFn = executorRuntimeFingerprint, oracleProbe = defaultOracleProbe,
   sleepAssertionProbe = verifyMacSleepAssertion,
   requireSleepAssertion = process.platform === "darwin",
+  assertLiveReadyFn = assertLiveReady,
   now = Date.now(),
 } = {}) {
   const dir = fs.realpathSync(path.resolve(executorDir));
@@ -455,13 +465,15 @@ export async function inspectExecutor({
     const value = Number(cfg[name] ?? fallback);
     return Number.isFinite(value) && value > 0 ? value : fallback;
   };
+  /* The poller's canary / paper defaults (poller.mjs LIVE_LIMITS, PAPER_DEFAULTS). */
   const expectedCaps = {
-    maxSolPerTrade: configuredCap("MAX_SOL_PER_TRADE", mode === "live" ? 0.005 : 0.05),
-    dailySolCap: configuredCap("DAILY_SOL_CAP", mode === "live" ? 0.01 : 0.5),
-    dailyLossLimitSol: configuredCap("DAILY_LOSS_LIMIT_SOL", mode === "live" ? 0.01 : 0.15),
+    maxEthPerTrade: configuredCap("MAX_ETH_PER_TRADE", mode === "live" ? 0.0004 : 0.004),
+    dailyEthCap: configuredCap("DAILY_ETH_CAP", mode === "live" ? 0.0008 : 0.04),
+    dailyLossLimitEth: configuredCap("DAILY_LOSS_LIMIT_ETH", mode === "live" ? 0.0008 : 0.012),
     maxOpenPositions: configuredCap("MAX_OPEN_POSITIONS", 4),
   };
-  expectedCaps.maxSolPerTradeLamports = Math.floor(expectedCaps.maxSolPerTrade * 1_000_000_000);
+  // The poller rehearses at ethToWei(cap): micro-ETH precision, exact in BigInt.
+  expectedCaps.maxEthPerTradeWei = (BigInt(Math.round(expectedCaps.maxEthPerTrade * 1e6)) * 10n ** 12n).toString();
   const localRuntimeFingerprint = runtimeFingerprintFn(dir);
   if (mode === "live" && !expectedRuntimeCommit)
     issue(issues, "runtime_commit_unconfigured", "critical",
@@ -470,19 +482,30 @@ export async function inspectExecutor({
     issue(issues, "runtime_files_incomplete", "critical",
       "the complete trading runtime cannot be fingerprinted from regular local files");
 
+  /* THE REGISTRY GATE, mirrored. The poller refuses to arm while any live-path
+     threshold is VOID; a monitor that certified "safe to unpause" against the same
+     registry would be certifying a boot the poller will refuse. */
+  if (mode === "live") {
+    try { assertLiveReadyFn(); }
+    catch (error) {
+      issue(issues, "thresholds_unmeasured", "critical",
+        `the thresholds registry refuses to arm: ${String(error.message).split("\n")[0]}`);
+    }
+  }
+
   // The swap API must never author the USD anchor used to judge its own quote.
-  // Probe the exact two-RPC Pyth path before certifying a paused live process as
+  // Probe the exact two-RPC Chainlink path before certifying a paused live process as
   // ready. Endpoint values and raw transport errors are deliberately never emitted.
   let oracle = { checked: false, ok: mode !== "live" };
   if (mode === "live") {
-    if (!cfg.SOLANA_RPC || !cfg.SOLANA_RPC_SECONDARY) {
+    if (!cfg.RH_RPC || !cfg.RH_RPC_SECONDARY) {
       oracle = { checked: true, ok: false };
-      issue(issues, "sol_usd_oracle_unconfigured", "critical",
-        "independent Pyth SOL/USD readiness requires both configured RPC providers");
+      issue(issues, "eth_usd_oracle_unconfigured", "critical",
+        "independent Chainlink ETH/USD readiness requires both configured RPC providers");
     } else {
       try {
         const observation = await oracleProbe({
-          primaryUrl: cfg.SOLANA_RPC, secondaryUrl: cfg.SOLANA_RPC_SECONDARY, now,
+          primaryUrl: cfg.RH_RPC, secondaryUrl: cfg.RH_RPC_SECONDARY, now,
         });
         oracle = {
           checked: true, ok: true, source: observation.source,
@@ -492,8 +515,8 @@ export async function inspectExecutor({
         };
       } catch {
         oracle = { checked: true, ok: false };
-        issue(issues, "sol_usd_oracle_unavailable", "critical",
-          "independent two-provider Pyth SOL/USD readiness check failed");
+        issue(issues, "eth_usd_oracle_unavailable", "critical",
+          "independent two-provider Chainlink ETH/USD readiness check failed");
       }
     }
   }
@@ -566,7 +589,7 @@ export async function inspectExecutor({
   if (journal.primed !== true)
     issue(issues, "journal_unprimed", "warning", "executor has not durably primed its feed cursor");
   const feed = await probeFeed({
-    api: String(cfg.CC_API || "https://claude-company-api.onrender.com").replace(/\/$/, ""),
+    api: String(cfg.CC_API || "https://claude-company-robinhood-api.onrender.com").replace(/\/$/, ""),
     floor: cfg.CC_FLOOR, secret: cfg.CC_SECRET, cursor: journal.cursor,
     pollMs, fetchFn, now, issues, expectedMode: mode, expectedWallet: journal.wallet,
     expectedCursor: journal.cursor, expectedOpen: journal.openPositions,
@@ -582,7 +605,7 @@ export async function inspectExecutor({
     : mode !== "live" ? "not-live"
       : !hasCritical && !hasWarning ? "ready" : "blocked";
   return {
-    schemaVersion: 1, observedAt: now, status,
+    schemaVersion: 2, chain: 4663, observedAt: now, status,
     safeToUnpause: unpauseReadiness === "ready", unpauseReadiness, mode,
     runtime: { commit: expectedRuntimeCommit, fingerprint: localRuntimeFingerprint, pollMs },
     process: { pid, alive: Boolean(processState.alive), supervisor,
