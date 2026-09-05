@@ -14,10 +14,10 @@
   /* NIGHT FIRST. The bare :root IS the tower after the bell — polished black stone,
      smoked oak, brushed steel, aged brass, and Robinhood green used only as light.
      Brass (--amber) stays brass everywhere it is used; green never becomes paint. */
-  --cream:#d4dde0; --path-stone:#1a2428; --timber:#3a2e26; --timber-dark:#1f1a17;
-  --teal:#0f7a4a; --solar-navy:#11313a; --amber:#d1a84f; --glass-aqua:#3ee063;
-  --metal:#7d8b91; --terracotta:#22303a; --coral:#e06b57; --leaf:#1d6b3f;
-  --charcoal:#0d1518; --water:#3ee063; --claude:#d97757;
+  --cream:#d4dde0; --path-stone:#2c3a41; --timber:#4a3a2e; --timber-dark:#33291f;
+  --teal:#16a163; --solar-navy:#1b4a58; --amber:#d1a84f; --glass-aqua:#3ee063;
+  --metal:#93a3a9; --terracotta:#33454f; --coral:#e06b57; --leaf:#2a8a52;
+  --charcoal:#1c262b; --water:#3ee063; --claude:#d97757;
   /* the emitted light: the building's own green, never a surface colour */
   --rh-green:#00c805; --rh-soft:#3ee063; --rh-pale:#8bff9f;
 
@@ -773,13 +773,19 @@ import * as THREE from "/vendor/three/three.module.js"; /*__INLINE_THREE__*/
 const RH_GREEN = 0x00c805, RH_SOFT = 0x3ee063, RH_PALE = 0x8bff9f, LOSS = 0xff5a4a;
 
 const P = {                       // 21 keys, unchanged names — night-tower values
-  cream:0xd4dde0, pathStone:0x1a2428, timber:0x3a2e26, timberDark:0x1f1a17,
-  teal:0x0f7a4a, solarNavy:0x11313a, amber:0xd1a84f, glassAqua:0x3ee063,
-  metal:0x7d8b91, terracotta:0x22303a, coral:0xe06b57, leaf:0x1d6b3f,
-  charcoal:0x0d1518, water:0x3ee063,
+  /* LIT, not black. The first cut painted every structural surface near-black
+     (floor 0x0c1316, wall 0x151d21) and then tried to light it: measured, the default
+     view came out at mean luminance 11.9/255 with 85% of the frame inside 12/255, and
+     tripling all three lights only reached 24. You cannot light a surface that reflects
+     nothing. These are the same hues at a luminance that catches the lamps; the room is
+     still a dark tower at night, it is just one you can see. */
+  cream:0xd4dde0, pathStone:0x2c3a41, timber:0x4a3a2e, timberDark:0x33291f,
+  teal:0x16a163, solarNavy:0x1b4a58, amber:0xd1a84f, glassAqua:0x3ee063,
+  metal:0x93a3a9, terracotta:0x33454f, coral:0xe06b57, leaf:0x2a8a52,
+  charcoal:0x1c262b, water:0x3ee063,
   claude:0xd97757,                // Claude's own coral — the crest and the CEO
   codex:0x6f91ff,                 // Codex pet blue — the advisory improvement engineer
-  floor:0x0c1316, path:0x141e22, wall:0x151d21, trim:0x1e2b30, sky:0x0d2529,
+  floor:0x212e34, path:0x2a3940, wall:0x263239, trim:0x33454d, sky:0x1d3f47,
 };
 
 /* ── emitted light, the one register applyShift3D dials ───────────────────
@@ -907,10 +913,10 @@ window.__resetView = resetView;
    dialled through window.__lights (set once they exist — this runs earlier),
    glows through GLOWS, and the city backdrop repaints itself for the hour. */
 const SHIFT_LOOK = {
-  night: { bg: 0x05090c, fog: 0x05090c, exposure: 1.1, glow: 1.0,
-           hemi: [0x2a3f47, 0x0f3d24, 1.0], sun: [0x9fb8c8, 1.5], fill: [0x2fd06a, 0.5] },
-  dawn:  { bg: P.sky,    fog: 0x10262b, exposure: 1.12, glow: 0.55,
-           hemi: [0x3d5a63, 0x0f7a4a, 1.2], sun: [0xd8c9a8, 2.0], fill: [0x3ee063, 0.4] },
+  night: { bg: 0x0b1418, fog: 0x0b1418, exposure: 1.28, glow: 1.0,
+           hemi: [0x4e6a75, 0x1a5636, 1.9], sun: [0xc3d6e2, 2.6], fill: [0x46d982, 0.9] },
+  dawn:  { bg: P.sky,    fog: 0x22454e, exposure: 1.30, glow: 0.55,
+           hemi: [0x6f8f9b, 0x1f8f57, 2.1], sun: [0xf0e2c4, 3.1], fill: [0x5ce894, 0.75] },
 };
 function applyShift3D() {
   const day = document.documentElement.dataset.theme === "light";
@@ -1378,7 +1384,7 @@ const SPOTS = {
 };
 
 /* ═══ FURNITURE ═══════════════════════════════════════════════════════════ */
-const TIMBER = 0x2b2320, STEEL = 0x6b7d82, DARK = 0x0a0e10;
+const TIMBER = 0x3d322c, STEEL = 0x8494a0, DARK = 0x1a2429;
 
 /* ── solid things, and getting around them ──────────────────────────────────
    Agents used to walk the straight line between two points, which meant straight
@@ -1724,7 +1730,7 @@ function buildDesk(at, yaw, y = 0, accent = P.teal, kitId = null) {
   /* The slab: 0.35/0.15 rather than a true mirror finish because the baked room
      is capped at 24 (roughness:metalness) buckets and this pair already exists —
      one merged draw call instead of a new one per desk. */
-  box(g, [1.05, 0.06, 2.0], [0, 0.75, 0], 0x0e1417, 0.35, 0.15);      // black glass top
+  box(g, [1.05, 0.06, 2.0], [0, 0.75, 0], 0x1e2a30, 0.35, 0.15);      // black glass top
   box(g, [0.62, 0.012, 1.66], [0.14, 0.786, 0], P.timber, 0.85);      // smoked-oak inlay, where the hands are
   box(g, [1.00, 0.01, 1.90], [0, 0.715, 0], RH_GREEN, 0.31, 0.11);    // THE UNDERGLOW (green light bucket)
   for (const [dx, dz] of [[-0.44, -0.88], [0.44, -0.88], [-0.44, 0.88], [0.44, 0.88]])
@@ -2155,7 +2161,7 @@ function archiveFile(decision) {
   co.position.set(SPOTS.cooler[0], 0, SPOTS.cooler[1]);
   room.add(co);
   box(co, [0.40, 0.92, 0.40], [0, 0.46, 0], P.metal, 0.35, 0.6);
-  box(co, [0.30, 0.20, 0.03], [0, 0.66, 0.21], 0x0e1417, 0.35, 0.15);      // tap panel
+  box(co, [0.30, 0.20, 0.03], [0, 0.66, 0.21], 0x1e2a30, 0.35, 0.15);      // tap panel
   box(co, [0.34, 0.012, 0.34], [0, 0.925, 0], RH_GREEN, 0.31, 0.11);       // lit collar
   const bottle = new THREE.Mesh(
     new THREE.CylinderGeometry(0.2, 0.2, 0.44, 12),
@@ -2360,7 +2366,7 @@ window.__pantry = {
      (top 1.54, so it hides nobody from the south-east camera) and a light
      line under the lip. */
   box(g, [7.4, 0.9, 0.7], [X, 0.45, 11.95], P.timberDark, 0.82, 0);
-  box(g, [7.4, 0.06, 0.8], [X, 0.94, 11.95], 0x0e1417, 0.35, 0.15);
+  box(g, [7.4, 0.06, 0.8], [X, 0.94, 11.95], 0x1e2a30, 0.35, 0.15);
   box(g, [7.4, 0.6, 0.1], [X, 1.24, 12.33], 0x0b1417, 0.55, 0.2);
   box(g, [7.3, 0.02, 0.05], [X, 0.985, 12.30], RH_GREEN, 0.31, 0.11);
 
@@ -2375,7 +2381,7 @@ window.__pantry = {
   };
 
   for (let i = 0; i < 4; i++) cyl(g, 0.055, 0.11, [7.9 + i * 0.2, 1.03, 11.85], P.cream, 8);
-  cyl(g, 0.26, 0.12, [10.3, 1.04, 11.95], 0x0e1417, 12);
+  cyl(g, 0.26, 0.12, [10.3, 1.04, 11.95], 0x1e2a30, 12);
   for (const [dx, dz, c] of [[-0.08, -0.02, 0x1d6b3f], [0.10, 0.04, 0x00c805], [0.02, 0.10, 0xe0ad3d]])
     cyl(g, 0.09, 0.16, [10.3 + dx, 1.14, 11.95 + dz], c, 8);
   box(g, [0.34, 0.5, 0.34], [11.4, 1.24, 11.95], 0x1a2428, 0.9, 0);
@@ -2408,7 +2414,7 @@ window.__pantry = {
      STOOLS sit exactly ON snackA / snackB / snackC — seat top 0.475, which is
      the height the -0.30 seated hip drop was tuned for. None is solid. */
   cyl(g, 0.09, 0.72, [9.5, 0.36, 8.73], STEEL, 10);
-  cyl(g, 0.62, 0.05, [9.5, 0.76, 8.73], 0x0e1417, 20);
+  cyl(g, 0.62, 0.05, [9.5, 0.76, 8.73], 0x1e2a30, 20);
   const ringGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.01, 24);
   const tableGlow = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({
     color: RH_GREEN, emissive: new THREE.Color(RH_GREEN),
@@ -4849,7 +4855,7 @@ scene.add(officeDecor);
      two chairs a visitor sits in while he decides. */
   const SD = DAIS_Y;                                   // his dais is the taller one
   b([3.0, 0.86, 0.52], [0, SD + 0.43, -11.75], TIMBER, 0.75);            // credenza
-  b([3.04, 0.05, 0.56], [0, SD + 0.88, -11.75], 0x0e1417, 0.30, 0.2);   // black-glass top
+  b([3.04, 0.05, 0.56], [0, SD + 0.88, -11.75], 0x1e2a30, 0.30, 0.2);   // black-glass top
   for (const dx of [-0.9, 0, 0.9]) b([0.34, 0.03, 0.04], [dx, SD + 0.52, -11.48], P.claude, 0.4, 0.4);
   solid(0, -11.75, 3.0, 0.52);
   c(0.10, 0.26, [-0.95, SD + 1.01, -11.75], 0x9ad3c8);                   // decanter
@@ -5281,7 +5287,7 @@ const FITOUT = [
   // meeting_table — The boardroom slab: black glass on a steel frame, with a green light line
   // down its spine. Top surface stays at 0.80 so everything authored for it still sits flat.
   { at: [0, 4.4], foot: [-2.7, 3.8, 2.7, 5], parts: [
-    ["box", [5.4, 0.06, 1.2], [0, 0.77, 4.4], 0x0e1417, 0.15, 0.3],  // glass top slab
+    ["box", [5.4, 0.06, 1.2], [0, 0.77, 4.4], 0x1e2a30, 0.15, 0.3],  // glass top slab
     ["box", [5, 0.12, 0.1], [0, 0.64, 3.85], P.trim],  // apron rail, south edge
     ["box", [5, 0.12, 0.1], [0, 0.64, 4.95], P.trim],  // apron rail, north edge
     ["box", [0.16, 0.7, 0.16], [-2.35, 0.35, 3.95], P.metal, 0.4, 0.6],  // table leg
@@ -5388,7 +5394,7 @@ const FITOUT = [
     ["box", [0.12, 0.38, 0.12], [7.18, 0.19, 4.08], P.metal, 0.4, 0.6],  // leg back-right
     ["box", [1.2, 0.06, 0.62], [6.6, 0.17, 3.8], P.pathStone],  // lower shelf
     ["glow", [1.3, 0.01, 0.7], [6.6, 0.375, 3.8], RH_GREEN, 0.8],  // underglow, just below the top
-    ["box", [1.4, 0.08, 0.8], [6.6, 0.42, 3.8], 0x0e1417, 0.2, 0.3],  // glass top
+    ["box", [1.4, 0.08, 0.8], [6.6, 0.42, 3.8], 0x1e2a30, 0.2, 0.3],  // glass top
     ["box", [0.46, 0.06, 0.34], [6.25, 0.49, 3.8], P.metal, 0.4, 0.6],  // steel tray
     ["cyl", 0.09, 0.13, [6.25, 0.585, 3.8], P.cream],  // mug on tray
     ["box", [0.36, 0.07, 0.28], [7, 0.495, 3.75], P.terracotta],  // book, lower
@@ -5432,7 +5438,7 @@ const FITOUT = [
   { at: [-2.1, 12.1], foot: [-3.48, 11.69, -0.75, 12.5], parts: [
     ["box", [2.7, 0.1, 0.58], [-2.1, 0.05, 12.21], DARK],  // toe kick
     ["box", [2.7, 0.74, 0.68], [-2.1, 0.47, 12.16], P.pathStone],  // base cabinet carcass
-    ["box", [2.7, 0.08, 0.76], [-2.1, 0.88, 12.12], 0x0e1417, 0.2, 0.3],  // worktop slab
+    ["box", [2.7, 0.08, 0.76], [-2.1, 0.88, 12.12], 0x1e2a30, 0.2, 0.3],  // worktop slab
     ["box", [1.28, 0.62, 0.08], [-2.74, 0.48, 11.79], P.timber],  // cabinet door left
     ["box", [1.28, 0.62, 0.08], [-1.46, 0.48, 11.79], P.timber],  // cabinet door right
     ["box", [0.34, 0.06, 0.07], [-2.32, 0.7, 11.725], P.metal, 0.4, 0.6],  // door handle left
@@ -5450,7 +5456,7 @@ const FITOUT = [
   { at: [0.6, 12.1], foot: [-0.75, 11.69, 1.95, 12.5], parts: [
     ["box", [2.7, 0.1, 0.58], [0.6, 0.05, 12.21], DARK],  // toe kick
     ["box", [2.7, 0.74, 0.68], [0.6, 0.47, 12.16], P.pathStone],  // base cabinet carcass
-    ["box", [2.7, 0.08, 0.76], [0.6, 0.88, 12.12], 0x0e1417, 0.2, 0.3],  // worktop slab
+    ["box", [2.7, 0.08, 0.76], [0.6, 0.88, 12.12], 0x1e2a30, 0.2, 0.3],  // worktop slab
     ["box", [1.28, 0.26, 0.08], [-0.06, 0.68, 11.79], P.timber],  // upper drawer front
     ["box", [1.28, 0.3, 0.08], [-0.06, 0.34, 11.79], P.timber],  // lower drawer front
     ["box", [1.28, 0.62, 0.08], [1.26, 0.48, 11.79], P.timber],  // cabinet door
@@ -5477,7 +5483,7 @@ const FITOUT = [
   { at: [2.85, 12.1], foot: [1.95, 11.69, 3.75, 12.5], parts: [
     ["box", [1.8, 0.1, 0.58], [2.85, 0.05, 12.21], DARK],  // toe kick
     ["box", [1.8, 0.74, 0.68], [2.85, 0.47, 12.16], P.pathStone],  // base cabinet carcass
-    ["box", [1.8, 0.08, 0.76], [2.85, 0.88, 12.12], 0x0e1417, 0.2, 0.3],  // worktop slab
+    ["box", [1.8, 0.08, 0.76], [2.85, 0.88, 12.12], 0x1e2a30, 0.2, 0.3],  // worktop slab
     ["box", [1.7, 0.62, 0.08], [2.85, 0.48, 11.79], P.timber],  // cabinet door
     ["box", [0.07, 0.34, 0.07], [2.12, 0.48, 11.725], P.metal, 0.4, 0.6],  // cabinet door handle
     ["box", [0.88, 0.46, 0.54], [2.62, 1.15, 12.17], 0x243136],  // microwave body
