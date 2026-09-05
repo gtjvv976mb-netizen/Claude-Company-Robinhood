@@ -30,8 +30,10 @@ by you in a browser or a terminal you control.
 > keychain, used in-process):** (a) the repository exists at
 > https://github.com/gtjvv976mb-netizen/Claude-Company-Robinhood (public, `origin` set on the
 > fork); (b) Pages is enabled with source = GitHub Actions and the repo variable `API_BASE` is
-> set to `https://claude-company-robinhood-api.onrender.com`. The site will answer at
-> https://gtjvv976mb-netizen.github.io/Claude-Company-Robinhood/ after the first push.
+> set to `https://claude-company-robinhood-api.onrender.com`. **First push done 2026-09-05 (commit
+> 4e191fe); the Deploy site workflow completed and the site answers at
+> https://gtjvv976mb-netizen.github.io/Claude-Company-Robinhood/ — index 78,481 bytes, the executor
+> install graph and the assets all 200.** The gateway at claudedotcompany.com already opens onto it.
 > **Still the owner's:** the Actions secrets in (b), the DNS record in (c) — and `viewer/CNAME`
 > must stay OUT of the tree until that record exists, or Pages redirects to a name that does not
 > resolve — and every step of (d) Render, which has no API credential here.
