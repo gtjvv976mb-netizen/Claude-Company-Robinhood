@@ -38,6 +38,28 @@ by you in a browser or a terminal you control.
 > must stay OUT of the tree until that record exists, or Pages redirects to a name that does not
 > resolve — and every step of (d) Render, which has no API credential here.
 
+> **Status, 2026-09-05 (later) — the floor redesign is LIVE.** Commit `e8fb867` (the night-tower
+> floor: live screens/boards/ticker/stations/pantry/kitchen, the three station bodies moved off
+> their spots, and the new `coffee` ambient kind in `src/world.js`) plus `6aab474` are pushed and
+> deployed; verified on the web, not on disk — `floor.html` answers 200 and contains the redesign
+> marker. `npm test` 88/88 locally and again in CI before the Pages build. The gateway repo got
+> `20431d3`: `RH_API_BASE` is now injectable, and stays empty until (d) exists so the homepage
+> does not fire a cross-origin request at a host that is not there.
+>
+> **Deploy order note for (d):** this release changed `src/world.js` (the server emits the new
+> `coffee` ambient kind). The CLIENT is already out; bring Render up second and there is no window
+> where a new server talks to an old viewer.
+>
+> **What is still the owner's, and why it cannot be done from here:** there is no Render API
+> credential, no Cloudflare/registrar credential, and no `gh`/`wrangler`/`render` CLI on this
+> machine — checked, not assumed. Beyond that, the values themselves are secrets
+> (`ANTHROPIC_API_KEY`, `XAI_API_KEY`, `CODEX_REVIEW_TOKEN`) or account-specific
+> (`TREASURY_OWNER_RH`), and secrets are never handled here by rule. The remaining steps are:
+> the Actions secrets in (b), the DNS record in (c), and (d) Render — which `render.yaml` reduces
+> to **New → Blueprint → connect this repo → Apply**, then five `sync: false` values typed into
+> the dashboard. After the DNS record resolves, re-add `viewer/CNAME` and flip the gateway's two
+> `data-rh-world` hrefs, and set `RH_API_BASE` alongside `API_BASE` in the gateway's Pages workflow.
+
 ## (a) Create the GitHub repository
 
 **Done 2026-09-05** (see the status block above). The repository exists and the fork's `origin`
