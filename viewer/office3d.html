@@ -6630,7 +6630,7 @@ tabDesk.addEventListener("click", () => togglePane("desk", loadRoom));
 tabTape.addEventListener("click", () => togglePane("tape"));
 tabInbox.addEventListener("click", () => togglePane("inbox"));
 
-const fmtTok = (base, dec) => (Number(BigInt(base) / 10n ** BigInt(Math.max(0, dec - 3))) / 1000)
+const fmtTok = (base, dec) => (Number(BigInt(base ?? 0) / 10n ** BigInt(Math.max(0, (Number.isFinite(Number(dec)) ? Number(dec) : 18) - 3))) / 1000)
   .toLocaleString(undefined, { maximumFractionDigits: 0 });
 
 let ROOM = null;
@@ -7717,7 +7717,7 @@ function buildBudget() {
     return box;
   }
 
-  const bal = Number(BigInt(BUDGET.balanceBaseUnits) / 10n ** BigInt(Math.max(0, BUDGET.decimals - 3))) / 1000;
+  const bal = Number(BigInt(BUDGET.balanceBaseUnits ?? 0) / 10n ** BigInt(Math.max(0, (Number(BUDGET.decimals) || 18) - 3))) / 1000;
   const big = mk("div", "bud-bal");
   big.innerHTML = `<b></b> $CLAUDECO`;
   big.querySelector("b").textContent = bal.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -8043,7 +8043,7 @@ function paintHud({ feed, settings, budget, rent } = {}) {
     set("s-mine", mine.length ? `${mine.length} to place` : "nothing to place");
   }
   if (budget) {
-    const toNum = (u) => Number(BigInt(u) / 10n ** BigInt(Math.max(0, budget.decimals - 3))) / 1000;
+    const toNum = (u) => Number(BigInt(u ?? 0) / 10n ** BigInt(Math.max(0, (Number(budget.decimals) || 18) - 3))) / 1000;
     // Two different numbers, and the old single "Balance" label conflated them:
     // the wallet's own on-chain holdings, and the credit already sent in.
     set("s-bal", toNum(budget.balanceBaseUnits).toLocaleString(undefined, { maximumFractionDigits: 0 }) + " CLAUDECO");

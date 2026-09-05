@@ -133,8 +133,15 @@ const runtime = {
 j.markAccounted(spec.id, runtime);
 const accountedRisk = j.rollingRisk();
 j.markAccounted(spec.id, runtime);
-ok("accounting replay is idempotent and cannot duplicate risk events", () =>
-  assert.deepEqual(j.rollingRisk(), accountedRisk));
+/* rollingRisk() stamps riskWindowAsOf with Date.now() on every call; two calls a
+   millisecond apart are not "different risk", and the Solana repo's CI runner lost
+   exactly that race (…895 vs …894, 2026-09-05). Compare the risk, bound the clock. */
+const sansClock = (r) => { const { riskWindowAsOf, ...rest } = r; return rest; };
+ok("accounting replay is idempotent and cannot duplicate risk events", () => {
+  const again = j.rollingRisk();
+  assert.deepEqual(sansClock(again), sansClock(accountedRisk));
+  assert.ok(Math.abs(again.riskWindowAsOf - accountedRisk.riskWindowAsOf) < 5_000, "risk window clocks within 5s");
+});
 ok("rolling risk is exact in wei and only approximate in the shared *Sol vocabulary", () => {
   assert.equal(accountedRisk.deployedTodayWei, "1060000000000000");
   assert.equal(accountedRisk.deployedTodaySol, 0.00106);
