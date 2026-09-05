@@ -35,9 +35,10 @@ services:
         value: https://rpc.mainnet.chain.robinhood.com
       - key: RH_RPC_SECONDARY
         sync: false             # optional second provider; set in the dashboard
-      # The access token. The Robinhood edition of $CLAUDECO is NOT launched yet — this
-      # is the all-zero placeholder, and leasing stays closed until the real ERC-20
-      # address from docs/LAUNCH-CHECKLIST.md is pasted here.
+      # The access token, LAUNCHED and live: the Robinhood edition of $CLAUDECO on
+      # PONS V2 (paired against NVDA). This is the real ERC-20 address, not a
+      # placeholder — leasing opens once TREASURY_OWNER_RH below is set. The desk
+      # never takes a position in it; scope-guard's NEVER_POSITIONS refuses it.
       - key: CLAUDECO_RH_TOKEN
         value: "0x7039986CaC6C7885b53f10c7492E653055470ab9"
       - key: CLAUDECO_RH_DECIMALS
