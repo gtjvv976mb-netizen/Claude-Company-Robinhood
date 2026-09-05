@@ -26,9 +26,9 @@ const SEATS = ["Scout", "Screener", "Forensics", "Liquidity", "Flow", "Technical
 const ROUTINE_LINES = 3, TASK_LINES = 3, CHATTER_LINES = 8, SNACK_SCRIPTS = 8, VISIT_SCRIPTS = 10;
 
 // Ambient life away from the desks: the fridge raid, the kitchenette, the sofa,
-// the meeting table, the cooler, a long look out the window. Solo or duo — the
-// client owns where these places are and what gets said there.
-const AMBIENT_KINDS = ["fridge", "cook", "sofa", "meeting", "cooler", "window"];
+// the meeting table, the cooler, a long look out the window, and the coffee run.
+// Solo or duo — the client owns where these places are and what gets said there.
+const AMBIENT_KINDS = ["fridge", "cook", "sofa", "meeting", "cooler", "window", "coffee"];
 /* THE PRINCIPALS. The three figures with their own rooms used to sit in them
    all day, which made the most interesting corners of the floor the deadest.
    Now they walk: the boss takes the morale round, Codex Banks inspects the
@@ -36,7 +36,9 @@ const AMBIENT_KINDS = ["fridge", "cook", "sofa", "meeting", "cooler", "window"];
    event so two viewers see the same round at the same moment. */
 const PRINCIPAL_ROUNDS = ["morale", "inspect", "consult"];
 const ROUND_LINES = 4;
-const AMBIENT_DUO = new Set(["sofa", "meeting", "cooler"]);
+// "coffee" is a duo, but an asymmetric one: A boils the kettle and carries a cup
+// to B's desk, and B never leaves the seat. Same casting call, one walker.
+const AMBIENT_DUO = new Set(["sofa", "meeting", "cooler", "coffee"]);
 const AMBIENT_LINES = 4;
 
 let timer = null;
