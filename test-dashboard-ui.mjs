@@ -137,6 +137,38 @@ assert.match(html, /dashMetric\("Settled P&L", feedPrivate \? "PRIVATE"/,
     "an opened alert tab is highlighted the way a selected destination is");
   assert.doesNotMatch(html, /\.dtab \.cnt\{/,
     "no count chip in the line box: it made this tab 3px taller than every tab beside it");
+
+  /* ABOVE THE RAIL, AND NEVER BESIDE IT. Measured: the panel spans 14..534 and the
+   * rail spans W-494..W-14, so under a ~1028px viewport they overlap — at z-index 6
+   * the rail painted over the alerts and every row's "Got it" was unclickable. */
+  const zBar = Number(html.match(/\.alertbar\{[^}]*z-index:(\d+)/)?.[1]);
+  const zRail = Number(html.match(/\.rail\{[\s\S]*?z-index:(\d+)/)?.[1]);
+  assert.ok(zBar > zRail, `the alert panel must sit above the rail, got ${zBar} vs ${zRail}`);
+  assert.match(html, /if \(open\) window\.closeRail\?\.\(\);/,
+    "opening the alerts closes the other panel on the dock line");
+  assert.match(html, /window\.__closeAlerts\?\.\(\);\n\s*if \(!DASHBOARD_PANEL\[which\]\)/,
+    "...and opening a destination closes the alerts");
+  assert.match(html, /window\.closeRail = closeRail;/,
+    "the alerts live in a later module, so the rail's closer is reachable");
+
+  /* A LIVE REGION THAT IS NOT RENDERED ANNOUNCES NOTHING. The stack is display:none
+   * until the tab is opened, so role="alert" on it told a screen-reader user about
+   * a 3am exit exactly never. The announcement comes from a node that is always
+   * rendered, and the hidden stack no longer claims to be a live region. */
+  assert.doesNotMatch(html, /id="alertbar"[^>]*aria-live/,
+    "the display:none stack must not pose as a live region");
+  assert.match(html, /<div class="sr" id="alert-live" role="status" aria-live="polite">/);
+  assert.match(html, /alertLive\.textContent = unread\.length === 1/,
+    "and it is given the alert to announce");
+
+  /* THE PANEL FOLLOWS ITS OWN TAB. It used to open the markup of #stage, which put
+   * it before every tab on the page: a forward Tab from Alerts skipped its buttons. */
+  assert.ok(html.indexOf('id="alert-nav"') < html.indexOf('id="alertbar"'),
+    "the panel's markup must come after the tab that opens it");
+
+  /* THE 20-SECOND POLL MUST NOT REBUILD AN OPEN PANEL under the reader's hands. */
+  assert.match(html, /if \(sig === alertSig && alertBar\.childElementCount\) return;/,
+    "an unchanged alert list is left alone, scroll position and focus intact");
 }
 
 assert.match(html, /@media \(max-width:760px\)[\s\S]*?\.dock\{left:8px; right:8px; top:auto; bottom:8px/,
