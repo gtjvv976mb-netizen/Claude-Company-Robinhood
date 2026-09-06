@@ -117,6 +117,28 @@ assert.match(html, /dashMetric\("Settled P&L", feedPrivate \? "PRIVATE"/,
   assert.doesNotMatch(html, /queueMicrotask\(\(\) => window\.showDashboard\?\.\("overview", \{ force: true \}\)\)/,
     "nothing force-opens the rail at boot; the dock is the resting state");
 }
+/* ── OWNER DECISION (2026-09-06): ALERTS DO NOT COVER THE ROOM ────────────────
+ * Unacked exits stacked as full-width banners from the top of the stage down —
+ * five of them measured 34.2% of a 1280x720 viewport and hid the back wall, the
+ * run board and half the desks. They are a tab now, and these are the three
+ * properties that make that true rather than the pixel values around them. */
+{
+  assert.match(html, /\.alertbar\.open\{display:flex\}/,
+    "the stack draws only when the tab is open");
+  assert.doesNotMatch(html, /\.alertbar\.on\{display:flex\}/,
+    "...and never merely because alerts exist");
+  assert.match(html, /\.alertbar\{[^}]*left:14px;right:auto/,
+    "it hangs off the left edge instead of spanning the room");
+  const navBlock = html.slice(html.indexOf('id="alert-nav"'), html.indexOf('id="primary-nav"'));
+  assert.doesNotMatch(navBlock, /data-destination|role="tab"/,
+    "the alert tab is a disclosure button and must never join the eight-destination tablist");
+  assert.match(navBlock, /class="dtab"/, "...while being the same object visually");
+  assert.match(html, /\.dtab\[aria-selected="true"\],\.dtab\[aria-expanded="true"\]\{/,
+    "an opened alert tab is highlighted the way a selected destination is");
+  assert.doesNotMatch(html, /\.dtab \.cnt\{/,
+    "no count chip in the line box: it made this tab 3px taller than every tab beside it");
+}
+
 assert.match(html, /@media \(max-width:760px\)[\s\S]*?\.dock\{left:8px; right:8px; top:auto; bottom:8px/,
   "mobile navigation becomes a reachable bottom dock");
 assert.ok(
