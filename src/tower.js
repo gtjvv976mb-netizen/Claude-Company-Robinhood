@@ -52,12 +52,23 @@ if (seeded === 0) {
  *
  * ROBINHOOD EDITION: the deed is an EVM address, stored LOWERCASE — wallets return the
  * same address in two spellings and the deed is a plain TEXT compare. The Solana
- * edition's dev wallet cannot hold this deed; until HQ_OWNER_WALLET_RH is set the deed
- * is the zero address, which no wallet can sign in as, so the penthouse simply has no
- * signed-in owner rather than a wrong one.
+ * edition's dev wallet cannot hold this deed, so this fork names its own: the deed
+ * defaults to the Robinhood tower's dev wallet below (owner's call, 2026-09-06). It
+ * previously defaulted to the zero address, which no wallet can sign in as — a
+ * penthouse with no signed-in owner rather than a wrong one. That was the right
+ * default while no owner was known; one is known now. The zero address remains the
+ * "unconfigured" sentinel and is still refused by isHqOwner.
  */
+/* The Robinhood tower's dev wallet, given sole ownership of the penthouse by the
+   owner on 2026-09-06. EIP-55 verified before it was written here: the address as
+   supplied is byte-identical to its own checksummed form, which is what makes a
+   transcription error detectable rather than permanent. Stored lowercase because
+   floors.owner is a plain TEXT compare — see lib/address.js.
+   HQ_OWNER_WALLET_RH still overrides, so a fork or a staging deployment names its
+   own owner without editing source. */
 export const HQ_OWNER_WALLET =
-  normalise((process.env.HQ_OWNER_WALLET_RH || process.env.HQ_OWNER_WALLET || "").trim()) || ZERO_ADDRESS;
+  normalise((process.env.HQ_OWNER_WALLET_RH || process.env.HQ_OWNER_WALLET || "").trim())
+  || "0xcac7f130ba6bed24dea8fc26eab7bfface0d57f5";
 
 db.prepare("UPDATE floors SET state='hq', owner=? WHERE n=? AND (owner IS NULL OR owner <> ?)")
   .run(HQ_OWNER_WALLET, HQ_FLOOR, HQ_OWNER_WALLET);
@@ -66,17 +77,19 @@ db.prepare("UPDATE floors SET state='hq', owner=? WHERE n=? AND (owner IS NULL O
 export function hqOwnerWallet() {
   return normalise(db.prepare("SELECT owner FROM floors WHERE n=?").get(HQ_FLOOR)?.owner) || HQ_OWNER_WALLET;
 }
-/* The penthouse answers to the HOUSE: the dev wallet on the deed AND the
-   treasury. The owner asked for both; a later refactor narrowed it to one, and
-   the treasury quietly lost its own floor. Read the treasury from env directly
-   rather than importing leasing — tower is imported by it. Both sides of every
-   compare are normalised: a checksummed deed and a lowercase session are one wallet. */
+/* SOLE OWNERSHIP — THE DEED, AND NOTHING ELSE (owner's call, 2026-09-06).
+   This granted standing to the deed OR the treasury wallet, so two wallets could
+   open the house desk's settings and take its executor secret. TREASURY_OWNER_RH
+   keeps its real job, which is where lease payments land; money and identity are
+   different jobs and this is the line where they were confused.
+
+   Both sides of the compare are still normalised: a checksummed deed and a
+   lowercase session are one wallet. The zero address is refused explicitly — it is
+   the "no owner configured" sentinel, and nobody can sign as it. */
 export const isHqOwner = (w) => {
   const me = normalise(w);
   if (!me || me === ZERO_ADDRESS) return false;
-  if (me === hqOwnerWallet()) return true;
-  const t = normalise((process.env.TREASURY_OWNER_RH || "").trim());
-  return !!t && me === t;
+  return me === hqOwnerWallet();
 };
 
 export function listFloors() {
