@@ -1210,9 +1210,29 @@ async function signOut() {
    the wallet still shows its own sheet. Nothing is ever signed without that click. */
 const GATE = (() => {
   try {
-    const g = JSON.parse(sessionStorage.getItem("cc_gate") || "null");
-    if (g && g.world === "rh" && /^0x[0-9a-fA-F]{40}$/.test(String(g.wallet || "")))
-      return { world: "rh", wallet: String(g.wallet).toLowerCase(), rdns: g.rdns || null };
+    /* THE GATEWAY IS A DIFFERENT ORIGIN. It is claudedotcompany.com and this is
+       robinhood.claudedotcompany.com, so its sessionStorage is not readable here
+       and this handoff has been dead since the towers moved to their own
+       subdomains — String(g.wallet) was also "[object Object]" against a regex
+       expecting 0x…, so it was doubly dead. It travels in the fragment now,
+       which no server ever sees, and is stripped from the URL on arrival. Only
+       WHICH provider to prefer crosses; the address does not go in a URL, and
+       this page learns it from the wallet a moment later regardless. */
+    let g = null;
+    const hop = /[#&]cc=([^&]*)/.exec(location.hash || "");
+    if (hop) {
+      try { g = JSON.parse(decodeURIComponent(hop[1])); } catch {}
+      try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+    }
+    if (!g) g = JSON.parse(sessionStorage.getItem("cc_gate") || "null");   // same-origin builds
+    const world = g && (g.w || g.world);
+    if (world !== "rh") return null;
+    const raw = String((g && g.wallet) || "");
+    return {
+      world: "rh",
+      wallet: /^0x[0-9a-fA-F]{40}$/.test(raw) ? raw.toLowerCase() : null,
+      rdns: (g && (g.r || g.rdns)) || null,
+    };
   } catch {}
   return null;
 })();
