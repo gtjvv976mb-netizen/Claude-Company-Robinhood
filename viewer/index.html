@@ -102,17 +102,52 @@
   --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
   --dusk-bar:rgba(5,9,12,.94);
 }
-/* THE DAWN SHIFT — chosen, never inferred, and it is NOT a light theme: the
-   same tower at first light through the north glazing, teal-dark instead of
-   black. It moves surfaces and the sky, and nothing else. The ink is not
-   redefined, because the ground never gets bright enough to need dark ink. */
+/* THE DAY SHIFT — chosen, never inferred, and it IS a day: the broadsheet is
+   printed on paper, not on stone. The room this page fronts is warm sand
+   (#c4b596), so the day chrome is a warm light neutral, never a blue-grey.
+   LIGHT GROUNDS, DARK INK: the whole ink ladder is redefined here, because a
+   near-white ink on a near-white ground is the same failure as the one this
+   theme exists to end, only inverted.
+   The hero keeps its own sky and its own ink (--dusk-*, --hero-*): it is a
+   PICTURE of the building at first light, shaded to ~.63 black under the
+   headline by .shade, so its near-white copy is ink on a dark ground and stays
+   correct. Only the chrome below the fold turns to paper. */
 :root[data-theme="light"]{
-  --panel:#0d2529; --panel-line:#1d3d43; --card-line:#24484f; --bar:#0a2024;
-  --bg:#0a2024;          /* the dawn shell, one step under the panel */
-  --bg-2:#0d2529;        /* tinted band = dawn --panel */
-  --card:#11313a;        /* inset stock = dawn --card  */
-  --rule:#24484f; --rule-soft:#1d3d43;
-  --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92); --shadow:rgba(0,0,0,.5);
+  /* the shell and the two surface depths */
+  --bar:#e9ece2; --bar-ink:#17211d; --bar-soft:rgba(23,33,29,.64);
+  --panel:#f4f6ef; --panel-line:#d6dbcb; --card:#ffffff; --card-line:#e3e7da;
+  --bg:#e9ece2;          /* the day shell = --bar (ground, under the panel) */
+  --bg-2:#f4f6ef;        /* tinted band = day --panel */
+  /* the hairlines keep their MEANING, not their lightness: --rule is the
+     stronger of the two in both themes, which on paper means the darker. */
+  --rule:#d6dbcb; --rule-soft:#e3e7da;
+
+  /* the ink ladder, inverted end to end */
+  /* --ink-faint is the ONE value that had to leave the handed-down day palette.
+     #77877c measured 3.17:1 on --bg and 3.48:1 on --bg-2 with this ruler, and
+     this page sets running prose in it (.fine 11.5px, .verified 12px, .figlabel,
+     .slugname, cite). #5d6b61 measures 4.69 / 5.15 / 5.61 on bg / panel / card
+     and is still a clear third step under --ink-soft. Exactly the lift the night
+     ladder already carries, in the other direction. */
+  --ink:#17211d; --ink-soft:#48584f; --ink-faint:#5d6b61;
+
+  --dock-bg:rgba(244,246,239,.88); --hint-bg:rgba(244,246,239,.95);
+  --shadow:rgba(25,35,28,.18);
+  --good:#0d7a41; --warn:#8a6410; --bad:#b8372a;
+  /* brass, one step under the handed-down #8a6410: that value measured 4.490:1
+     on --bg — under the bar by 0.01 — and brass carries 9.5px kickers and slugs
+     here. #866010 measures 4.75 and is the same brass to the eye. */
+  --teal:#177a4f; --amber:#866010; --coral:#b8503f; --claude:#b45c3c;
+  --terracotta:#b8503f; --kind-model:#866010;
+
+  /* the page's own names: brass at display and at caption size, and the one
+     resting fill with the near-white of its own hue on it. --rh-green,
+     --rh-soft, --rh-pale and --on-dark are NOT redefined — they are emitted
+     light and the ink that rides on it. */
+  --accent:#866010; --accent-ink:#866010;
+  --hot:#177a4f; --hot-ink:#f2f9f4;
+
+  /* the picture: first light, unchanged. */
   --dusk-bar:rgba(13,37,41,.94);
   --hero-sky:linear-gradient(180deg,
     #0d2529 0%, #11313a 18%, #16404a 36%, #1a4f55 50%,
@@ -239,6 +274,11 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--accent-ink);outline
 .figcap{position:absolute;right:clamp(18px,3vw,44px);bottom:14px;z-index:4;margin:0;
   font-family:"JetBrains Mono",ui-monospace,monospace;font-size:9.5px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--dusk-soft);opacity:.75}
+/* DAY ONLY: the hero stays a night picture, but its day sky ends in Robinhood green
+   rather than near-black, so the caption's night ink lands on a much lighter ground:
+   measured 3.70:1 against #114026 under the .66 shade. Undiluted --dusk-ink is 8.5:1
+   on the same pixel and keeps the caption a caption. */
+:root[data-theme="light"] .figcap{color:var(--dusk-ink);opacity:.82}
 @media (max-width:900px){.figcap{display:none}}
 @media (max-width:720px){
   .hero-art{right:-15vw;height:min(64%,560px)}
@@ -370,6 +410,9 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
 .kind.code{border-color:var(--metal);color:var(--ink-soft)}
 .kind.model{border-color:var(--kind-model);color:var(--kind-model)}
 .kind.claude{border-color:var(--claude);background:var(--claude);color:#2a1a14;font-weight:700}
+/* DAY ONLY: --claude is the dark half by day, so its night ink (#2a1a14, 3.61:1)
+   has to invert with it. White measures 4.63:1. */
+:root[data-theme="light"] .kind.claude{color:#ffffff}
 /* two seats are load-bearing: the one paid to refute, and the one that signs off */
 .seat.red .seatno{color:var(--terracotta)}
 .seat.red .seatq{font-style:italic}
@@ -438,6 +481,9 @@ h3{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
   cursor:pointer;flex:none}
 .cacopy:hover{background:var(--rh-green);border-color:var(--rh-green);color:#04140a}
 .cacopy.done{background:var(--good);border-color:var(--good);color:#04140a}
+/* DAY ONLY: --good is the dark half by day, so its night ink (#04140a, 3.49:1) inverts
+   with it. White measures 5.42:1. */
+:root[data-theme="light"] .cacopy.done{color:#ffffff}
 .tokenlinks{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
 .verified{margin-top:16px;font-size:12px;line-height:1.6;color:var(--ink-faint)}
 

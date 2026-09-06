@@ -41,6 +41,11 @@
      nameplate, a speech bubble — so it stays a light stock in both shifts and its
      ink stays dark in both. The rail's memos are not paper; they are cards. */
   --paper:#d4dde0; --paper-edge:#9fb3ad;
+  /* the room's own caption ink. At night this IS --ink-faint, so the night room is
+     unchanged; by day the room's grounds are mid tans, not light panels, and the
+     chrome's faint ink measured 1.00-1.88:1 on them (SVG text paints with `fill`,
+     so a scanner that reads `color` will not see this at all). */
+  --room-cap:#5f7570;
   --on-paper:#0b1417; --on-paper-soft:#30454a; --on-paper-faint:#4a5c60;
 }
 :root:not([data-theme="light"]){
@@ -65,15 +70,43 @@
   --wall:#1a2c31; --wall-soft:#24393f; --felt:#123a2b;
   --lamp:rgba(209,168,79,.22);
 }
-/* THE DAWN SHIFT. Same tower, first light through the north glazing: the panels and
-   the floor lift to teal-dark and the lamps go out. Ink, good/warn/bad and every brass
-   and green token inherit from the bare :root above — only the surfaces move. */
+/* THE DAY SHIFT. Not dusk — daylight. The grounds go LIGHT and the ink goes DARK, the
+   full inversion: a warm light neutral, keyed to the sand the tower's own room is lit in,
+   never a blue-grey. --rh-green/--rh-soft/--rh-pale and --on-dark are EMITTED LIGHT and the
+   ink that rides on dark fills, so they do not move; brass, green and coral step down to
+   their daylight values so they can be read AS ink on a light ground. */
 :root[data-theme="light"]{
-  --panel:#0d2529; --panel-line:#1d3d43; --card:#11313a; --card-line:#24484f;
-  --bar:#0d2529; --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92);
-  --shadow:rgba(0,0,0,.5);
-  --floor:#0d2529; --floor-alt:#11313a; --floor-edge:#081b1f;
-  --wall:#24484f; --wall-soft:#2d5a62; --felt:#164434;
+  --bar:#e9ece2; --bar-ink:#17211d; --bar-soft:rgba(23,33,29,.64);
+  --panel:#f4f6ef; --panel-line:#d6dbcb; --card:#ffffff; --card-line:#e3e7da;
+  --ink:#17211d; --ink-soft:#48584f; --ink-faint:#5d6b61;
+  --dock-bg:rgba(244,246,239,.88); --hint-bg:rgba(244,246,239,.95);
+  --shadow:rgba(25,35,28,.18);
+  --good:#0d7a41; --warn:#8a6410; --bad:#b8372a;
+  --teal:#177a4f; --amber:#866010; --coral:#b8503f; --claude:#b45c3c;
+  /* --rh-green and --rh-pale keep their bare-:root values: emitted light, never paint.
+     --rh-soft is the one exception and only here — its single use on this page is
+     .firm em, the wordmark, as INK, and #3ee063 on the day --bar measured 1.46:1:
+     a pale mint word on paper. #077926 is the same brand green at 4.66:1.
+     Night is untouched; revert by deleting this one line. */
+  --rh-soft:#077926;
+  /* ---- the room at day: sunlit boards, dark oak structure, sand beyond the walls ----
+     Measured, not assumed. The floor MUST lift: the desk names print --ink and the room's
+     captions print --ink-faint straight onto it, and both are dark now (on the old
+     teal-dark floor they would have gone to 1.1:1). --wall MUST NOT lift: the "C E O"
+     plate prints --brass-lite and every glass-office door prints --paper — light inks —
+     directly on it. --wall-soft is the one token pulled both ways: it is the desks AND,
+     at 55%, the ground of the executive suite that the CEO's own caption sits on, so it
+     settles at a mid tan that keeps the suite readable without erasing the paper trays.
+     --brass steps down with --amber because most of it (threshold, suite frame, the
+     dashed path) now lies on a LIGHT ground: 1.90:1 at night's brass, 4.58:1 at this one. */
+  --floor:#f8f5ee; --floor-alt:#ece6d6; --floor-edge:#c4b596;
+  --wall:#433d32; --wall-soft:#8f8267; --felt:#7fb692;
+  --brass:#866010;
+  /* room captions on the day room: measured against each ground this ink actually
+     lands on — floor-edge #c4b596 7.36, floor #beb092 6.95, the floor plate #b6b595
+     7.10, the suite carpet #9ba283 5.59. */
+  --room-cap:#1f2a22;
+  --glass:rgba(23,33,29,.035);
   --lamp:rgba(209,168,79,.10);
 }
 
@@ -191,6 +224,10 @@ body{
 }
 /* an INNER tab selects with paint; only a top-level dock tab gets the emitted green */
 .tab[aria-selected="true"]{background:var(--teal); color:var(--cream); border-color:var(--teal)}
+/* DAY ONLY: --cream is a night ink (a cool near-white for the night's bright teal).
+   On the day --teal #177a4f it measures 3.87:1; plain white measures 5.34:1.
+   Night keeps --cream and its own 2.95:1 — that pair is pre-existing and frozen. */
+:root[data-theme="light"] .tab[aria-selected="true"]{color:#ffffff}
 .tab:focus-visible{outline:2px solid var(--amber); outline-offset:2px}
 .tape{
   flex:1; min-height:0; overflow-y:auto; padding:10px 14px;
@@ -216,6 +253,21 @@ body{
 .v-WATCH,.v-HELD{background:var(--warn); color:#26201a}
 .v-DECLINED{background:var(--bad); color:#2a0e09}
 .v-PASS{background:var(--ink-faint); color:#fff} .v-VETOED,.v-killed,.v-screened_out{background:var(--bad); color:#2a0e09}
+/* DAY ONLY, and identical to the rule office3d.html already carries: --good/--warn/--bad
+   are dark INK colours by day (they must read as text on a white card), so every badge
+   that uses one as a FILL still carried its night ink and collapsed — measured
+   #04140a on --good 3.49, #26201a on --warn 3.00, #2a0e09 on --bad 3.11. White restores
+   them to 5.42 / 5.37 / 5.80. .v-PASS fills with --ink-faint, which cannot carry white
+   by day (3.79 at the old faint, 4.62 at the new one); it steps to --ink-soft = 8.06. */
+:root[data-theme="light"] .v-PROPOSE,
+:root[data-theme="light"] .v-APPROVED,
+:root[data-theme="light"] .v-WATCH,
+:root[data-theme="light"] .v-HELD,
+:root[data-theme="light"] .v-DECLINED,
+:root[data-theme="light"] .v-VETOED,
+:root[data-theme="light"] .v-killed,
+:root[data-theme="light"] .v-screened_out{color:#ffffff}
+:root[data-theme="light"] .v-PASS{background:var(--ink-soft); color:#ffffff}
 .memo p{margin:0 0 6px; font-size:12.5px; line-height:1.5; color:var(--ink-soft)}
 .memo .kv{display:flex; gap:12px; font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--ink-faint); flex-wrap:wrap}
 .memo .kv b{color:var(--ink); font-variant-numeric:tabular-nums}
@@ -384,7 +436,7 @@ function buildRoom() {
   add(room, "circle", { cx:770, cy:S.y+S.h+1, r:4, fill:"var(--brass-lite)" });
   add(room, "line", { x1:660, y1:S.y+S.h+22, x2:780, y2:S.y+S.h+22,
     stroke:"var(--brass)", "stroke-width":2, "stroke-dasharray":"6 6", opacity:.55 });
-  text(room, 720, S.y+S.h+40, "SLIP IT UNDER THE DOOR", { size:8.5, fill:"var(--ink-faint)", ls:"0.2em" });
+  text(room, 720, S.y+S.h+40, "SLIP IT UNDER THE DOOR", { size:8.5, fill:"var(--room-cap)", ls:"0.2em" });
   // nameplate
   add(room, "rect", { x:S.x+120, y:S.y+8, width:160, height:30, rx:3, fill:"var(--wall)", opacity:.92 });
   add(room, "rect", { x:S.x+120, y:S.y+8, width:160, height:30, rx:3, fill:"none", stroke:"var(--brass)", "stroke-width":1.5 });
@@ -412,7 +464,7 @@ function buildRoom() {
   // --- rugs ---
   add(room, "ellipse", { cx:660, cy:706, rx:145, ry:74, fill:"var(--felt)", opacity:.20 });
   add(room, "ellipse", { cx:660, cy:706, rx:145, ry:74, fill:"none", stroke:"var(--felt)", "stroke-width":3, opacity:.45 });
-  text(room, 660, 656, "THE FLOOR", { size:9.5, fill:"var(--ink-faint)", ls:"0.24em" });
+  text(room, 660, 656, "THE FLOOR", { size:9.5, fill:"var(--room-cap)", ls:"0.24em" });
 
   // --- desks ---
   for (const s of STAFF) {
@@ -429,31 +481,31 @@ function buildRoom() {
     add(room, "rect", { x:x + 14, y:y + h - 26, width:26, height:16, rx:2, fill:"var(--paper)", stroke:"var(--paper-edge)" });
     add(room, "circle", { cx:x + w - 24, cy:y + h - 18, r:7, fill:"var(--brass)", opacity:.75 });
     text(room, x + w/2, y + h + 17, s.name.toUpperCase(), { size:10, fill:"var(--ink)", ls:"0.14em", weight:700 });
-    text(room, x + w/2, y + h + 30, s.role, { size:9.5, fill:"var(--ink-faint)", ls:"0.04em", weight:500 });
+    text(room, x + w/2, y + h + 30, s.role, { size:9.5, fill:"var(--room-cap)", ls:"0.04em", weight:500 });
   }
 
   // --- printer ---
   add(room, "rect", { x:310, y:680, width:84, height:52, rx:5, fill:"var(--wall-soft)" });
   add(room, "rect", { x:322, y:670, width:60, height:14, rx:3, fill:"var(--paper)", stroke:"var(--paper-edge)" });
   add(room, "rect", { x:320, y:706, width:64, height:8, rx:2, fill:"var(--wall)" });
-  text(room, 352, 750, "PRINTER", { size:9, fill:"var(--ink-faint)", ls:"0.18em" });
+  text(room, 352, 750, "PRINTER", { size:9, fill:"var(--room-cap)", ls:"0.18em" });
 
   // --- shredder (where the screener's rejects go) ---
   add(room, "rect", { x:262, y:532, width:60, height:46, rx:4, fill:"var(--wall)" });
   add(room, "rect", { x:272, y:540, width:40, height:5, rx:2.5, fill:"var(--bad)" });
-  text(room, 292, 596, "SHREDDER", { size:9, fill:"var(--ink-faint)", ls:"0.16em" });
+  text(room, 292, 596, "SHREDDER", { size:9, fill:"var(--room-cap)", ls:"0.16em" });
 
   // --- water cooler ---
   add(room, "rect", { x:942, y:674, width:40, height:56, rx:5, fill:"var(--glass-line)", opacity:.5 });
   add(room, "rect", { x:948, y:660, width:28, height:22, rx:8, fill:"var(--glass)", stroke:"var(--glass-line)", "stroke-width":2 });
-  text(room, 962, 750, "COOLER", { size:9, fill:"var(--ink-faint)", ls:"0.18em" });
+  text(room, 962, 750, "COOLER", { size:9, fill:"var(--room-cap)", ls:"0.18em" });
 
   // --- archive shelving (the journal) ---
   add(room, "rect", { x:310, y:742, width:200, height:34, rx:4, fill:"var(--wall-soft)" });
   for (let i = 0; i < 11; i++)
     add(room, "rect", { x:318 + i*17, y:748, width:12, height:22, rx:1.5,
       fill:i % 3 ? "var(--paper)" : "var(--brass)", opacity:.9 });
-  text(room, 410, 734, "THE JOURNAL", { size:9, fill:"var(--ink-faint)", ls:"0.18em" });
+  text(room, 410, 734, "THE JOURNAL", { size:9, fill:"var(--room-cap)", ls:"0.18em" });
 
   // --- plants ---
   for (const [px, py] of [[60,930],[1390,930],[60,110],[1010,930],[1390,110]]) {

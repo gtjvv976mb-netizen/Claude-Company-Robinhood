@@ -49,14 +49,26 @@
   --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
   --bg:#05090c; --line:#1e2f34;
 }
-/* THE DAWN SHIFT. Same tower, first light through the north glazing: the surfaces lift
-   to teal-dark. Ink, good/warn/bad and every brass and green token inherit from the
-   bare :root above — only the surfaces move. */
+/* THE DAY SHIFT. Not dusk — daylight. The grounds go LIGHT and the ink goes DARK, the
+   full inversion, on a warm light neutral rather than a blue-grey. --rh-green/--rh-soft/
+   --rh-pale and --on-dark do not move: they are emitted light and the ink that rides on
+   dark fills. --bg keeps its night relation (the page ground IS the masthead's ground)
+   and --line keeps its own (the page hairline IS the card hairline). */
 :root[data-theme="light"]{
-  --panel:#0d2529; --panel-line:#1d3d43; --card:#11313a; --card-line:#24484f;
-  --bar:#0d2529; --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92);
-  --shadow:rgba(0,0,0,.5);
-  --bg:#0d2529; --line:#24484f;
+  --bar:#e9ece2; --bar-ink:#17211d; --bar-soft:rgba(23,33,29,.64);
+  --panel:#f4f6ef; --panel-line:#d6dbcb; --card:#ffffff; --card-line:#e3e7da;
+  --ink:#17211d; --ink-soft:#48584f; --ink-faint:#5d6b61;
+  --dock-bg:rgba(244,246,239,.88); --hint-bg:rgba(244,246,239,.95);
+  --shadow:rgba(25,35,28,.18);
+  --good:#0d7a41; --warn:#8a6410; --bad:#b8372a;
+  --teal:#177a4f; --amber:#866010; --coral:#b8503f; --claude:#b45c3c;
+  /* --rh-green and --rh-pale keep their bare-:root values: emitted light, never paint.
+     --rh-soft is the one exception and only here — its single use on this page is
+     .brand em, the wordmark, as INK, and #3ee063 on the day --bar measured 1.46:1:
+     a pale mint word on paper. #077926 is the same brand green at 4.66:1.
+     Night is untouched; revert by deleting this one line. */
+  --rh-soft:#077926;
+  --bg:#e9ece2; --line:#e3e7da;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Archivo,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -101,6 +113,10 @@ ol code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;col
 /* the control lights up under the cursor: paint at rest, emitted green on hover */
 .btn:hover{background:var(--rh-green);color:#04140a}
 .btn:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+/* DAY ONLY: --cream is a night ink (a cool near-white for the night's bright teal).
+   On the day --teal #177a4f it measures 3.87:1; plain white measures 5.34:1.
+   Night keeps --cream and its own 2.95:1 — that pair is pre-existing and frozen. */
+:root[data-theme="light"] .btn{color:#ffffff}
 /* The disclaimer is the most legally material prose on the page, so it takes the
    CONTEXT ink step, not the label step: --ink-faint is licensed for 9-10.5px
    uppercase keys and would land this at 2.80:1 in the dawn shift. */

@@ -44,15 +44,52 @@
   --bar:#05090c; --bar-ink:#e9f2ef; --bar-soft:rgba(233,242,239,.62);
   --dock-bg:rgba(7,12,14,.86); --shadow:rgba(0,0,0,.6); --hint-bg:rgba(7,12,14,.9);
 }
-/* THE DAWN SHIFT. Same tower, first light through the glazing: the surfaces lift to
-   teal-dark and the bar goes with them. Ink, good/warn/bad and every brass and green
-   token inherit from the bare :root above — only the surfaces move. This is NOT a
-   paper theme; the ground never gets bright enough to need dark ink. */
+/* THE DAY SHIFT. Same tower, full daylight through the glazing: the chrome is
+   printed on paper. The room behind it is warm sand (#c4b596), so the day
+   surfaces are a warm light neutral, not a blue-grey. LIGHT GROUNDS, DARK INK —
+   the whole ink ladder is redefined here, because leaving the night's
+   near-white ink on a bright ground is the same failure inverted.
+   --rh-green / --rh-soft / --rh-pale and --on-dark are NOT redefined: they are
+   emitted light and the ink that rides on it, and they read at any hour. */
 :root[data-theme="light"]{
-  --panel:#0d2529; --panel-line:#1d3d43; --card:#11313a; --card-line:#24484f;
-  --bar:#0d2529; --dock-bg:rgba(13,37,41,.86); --hint-bg:rgba(13,37,41,.92);
-  --shadow:rgba(0,0,0,.5);
+  --bar:#e9ece2; --bar-ink:#17211d; --bar-soft:rgba(23,33,29,.64);
+  --panel:#f4f6ef; --panel-line:#d6dbcb; --card:#ffffff; --card-line:#e3e7da;
+  /* --ink-faint left the handed-down day palette by one step: #77877c measured
+     3.48:1 on --panel and 3.79:1 on --card, and .row .n / .row .s are 10-11px
+     labels. #5d6b61 measures 5.15 / 5.61 and stays a clear third ink step. */
+  --ink:#17211d; --ink-soft:#48584f; --ink-faint:#5d6b61;
+  --dock-bg:rgba(244,246,239,.88); --hint-bg:rgba(244,246,239,.95);
+  --shadow:rgba(25,35,28,.18);
+  --good:#0d7a41; --warn:#8a6410; --bad:#b8372a;
+  /* brass one step under the handed-down #8a6410, which measured 4.490:1 on
+     --bar — under the bar by 0.01 — and .stat b prints on --bar. #866010 = 4.75. */
+  --teal:#177a4f; --amber:#866010; --coral:#b8503f; --claude:#b45c3c;
+  /* --rh-green and --rh-pale keep their bare-:root values: they are emitted
+     light, and every place they FILL (button.home.on, .btn.primary:hover) still
+     prints #04140a on them at 8.35:1. --rh-soft is the one exception, and only
+     here: its single use on this page is .firm em — the word "Tower" in the
+     masthead — as INK, and #3ee063 on the day --bar measured 1.46:1, a pale
+     mint word on paper. #077926 is the same brand green carried down to 4.66:1.
+     Night is untouched; revert by deleting this one line. */
+  --rh-soft:#077926;
 }
+
+/* DAY ONLY. Three chips hard-code a near-black ink for the NIGHT fills (bright brass,
+   bright green, bright coral). By day those same tokens ARE the dark half, so the ink
+   has to invert with them: measured #2a2018 on --amber 2.80, #04140a on --good 3.49,
+   #2a1a14 on --claude 3.61. White measures 5.68 / 5.42 / 4.63. Night is untouched —
+   these rules cannot match while data-theme is dark.
+   .offline and .cost dilute their ink with opacity, which no token value can reach:
+   --ink-soft at .75 measured 3.60 and at .85 measured 4.47 on the day panel. */
+:root[data-theme="light"] .chip.vacant,
+:root[data-theme="light"] .chip.owned,
+:root[data-theme="light"] .chip.hq{color:#ffffff}
+:root[data-theme="light"] .offline,
+:root[data-theme="light"] .cost{opacity:1}
+/* DAY ONLY: --cream is a night ink (a cool near-white for the night's bright teal).
+   On the day --teal #177a4f it measures 3.87:1; plain white measures 5.34:1.
+   Night keeps --cream and its own 2.95:1 — that pair is pre-existing and frozen. */
+:root[data-theme="light"] .btn.primary{color:#ffffff}
 *{box-sizing:border-box} html,body{height:100%}
 body{margin:0;background:var(--bar);color:var(--ink);
   font-family:Archivo,system-ui,-apple-system,"Segoe UI",sans-serif;
