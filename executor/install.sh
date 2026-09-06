@@ -430,7 +430,13 @@ trap rollback_install EXIT
 
 echo "▶ fetching the executor and shared policy…"
 RUNTIME_FILES=(poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs)
-SOURCE_FILES=("${RUNTIME_FILES[@]}" package.json package-lock.json)
+# TOOLS SHIP WITH THE RELEASE BUT ARE NOT THE TRADING RUNTIME. burner-backup.mjs is
+# never imported by poller.mjs, so it must stay out of RUNTIME_FILES: the installer,
+# launchd-runner.mjs and heartbeat-health.mjs's fingerprint all name the same trading
+# runtime, and a tool in that list would make the byte identity cover code that never
+# executes a trade. It is still downloaded, staged and syntax-checked.
+TOOL_FILES=(burner-backup.mjs)
+SOURCE_FILES=("${RUNTIME_FILES[@]}" "${TOOL_FILES[@]}" package.json package-lock.json)
 if [ "$MODE" = "live" ]; then
   echo "▶ staging immutable runtime blobs from commit $SOURCE_COMMIT"
   for file in "${SOURCE_FILES[@]}"; do
@@ -457,7 +463,7 @@ else
     }
   done
 fi
-for file in "${RUNTIME_FILES[@]}"; do
+for file in "${RUNTIME_FILES[@]}" "${TOOL_FILES[@]}"; do
   node --check "$STAGE_DIR/$file" >/dev/null 2>&1 || { echo "staged $file is not valid JS" >&2; exit 1; }
 done
 (cd "$STAGE_DIR" && npm ci --ignore-scripts --silent >/dev/null 2>&1)
@@ -674,6 +680,11 @@ cat <<DONE
 
   No wallet was funded by this installer. The private key stays at
   $INSTALL_DIR/burner.key and must never be uploaded or pasted.
+
+  BACK IT UP BEFORE YOU FUND IT — it exists on this disk and nowhere else:
+      node $CURRENT_LINK/burner-backup.mjs --out ~/wall-st-e-rh-recovery.txt
+      node $CURRENT_LINK/burner-backup.mjs --verify ~/wall-st-e-rh-recovery.txt
+  Then move that file somewhere this machine cannot reach.
   Live mode will not arm until every live-path threshold in live-thresholds.mjs
   is measured on this chain (assertLiveReady); the journal is created regardless.
   First feed connection skips historic calls and waits for the next one.

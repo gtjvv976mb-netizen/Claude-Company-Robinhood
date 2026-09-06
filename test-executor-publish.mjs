@@ -17,6 +17,21 @@ const install = fs.readFileSync(new URL("./executor/install.sh", import.meta.url
 const build = fs.readFileSync(new URL("./scripts/build-viewer.mjs", import.meta.url), "utf8");
 
 const runtime = install.match(/RUNTIME_FILES=\(([^)]*)\)/)?.[1]?.trim().split(/\s+/) ?? [];
+/* Tools ship with the release but are deliberately OUTSIDE the trading runtime, so the
+   heartbeat's byte identity covers only code that can execute a trade. They must still
+   be published, or the install aborts on the download exactly as it did for
+   token2022.mjs. */
+const tools = install.match(/TOOL_FILES=\(([^)]*)\)/)?.[1]?.trim().split(/\s+/).filter(Boolean) ?? [];
+assert.ok(tools.length >= 1, "install.sh declares no TOOL_FILES — the recovery tool would not ship");
+/* A tool must be downloaded AND syntax-checked, or it is not really shipped. */
+assert.match(install, /SOURCE_FILES=\("\$\{RUNTIME_FILES\[@\]\}" "\$\{TOOL_FILES\[@\]\}"/,
+  "tools must be in the set the installer downloads");
+assert.match(install, /for file in "\$\{RUNTIME_FILES\[@\]\}" "\$\{TOOL_FILES\[@\]\}"; do\n\s*node --check/,
+  "tools must be syntax-checked with the runtime");
+/* ...and must NOT be in the trading runtime, whose byte identity should cover only
+   code that can execute a trade. */
+for (const t of tools)
+  assert.ok(!runtime.includes(t), `${t} is a tool and must not be inside RUNTIME_FILES`);
 assert.ok(runtime.length >= 10, `could not read RUNTIME_FILES from install.sh (got ${runtime.length})`);
 
 /* the live-mode source-integrity loop fetches the same set plus the manifests */
@@ -27,7 +42,7 @@ const publishBlock = build.match(/const EXECUTOR_FILES = \[([\s\S]*?)\n\];/)?.[1
 assert.ok(publishBlock, "could not read EXECUTOR_FILES from build-viewer.mjs");
 const published = new Set([...publishBlock.matchAll(/"([\w.-]+\.[a-z]+)"/g)].map((m) => m[1]));
 
-for (const f of new Set([...runtime, ...sourceLoop])) {
+for (const f of new Set([...runtime, ...tools, ...sourceLoop])) {
   assert.ok(published.has(f),
     `install.sh fetches executor/${f} but the build never publishes it — every remote install would abort on it`);
 }

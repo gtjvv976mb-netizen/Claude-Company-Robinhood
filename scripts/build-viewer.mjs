@@ -150,6 +150,9 @@ fs.copyFileSync(marketingIndex, path.join(marketingOut, "index.html"));
 // installed poller fails on its first import.
 fs.mkdirSync(path.join(OUT, "executor"), { recursive: true });
 const EXECUTOR_FILES = [
+  /* the offline recovery tool — a key on one disk is a stranded-funds bug
+     waiting for its first dead host. See executor/burner-backup.mjs. */
+  "burner-backup.mjs",
   "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs", "scope-guard.mjs",
   "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs", "erc20-hazards.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
