@@ -1122,26 +1122,46 @@ const HALF_W = 17, HALF_D = 12.5;               // a 34 × 25 floor
 const room = new THREE.Group();
 scene.add(room);
 
-/* The Claude mark: twelve rounded petals about a small ringed centre — the same
-   figure that is on the token, laid into the floor. */
+/* THE VENUE'S MARK. The Solana floor carries Solana's bars; this floor carries the
+   Robinhood feather, in the chain's own green. Drawn, not loaded: the barbs are cut
+   out of a filled silhouette with destination-out, so the stone shows through the
+   gaps exactly as it does through the Solana mark. */
 function drawHouseMark(c) {
   const x = c.getContext("2d"), W = c.width, R = W / 2;
   x.clearRect(0, 0, W, W);
-  x.save(); x.translate(R, R);
-  const INK = "#c8674a", RINGC = "#f2e8d5", DOT = "#e8b96a";
-  const petals = 12, outer = R * 0.80, inner = R * 0.20, w = R * 0.108;
-  x.fillStyle = INK;
-  for (let i = 0; i < petals; i++) {
-    x.save(); x.rotate((i * Math.PI * 2) / petals);
-    x.beginPath();
-    if (x.roundRect) x.roundRect(-w / 2, -outer, w, outer - inner, w / 2);
-    else x.rect(-w / 2, -outer, w, outer - inner);
-    x.fill(); x.restore();
+  x.save();
+  x.translate(R, R * 1.02); x.rotate(-0.26);          // the mark leans, like the brand's
+  const GREEN = "#00c805";
+  const H = R * 0.84, Wd = R * 0.46;
+
+  // the plume silhouette — fuller, so the barb cuts texture it instead of eating it
+  x.beginPath();
+  x.moveTo(0, -H);
+  x.bezierCurveTo(Wd * 1.32, -H * 0.46, Wd * 1.10, H * 0.40, 0, H * 0.82);
+  x.bezierCurveTo(-Wd * 1.10, H * 0.40, -Wd * 1.32, -H * 0.46, 0, -H);
+  x.closePath();
+  x.fillStyle = GREEN; x.fill();
+
+  // barb separations, cut fine so the feather keeps its body
+  x.globalCompositeOperation = "destination-out";
+  x.lineCap = "round";
+  x.lineWidth = R * 0.022;
+  for (let i = 0; i < 13; i++) {
+    const t = i / 12;
+    const y = -H * 0.70 + t * (H * 1.34);
+    const reach = Math.sin(Math.PI * (0.22 + 0.70 * t)) * Wd * 1.24;
+    const drop = R * 0.20;
+    x.beginPath(); x.moveTo(0, y); x.lineTo(reach, y + drop); x.stroke();
+    x.beginPath(); x.moveTo(0, y); x.lineTo(-reach, y + drop); x.stroke();
   }
-  x.beginPath(); x.arc(0, 0, R * 0.175, 0, Math.PI * 2); x.fillStyle = INK; x.fill();
-  x.beginPath(); x.arc(0, 0, R * 0.130, 0, Math.PI * 2); x.fillStyle = RINGC; x.fill();
-  x.beginPath(); x.arc(0, 0, R * 0.092, 0, Math.PI * 2); x.fillStyle = INK; x.fill();
-  x.beginPath(); x.arc(0, 0, R * 0.048, 0, Math.PI * 2); x.fillStyle = DOT; x.fill();
+  // a narrow channel either side of the quill so the shaft reads as a shaft
+  x.lineWidth = R * 0.030;
+  x.beginPath(); x.moveTo(0, -H * 0.96); x.lineTo(0, H * 0.84); x.stroke();
+
+  // the quill, drawn back over the channel
+  x.globalCompositeOperation = "source-over";
+  x.strokeStyle = GREEN; x.lineWidth = R * 0.020; x.lineCap = "round";
+  x.beginPath(); x.moveTo(0, -H * 0.97); x.lineTo(0, H * 0.88); x.stroke();
   x.restore();
 }
 
@@ -2257,7 +2277,7 @@ function archiveFile(decision) {
         emissiveIntensity: 0.16 * GLOW_SCALE, depthWrite: false,
       }));
     medallion.rotation.x = -Math.PI / 2;
-    medallion.position.set(SPOTS.meeting[0], 0.024, SPOTS.meeting[1]);
+    medallion.position.set(0, 0.024, 0);   // the real centre of the room, not the meeting spot
     medallion.receiveShadow = true; medallion.castShadow = false;
     medallion.userData.noBake = true;
     room.add(medallion);
