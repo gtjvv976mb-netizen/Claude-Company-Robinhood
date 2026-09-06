@@ -1342,7 +1342,18 @@ function maybeProbeExecutionReadiness() {
     readinessTimer.unref?.();
   });
   Promise.race([
-    executor.probeExecutionReadiness({ amountWei: capWei().toString() }),
+    /* THE EXITS' DENOMINATOR IS PART OF BEING READY. The rehearsal proved the route,
+       the providers and the gas, and never once read the ETH/USD feed — which every
+       USD-priced stop depends on. So a rotated Chainlink aggregator, a routine event,
+       was discovered not at boot with a human present but on the first tick that
+       needed a mark for an open position, at whatever hour that fell. Proving it here
+       moves that discovery to startup, and to every periodic rehearsal after it. */
+    Promise.all([
+      executor.probeExecutionReadiness({ amountWei: capWei().toString() }),
+      independentEthUsdPrice(providers).catch((error) => {
+        throw new Error(`the ETH/USD feed every USD-priced stop depends on is unusable: ${error.message}`);
+      }),
+    ]).then(([result]) => result),
     readinessDeadline,
   ]).then((result) => {
     const succeededAt = Date.now();

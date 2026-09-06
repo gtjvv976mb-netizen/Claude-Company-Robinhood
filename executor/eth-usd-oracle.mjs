@@ -136,7 +136,18 @@ export async function independentEthUsdPrice(providers, {
   for (const [index, word] of aggregatorWords.entries()) {
     const current = "0x" + word.slice(-40).toLowerCase();
     if (current !== aggregator.toLowerCase())
-      throw new Error(`ETH/USD proxy routes to aggregator ${current} on provider ${index + 1}, expected ${aggregator} — re-verify the feed before trusting it`);
+      /* A ROTATION IS ROUTINE, AND THAT IS THE POINT OF SAYING SO. Chainlink proxies
+         change their underlying aggregator on upgrades; reading through the proxy is
+         the documented way to survive that. Pinning is still worth keeping — it is
+         what would notice a proxy pointed somewhere hostile — but the two cases must
+         not read identically, because one of them happens on purpose and the message
+         is what tells an operator which one they are looking at. */
+      throw Object.assign(new Error(
+        `ETH/USD proxy routes to aggregator ${current} on provider ${index + 1}, but this build pins ` +
+        `${aggregator}. A Chainlink proxy rotating its aggregator is ROUTINE — it is usually an upgrade, ` +
+        "not an attack. Verify the new aggregator is Chainlink's, then update the pin. Until you do, " +
+        "this feed is refused and exits that price in USD have no denominator."),
+        { failureClass: "oracle", oracleRotation: true, observedAggregator: current, pinnedAggregator: aggregator });
   }
   let primary, secondary;
   try {
