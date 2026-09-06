@@ -32,6 +32,10 @@ export function executorRuntimeFingerprint(executorDir) {
 /** Build the bounded, non-secret health facts sent after a completed poll cycle. */
 export function executorHeartbeatHealth({
   entriesPaused = false, hardStop = false, blockingIntent = false, positions = [],
+  /* A call the desk published and this bot dropped to a transient failure is not the
+     same event as one refused on its merits, and the cursor advances past both. The
+     pair is the only way to see whether calls are being lost. */
+  entriesLostToFailure = 0, entriesRefused = 0,
   lastTickCompletedAt = 0, lastFeedSuccessAt = 0, consecutiveFeedFailures = 0,
   consecutiveTickFailures = 0, feedRollback = false, executionReadiness = null,
   caps = null, runtimeCommit = null, runtimeFingerprint = null,
@@ -66,6 +70,8 @@ export function executorHeartbeatHealth({
     state = "degraded";
   return {
     state, entriesPaused: Boolean(entriesPaused), hardStop: Boolean(hardStop),
+    entriesLostToFailure: Number(entriesLostToFailure) || 0,
+    entriesRefused: Number(entriesRefused) || 0,
     blockingIntent: Boolean(blockingIntent), blockedPositions, manualAction, exitBlocked,
     lastTickCompletedAt: Number(lastTickCompletedAt) || 0,
     lastFeedSuccessAt: Number(lastFeedSuccessAt) || 0,

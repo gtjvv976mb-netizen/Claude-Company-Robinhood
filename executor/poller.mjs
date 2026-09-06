@@ -1415,6 +1415,10 @@ function sendHeartbeat() {
   try {
     health = executorHeartbeatHealth({
       entriesPaused: pauseEntries(), hardStop: hardStop(),
+      /* Calls DROPPED to a transient failure, distinct from calls refused on
+         their merits — the pair is what says whether a retry queue is needed. */
+      entriesLostToFailure: S.entriesLostToFailure || 0,
+      entriesRefused: S.entriesRefused || 0,
       blockingIntent: Boolean(journal.hasBlockingIntent()), positions: openList(),
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
@@ -1430,6 +1434,8 @@ function sendHeartbeat() {
     // Telemetry can lose detail; it can never stop the trading/reconciliation loop.
     health = executorHeartbeatHealth({
       entriesPaused: pauseEntries(), hardStop: hardStop(), blockingIntent: true,
+      entriesLostToFailure: S.entriesLostToFailure || 0,
+      entriesRefused: S.entriesRefused || 0,
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
       consecutiveFeedFailures: runtimeHealth.consecutiveFeedFailures,
@@ -1608,7 +1614,28 @@ async function tick() {
               if (ev.type === "entry" && (!intent || ["planned", "failed", "expired"].includes(intent.state))) {
                 // New exposure is optional; a permanently unsafe or pre-sign failed
                 // entry must not become a head-of-line denial of every later exit.
-                log(`SKIP ${ev.symbol || ev.id}: ${error.message} — entry acknowledged without a trade`);
+                //
+                /* BUT A CALL REFUSED AND A CALL LOST ARE NOT THE SAME EVENT, and this
+                   line reported them identically. A screen that says "no" is the system
+                   working; an aggregator 500, a gas spike or a stale quote is a call the
+                   desk published and this bot dropped on the floor — permanently, because
+                   the cursor advances past it either way. Nobody could see the difference,
+                   so nobody could know whether a retry queue was needed or whether the
+                   refusals were all correct. Counted separately now, and carried on the
+                   heartbeat so the answer is measured rather than guessed. */
+                const cls = error?.failureClass ?? null;
+                const lost = cls === "transport" || cls === "oracle";
+                if (lost) {
+                  S.entriesLostToFailure = (S.entriesLostToFailure || 0) + 1;
+                  S.entriesLostLast = { symbol: ev.symbol || String(ev.id), at: Date.now(),
+                    failureClass: cls, reason: String(error.message).slice(0, 200) };
+                } else {
+                  S.entriesRefused = (S.entriesRefused || 0) + 1;
+                }
+                log(`${lost ? "LOST" : "SKIP"} ${ev.symbol || ev.id}: ${error.message} — ` +
+                  (lost
+                    ? `the desk published this call and it was dropped to a ${cls} failure, not refused on its merits`
+                    : "entry acknowledged without a trade"));
                 S.cursor = Number(ev.id);
                 save();
                 continue;
