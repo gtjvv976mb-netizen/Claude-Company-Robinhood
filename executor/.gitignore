@@ -10,3 +10,9 @@ HARD_STOP
 # the manual round-trip probe keeps its own journal. Neither may ever be staged.
 .cc-executor.env.previous-*
 .roundtrip-test.sqlite*
+
+# A private key must never be stageable. install-secret.sh writes burner.key INTO this
+# directory, and this remote is public — only burner.json (the Solana name) was covered.
+burner.key
+*.key
+.cc-executor.env.*
