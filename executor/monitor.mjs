@@ -448,7 +448,21 @@ export async function inspectExecutor({
   const file = path.resolve(envFile || path.join(dir, ".cc-executor.env"));
   // The protected service file is authoritative. Ambient shell variables are a
   // fallback for ad-hoc paper runs, never a way to silently inspect another wallet.
+  /* THE MONITOR MUST NOT REPORT A CONTROL IT NEVER READ. readExecutorEnv returns {}
+     for a missing file, and every path below then falls back to a default relative to
+     executorDir — which defaults to process.cwd(). Run from anywhere but the install
+     directory it reported "not paused, not hard-stopped" while looking at paths that
+     do not exist. That is not an exotic case: install.sh never schedules this program
+     and never even mentions it outside a download list, so running it from the wrong
+     directory is the DEFAULT way anyone would run it. */
+  const envPresent = Boolean(file && fs.existsSync(file));
   const cfg = { ...environment, ...readExecutorEnv(file) };
+  /* An install that keeps the DEFAULT control paths is perfectly valid — the defaults
+     resolve against executorDir, and if the service's env file is sitting there then
+     executorDir is right and so are they. The dangerous case is the env file being
+     ABSENT, which means we are almost certainly not in the install directory at all
+     and every path below is a guess. */
+  const controlsFromConfig = envPresent || Boolean(cfg.HARD_STOP_FILE && cfg.PAUSE_ENTRIES_FILE);
   const resolveAt = (value, fallback) => path.isAbsolute(value || "")
     ? path.resolve(value) : path.resolve(dir, value || fallback);
   const stateDb = resolveAt(cfg.STATE_DB, ".cc-executor.sqlite");
@@ -568,6 +582,9 @@ export async function inspectExecutor({
     label: "sleep assertion fault latch",
   });
   const controls = {
+    /* False here means "the file is absent", which is only meaningful if we were
+       looking in the right place. controlsRead says whether we were. */
+    controlsRead: controlsFromConfig,
     entriesPaused: pauseControl.present || sleepFaultControl.present,
     entryPauseValid: pauseControl.valid && sleepFaultControl.valid,
     hardStop: hardStopControl.present,
@@ -575,6 +592,11 @@ export async function inspectExecutor({
     sleepAssertionFault: sleepFaultControl.present,
     sleepAssertionFaultValid: sleepFaultControl.valid,
   };
+  if (!controlsFromConfig)
+    issue(issues, "executor_env_unreadable", "critical",
+      `no executor environment at ${file}${envPresent ? " naming the control files" : ""} — ` +
+      `the control state reported below is GUESSED from ${dir}, not read from the service's own ` +
+      "configuration. Point it at the install directory: --executor-dir <path>.");
   if (pauseControl.present && !pauseControl.valid)
     issue(issues, "entry_pause_invalid", "critical", pauseControl.reason);
   if (hardStopControl.present && !hardStopControl.valid)

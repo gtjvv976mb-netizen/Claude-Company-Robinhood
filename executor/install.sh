@@ -678,6 +678,11 @@ cat <<DONE
   with no stop-loss until you remove it:
       touch $HARD_STOP_FILE
   To let the bot close a position again:  rm $HARD_STOP_FILE
+
+  NOTHING WILL TELL YOU IF THIS BOT GOES DARK. Check it yourself, and pass the
+  install directory — run from anywhere else the monitor cannot read the service's
+  configuration and will say so rather than guessing:
+      node $CURRENT_LINK/monitor.mjs --executor-dir $INSTALL_DIR
   Stop process:   sudo systemctl stop cc-executor
   Protected env:  $ENV_FILE
   Durable state:  $STATE_DB
