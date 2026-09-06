@@ -769,7 +769,13 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
     buildSource.includes("EXECUTOR_COMMIT (or CI GITHUB_SHA)") &&
     buildSource.includes("LOCAL_PREVIEW_NOT_INSTALLABLE") &&
     pagesWorkflow.includes('EXECUTOR_COMMIT="${{ github.sha }}"') &&
-    viewerSource.includes("gtjvv976mb-netizen/Claude-Company.git") &&
+    /* THIS repository. It asserted "gtjvv976mb-netizen/Claude-Company.git" — the
+       SOLANA repo — so this test was one of two holding the wrong clone in place
+       while the panel handed owners a command that checked out a commit which
+       exists only here. The negative matters as much as the positive: the correct
+       URL does not contain the wrong one as a substring, so both can be asserted. */
+    viewerSource.includes("gtjvv976mb-netizen/Claude-Company-Robinhood.git") &&
+    !viewerSource.includes("gtjvv976mb-netizen/Claude-Company.git") &&
     !viewerSource.includes("claude-company-executor.git") &&
     viewerSource.includes("hasPinnedExecutorRelease"));
   check("launchctl policy parsing supports current macOS words and confirms enable",

@@ -9733,7 +9733,7 @@ function buildControls(settings) {
        three separate pastes. The secret is NOT in here on purpose: the
        installer prompts for it, so it never reaches shell history or ps. */
     const cmd = hasPinnedExecutorRelease
-      ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company.git && cd Claude-Company && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N}`
+      ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company-Robinhood.git && cd Claude-Company-Robinhood && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N}`
       : "Executor installation is unavailable in this local preview. Build a release with an exact EXECUTOR_COMMIT.";
     const box2 = mk("div", "bud-addr");
     box2.style.cssText = "white-space:pre-wrap;word-break:break-all;font-size:10px;line-height:1.5";
@@ -9774,7 +9774,7 @@ function buildControls(settings) {
       "A larger profile is local-only, requires all three values plus a fresh v2 wallet-and-values acknowledgement, and cannot exceed 0.004 / 0.04 / 0.012 ETH."));
     // Same single pinned line as the dry-run install, with the canary flags.
     const liveCmd = hasPinnedExecutorRelease
-      ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company.git && cd Claude-Company && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N} --live --expected-commit ${releaseCommit} --max-sol 0.005 --daily-cap 0.01 --daily-loss-cap 0.01 --rpc-file /absolute/path/to/primary-rpc --secondary-rpc-file /absolute/path/to/secondary-rpc --jupiter-key-file /absolute/path/to/jupiter-api-key`
+      ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company-Robinhood.git && cd Claude-Company-Robinhood && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N} --live --expected-commit ${releaseCommit} --max-eth 0.0004 --daily-cap 0.0008 --daily-loss-cap 0.0008 --rpc-file /absolute/path/to/primary-rpc --secondary-rpc-file /absolute/path/to/secondary-rpc`
       : "Live-canary installation is unavailable in this local preview. Build a release with an exact EXECUTOR_COMMIT.";
     const liveBox = mk("div", "bud-addr");
     liveBox.style.cssText = "white-space:pre-wrap;word-break:break-all;font-size:10px;line-height:1.5";
@@ -11221,22 +11221,31 @@ async function loadWallsteDashboard({ background = false } = {}) {
     const releaseIsPinned = /^[0-9a-f]{40}$/i.test(executorReleaseCommit);
     const runtimeMatchesRelease = releaseIsPinned &&
       String(health?.runtimeCommit || "").toLowerCase() === executorReleaseCommit.toLowerCase();
-    const dryRunCommand = "git clone https://github.com/gtjvv976mb-netizen/Claude-Company.git && " +
-      "cd Claude-Company && git checkout --detach " + executorReleaseCommit +
+    /* THE ROBINHOOD REPOSITORY. This cloned Claude-Company — the Solana repo — and
+       then checked out executorReleaseCommit, which is a commit in THIS repository and
+       does not exist there, so the very first command the panel hands an owner failed.
+       The whole setup card was ported from the Solana tower with its prose translated
+       to ETH and its commands left on SOL. */
+    const dryRunCommand = "git clone https://github.com/gtjvv976mb-netizen/Claude-Company-Robinhood.git && " +
+      "cd Claude-Company-Robinhood && git checkout --detach " + executorReleaseCommit +
       " && bash executor/install.sh --floor " + FLOOR_N;
     const reviewCommand = "sudo journalctl -u cc-executor -f";
     const liveCanaryCommand = "bash executor/install.sh --floor " + FLOOR_N +
       " --live --expected-commit " + executorReleaseCommit +
-      " --max-sol 0.005 --daily-cap 0.01 --daily-loss-cap 0.01" +
+      /* --max-eth, not --max-sol: install.sh exits 1 on an unknown flag, so the
+         Solana spelling made this command fail before it did anything. The numbers
+         are install.sh's own LIVE_CANARY_* for this chain. And there is no Jupiter
+         here — this chain routes through KyberSwap, which takes no API key at all. */
+      " --max-eth 0.0004 --daily-cap 0.0008 --daily-loss-cap 0.0008" +
       " --rpc-file /absolute/path/to/primary-rpc" +
-      " --secondary-rpc-file /absolute/path/to/secondary-rpc" +
-      " --jupiter-key-file /absolute/path/to/jupiter-api-key";
+      " --secondary-rpc-file /absolute/path/to/secondary-rpc";
     const raisedProfileCommand = "bash executor/install.sh --floor " + FLOOR_N +
       " --live --expected-commit " + executorReleaseCommit +
-      " --max-sol 0.05 --daily-cap 0.5 --daily-loss-cap 0.15" +
+      /* install.sh's LIVE_OPERATOR_MAX_* — and the note under this command already
+         quoted these ETH figures while the command itself still said 0.05 SOL. */
+      " --max-eth 0.004 --daily-cap 0.04 --daily-loss-cap 0.012" +
       " --rpc-file /absolute/path/to/primary-rpc" +
-      " --secondary-rpc-file /absolute/path/to/secondary-rpc" +
-      " --jupiter-key-file /absolute/path/to/jupiter-api-key";
+      " --secondary-rpc-file /absolute/path/to/secondary-rpc";
     const setupCard = dashNode("section", "dashsection");
     setupCard.appendChild(dashNode("h4", "", "Owner-only local activation · five deliberate steps"));
     setupCard.appendChild(dashNode("p", "dp-note",
@@ -11285,7 +11294,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
 
     const localReady = activation.currentLiveMode === true && activation.executionReadinessReady === true &&
       readiness?.providers === 2;
-    const liveStep = setupStep(4, "Configure two independent RPCs and Jupiter locally, then arm locally",
+    const liveStep = setupStep(4, "Configure two independent RPCs locally, then arm locally",
       "Store each credential in its own mode-0600 file. After the service starts, the live executor reports a no-sign two-provider readiness check at the active trade cap. During installation, it asks you at the host terminal to retype the displayed burner public address; the browser cannot acknowledge that prompt. The default canary may refuse trades whose fixed costs are too large; any raised profile requires all three cap flags plus a second exact v2 acknowledgement typed locally.",
       localReady);
     liveStep.appendChild(dashNode("pre", "commandbox", liveCanaryCommand));

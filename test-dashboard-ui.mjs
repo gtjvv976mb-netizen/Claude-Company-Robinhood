@@ -69,7 +69,50 @@ assert.match(html, /Active local cap policy · self-reported/);
 assert.match(html, /rolling realized-loss entry brake/);
 assert.match(html, /The realized-loss value is an entry brake, not a guaranteed loss ceiling/);
 assert.match(html, /--daily-loss-cap 0\.01/);
-assert.match(html, /--max-sol 0\.05 --daily-cap 0\.5 --daily-loss-cap 0\.15/);
+/* ── THE COMMANDS THIS PANEL HANDS AN OWNER MUST RUN ON THIS CHAIN ────────────
+ * This file used to assert /--max-sol 0.05 --daily-cap 0.5 --daily-loss-cap 0.15/ —
+ * the SOLANA tower's string — so the test was actively holding the bug in place.
+ * The whole setup card had been ported from that tower with its prose translated
+ * to ETH and its commands left on SOL: it cloned Claude-Company (the Solana repo)
+ * and then checked out a commit that only exists HERE, passed --max-sol to an
+ * installer that exits 1 on an unknown flag, and asked for a Jupiter API key on a
+ * chain that routes through KyberSwap and needs no key at all. Every command it
+ * offered failed.
+ *
+ * The numbers are DERIVED from install.sh rather than retyped, so the panel and
+ * the installer cannot drift apart again. */
+{
+  const installer = fs.readFileSync(new URL("./executor/install.sh", import.meta.url), "utf8");
+  const shell = (name) => installer.match(new RegExp(`^${name}="([^"]+)"`, "m"))?.[1];
+  const canary = ["LIVE_CANARY_MAX_ETH", "LIVE_CANARY_DAILY_CAP", "LIVE_CANARY_DAILY_LOSS_CAP"].map(shell);
+  const raised = ["LIVE_OPERATOR_MAX_ETH", "LIVE_OPERATOR_MAX_DAILY_CAP", "LIVE_OPERATOR_MAX_DAILY_LOSS_CAP"].map(shell);
+  assert.ok(canary.every(Boolean) && raised.every(Boolean), "could not read the cap literals from install.sh");
+
+  assert.ok(html.includes(`--max-eth ${canary[0]} --daily-cap ${canary[1]} --daily-loss-cap ${canary[2]}`),
+    `the live-canary command must offer install.sh's own canary caps (${canary.join(" / ")})`);
+  assert.ok(html.includes(`--max-eth ${raised[0]} --daily-cap ${raised[1]} --daily-loss-cap ${raised[2]}`),
+    `the raised-profile command must offer install.sh's own operator maxima (${raised.join(" / ")})`);
+
+  /* Every flag the panel OFFERS must be one this installer accepts. Scanned with
+     comments stripped: a code comment explaining why --max-sol is wrong is not the
+     panel offering --max-sol, and reading prose as data is how the first version of
+     this assertion failed. */
+  const code = html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const accepted = new Set([...installer.matchAll(/^\s*(--[a-z-]+)\)/gm)].map((m) => m[1]));
+  assert.ok(accepted.has("--max-eth") && !accepted.has("--max-sol"), "sanity: this installer is the ETH one");
+  const offered = new Set([...code.matchAll(/(--[a-z][a-z-]+)/g)].map((m) => m[1])
+    .filter((f) => /^--(max|daily|rpc|secondary|expected|floor|live|secret|api|static|source|jupiter)/.test(f)));
+  assert.ok(offered.size >= 4, `sanity: found only ${offered.size} installer flags in the panel`);
+  for (const flag of offered)
+    assert.ok(accepted.has(flag), `the panel offers ${flag}, which install.sh rejects with "unknown flag"`);
+
+  /* And it must clone THIS repository: the pinned commit exists only here. */
+  assert.match(html, /git clone https:\/\/github\.com\/gtjvv976mb-netizen\/Claude-Company-Robinhood\.git/);
+  assert.ok(!/Claude-Company\.git/.test(html),
+    "cloning the Solana repo and checking out this repo's commit fails at the first command");
+  assert.ok(!/jupiter/i.test(code.slice(code.indexOf("const dryRunCommand"), code.indexOf("const setupCard"))),
+    "this chain routes through KyberSwap and takes no API key");
+}
 assert.match(html, /fresh v2 wallet-and-values acknowledgement/);
 assert.match(html, /const dashEth = \(value\) =>[\s\S]*?toFixed\(9\)/,
   "sub-milli-ETH caps and readiness probes retain enough precision to never render as zero");
