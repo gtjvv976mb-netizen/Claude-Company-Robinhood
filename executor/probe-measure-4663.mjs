@@ -39,7 +39,17 @@ const PER_TIER = Number(args.perTier || 2);
    from GeckoTerminal's top pages — two Stock Tokens the scope guard refuses as positions
    and a stablecoin — so by default only PONS launches and the V4 pools they graduate
    into are sampled, and every base token is passed through the scope guard first. */
-const DEXES = new Set(String(args.dexes || "pons-v2-dex,uniswap-v4-robinhood").split(",").filter(Boolean));
+/* EVERY VENUE BY DEFAULT, because the executor is venue-agnostic: evm-swap.mjs routes
+   through KyberSwap's aggregator, and the only allowlist on the trading path is the
+   scope guard on TOKENS. Defaulting to pons-v2-dex + uniswap-v4-robinhood measured a
+   market this bot does not trade — and measured almost nothing: of 60 pools, 15 have
+   WETH on a side, and those two venues hold ONE of them between them (pons-v2 has zero;
+   its pair allowlist carries native ETH, not WETH). The sample came back as a single
+   pool in a single liquidity tier, which is an anecdote, not a measurement. Across all
+   venues the same run samples 7 pools spanning all four tiers, and the thin ones lose
+   84-99% on a round trip — exactly the fact screen.minLiquidityUsd exists to encode,
+   and exactly what one pool could never have shown. --dexes still narrows it. */
+const DEXES = new Set(String(args.dexes || "").split(",").filter(Boolean));
 const RPC_URL = process.env.RH_RPC || "https://rpc.mainnet.chain.robinhood.com";
 const rpc = createRpc(RPC_URL, { label: "probe RPC" });
 const CLIPS = [5n * 10n ** 15n, 5n * 10n ** 16n, 5n * 10n ** 17n];     // 0.005 / 0.05 / 0.5 ETH
