@@ -497,6 +497,38 @@ section("a safety exit may consume an ambiguous BUY's nonce to clear its runway"
     /cancelAmbiguousForRunway: mayCancel,/.test(src));
 }
 
+section("a fill priced from expired state is quarantined as unpriceable, not as missing");
+{
+  /* A SELL'S PROCEEDS ARE A BALANCE DELTA ACROSS THE FILL'S BLOCK, so accounting one
+     needs eth_getBalance at TWO PAST blocks. On a 250ms-block L2 a non-archive node
+     serves a short window, so a process down longer than that returns to a fill it can
+     never price. The receipt is status 0x1 and the tokens are gone — the money is in
+     the wallet. Reporting that as "no output reached the wallet" would be a lie about
+     which of the two problems the operator has. */
+  const prunedHistory = {
+    eth_getBalance: (params, chain) => {
+      if (params[1] !== "latest" && params[1] !== "pending")
+        throw new Error("missing trie node — state at that block is not available");
+      return hex(chain.balanceAt(params[1]));
+    },
+  };
+  const w = makeWorld({ overlayA: prunedHistory, overlayB: prunedHistory });
+  const failed = await caught(() => w.executor.executeIntent(exitSpec(w)));
+  const intent = w.journal.getIntent("desk-exit:50:9");
+
+  ok("the intent is quarantined rather than retried against a node that cannot answer",
+    intent.state === "ambiguous", intent.state);
+  ok("...named as UNPRICEABLE, not as a fill that never happened",
+    /proceeds cannot be measured/.test(intent.error ?? "") &&
+    !/no .* reached/.test(intent.error ?? ""), intent.error);
+  ok("...saying plainly that the sell did land, so nobody hunts a missing transaction",
+    /The sell DID land/.test(intent.error ?? ""), intent.error);
+  ok("...and naming the way out rather than leaving it a dead end",
+    /archive endpoint/.test(intent.error ?? ""), intent.error);
+  ok("the thrown error carries the same account, so a caller is not left guessing",
+    /proceeds cannot be measured/.test(failed?.message ?? ""), failed?.message?.slice(0, 120));
+}
+
 section("providers disagree → HOLD, never a guess");
 {
   const w = makeWorld({ overlayB: { eth_getTransactionCount: async (p, chain) => hex(p[1] === "latest" ? chain.minedNonce + 1 : chain.pendingNonce()) } });

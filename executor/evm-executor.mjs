@@ -649,7 +649,17 @@ export class EvmExecutor {
       this.journal.markAmbiguous(intent.id, row.attempt, `receipt for ${row.txHash} has status ${receipt.status}`);
       throw new Error(`intent ${intent.id}: receipt status ${receipt.status} is neither success nor failure; quarantined`);
     }
-    const output = await this._measureOutput(intent, receipt, fee);
+    let output;
+    try {
+      output = await this._measureOutput(intent, receipt, fee);
+    } catch (error) {
+      /* Quarantine it under its own name instead of throwing the same generic error on
+         every tick forever. The distinction the operator needs is "we could not price a
+         fill that happened", not "the fill is missing" — the money is in the wallet. */
+      if (error?.code !== "STATE_WINDOW_PASSED") throw error;
+      this.journal.markAmbiguous(intent.id, row.attempt, `${error.message}`);
+      throw new Error(`intent ${intent.id}: ${error.message}`);
+    }
     if (intent.kind !== "approval" && output <= 0n) {
       this.journal.markAmbiguous(intent.id, row.attempt,
         `receipt ${row.txHash} succeeded but no ${intent.outputMint} reached ${this.address}`);
@@ -670,8 +680,25 @@ export class EvmExecutor {
     if (intent.kind === "approval") return 0n;
     if (isExitAsset(intent.outputMint) && isNative(intent.outputMint)) {
       const block = fromHexNumber(receipt.blockNumber, "blockNumber");
-      const [beforeA, beforeB] = await balanceOnBoth(this.providers, this.address, hex(block - 1));
-      const [afterA, afterB] = await balanceOnBoth(this.providers, this.address, hex(block));
+      /* A SELL IS PRICED FROM HISTORICAL STATE, WHICH EXPIRES. The proceeds are a
+         balance delta across the fill's block, so this needs eth_getBalance AT two
+         past blocks. On a 250ms-block L2 a non-archive node serves only a short
+         window, and a process that was down longer than that comes back to a fill it
+         can never price. That is not "no output" — the receipt is status 0x1 and the
+         tokens are gone — so it must not be reported as one. */
+      let beforeA, beforeB, afterA, afterB;
+      try {
+        [beforeA, beforeB] = await balanceOnBoth(this.providers, this.address, hex(block - 1));
+        [afterA, afterB] = await balanceOnBoth(this.providers, this.address, hex(block));
+      } catch (error) {
+        const pruned = new Error(
+          `proceeds cannot be measured: neither provider still serves the state at block ${block} ` +
+          `(${String(error.message).slice(0, 120)}). The sell DID land — its receipt is status 0x1 — ` +
+          "but the delta it is priced from needs historical state a pruned node cannot answer. " +
+          "Point either provider at an archive endpoint and recover, or account this fill by hand.");
+        pruned.code = "STATE_WINDOW_PASSED";
+        throw pruned;
+      }
       if (beforeA !== beforeB || afterA !== afterB)
         throw new Error(`providers disagree on the wallet balance around block ${block}`);
       // The sell spent nothing but gas, so what came back is the delta plus the fee.
