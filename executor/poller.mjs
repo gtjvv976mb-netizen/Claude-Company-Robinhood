@@ -1207,7 +1207,11 @@ async function manageOpen() {
       if (executor && pos.qtyRaw && BigInt(pos.qtyRaw) > 0n) {
         try {
           if (ethUsdError || !(currentEthUsd > 0))
-            throw new Error(`independent ETH/USD mark unavailable: ${ethUsdError?.message || "no usable Chainlink cache"}`);
+            /* An oracle gap is a fact about Chainlink, not about this pool — classified
+               so it cannot latch a market liquidation on two ticks. */
+            throw Object.assign(new Error(
+              `independent ETH/USD mark unavailable: ${ethUsdError?.message || "no usable Chainlink cache"}`),
+              { failureClass: "oracle" });
           const observation = await executor.preflightExitMark({
             mint: pos.mint, amountRaw: pos.qtyRaw, position: pos,
           });
@@ -1222,15 +1226,23 @@ async function manageOpen() {
           pos.riskDataUnavailable = true;
           pos.riskDataUnavailableReason = `independent executable exit mark unavailable: ${error.message}`;
           pos.riskDataUnavailableAt = Date.now();
+          /* WHAT THE FAILURE IS EVIDENCE OF decides how much of it is needed before a
+             latched, price-blind liquidation of the whole position. evm-swap tags an
+             aggregator answer with no route as "no-route" (two ticks, unchanged) and an
+             HTTP/DNS/timeout failure as "transport" (six observations over ten minutes).
+             An unclassified error falls through to the stricter routing fuse. */
           const witness = confirmExitMarkFailureWitness(pos, {
             observedAt: pos.riskDataUnavailableAt, reason: pos.riskDataUnavailableReason,
+            failureClass: error?.failureClass,
           }, { maxGapMs: Math.max(60_000, POLL_MS * 4) });
           save();
           if (!witness.confirmed) {
             log(`mark ${pos.symbol}: ${error.message} — new entries blocked; ` +
               "waiting for one independent next-tick failure witness before risk reduction");
           } else {
-            log(`mark ${pos.symbol}: executable mark failed on two consecutive ticks — ` +
+            log(`mark ${pos.symbol}: executable mark unavailable — ${witness.trigger.witnesses} ` +
+              `${witness.trigger.failureClass} observations over ` +
+              `${Math.round((witness.trigger.observedAt - witness.trigger.firstObservedAt) / 1000)}s — ` +
               "latching a risk-reducing exit so the aggregator cannot suppress a stop");
             await sellAll(pos, "independent executable exit mark unavailable on two consecutive ticks",
               1, null, witness.trigger);

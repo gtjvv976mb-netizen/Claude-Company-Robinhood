@@ -83,24 +83,56 @@ export function clearPriceExitWitness(position) {
  * by returning an inflated minimum-output floor that fails simulation. One failure
  * freezes new exposure; two distinct consecutive ticks latch a risk-reducing exit.
  */
+/* HOW MUCH EVIDENCE A LATCHED LIQUIDATION NEEDS, BY WHAT THE EVIDENCE IS ABOUT.
+ *
+ * The latch above is a real defence and it stays: an order service that answers "no
+ * route" forever would otherwise hide a breached stop indefinitely. But the code could
+ * not tell that verdict apart from an HTTP 500, and the sell it fires carries kind
+ * "risk-data", so validateExecutableExitOrder applies NO price condition — stop, target
+ * and take-profit are never consulted. Two failed quotes fifteen seconds apart therefore
+ * market-sold every open position, winners included, on a thirty-second outage at a
+ * shared public endpoint this bot polls once per position per tick.
+ *
+ * A routing verdict keeps the original two-tick fuse, unchanged. A transport failure or
+ * a missing ETH/USD denominator says nothing about the pool, so it must persist — six
+ * observations AND ten continuous minutes. A hostile service that simply refuses to
+ * answer is still stopped out; it takes minutes instead of one tick. Any successful
+ * mark clears the chain, and a change of failure class restarts it, because different
+ * evidence is not the same evidence continuing. */
+export const EXIT_MARK_FAILURE_POLICY = Object.freeze({
+  "no-route": Object.freeze({ witnesses: 2, minSpanMs: 0 }),
+  transport: Object.freeze({ witnesses: 6, minSpanMs: 600_000 }),
+  oracle: Object.freeze({ witnesses: 6, minSpanMs: 600_000 }),
+});
+
 export function confirmExitMarkFailureWitness(position, failure, {
-  minGapMs = 1, maxGapMs = 60_000,
+  minGapMs = 1, maxGapMs = 60_000, policy = EXIT_MARK_FAILURE_POLICY,
 } = {}) {
   const observedAt = Number(failure?.observedAt);
   if (!Number.isSafeInteger(observedAt) || observedAt <= 0)
     throw new Error("exit-mark failure observation time is invalid");
+  /* Unknown or absent class is treated as a routing verdict: the stricter fuse, so a
+     caller that forgets to classify cannot accidentally buy itself a ten-minute delay
+     on a real suppression attempt. */
+  const failureClass = String(failure?.failureClass || "no-route");
+  const rule = policy[failureClass] || policy["no-route"];
   const prior = position?.pendingExitMarkFailure;
   const gap = observedAt - Number(prior?.observedAt || 0);
-  if (prior?.kind === "executable-mark-unavailable" && gap >= minGapMs && gap <= maxGapMs) {
+  const continues = prior?.kind === "executable-mark-unavailable" &&
+    String(prior.failureClass || "no-route") === failureClass &&
+    gap >= minGapMs && gap <= maxGapMs;
+  const witnesses = continues ? Number(prior.witnesses || 1) + 1 : 1;
+  const firstObservedAt = continues ? Number(prior.firstObservedAt || prior.observedAt) : observedAt;
+  if (witnesses >= rule.witnesses && observedAt - firstObservedAt >= rule.minSpanMs) {
     delete position.pendingExitMarkFailure;
     return { confirmed: true, trigger: {
       kind: "risk-data", reason: "independent executable exit mark unavailable",
-      firstObservedAt: Number(prior.observedAt), observedAt, witnesses: 2,
+      failureClass, firstObservedAt, observedAt, witnesses,
     } };
   }
   position.pendingExitMarkFailure = {
-    kind: "executable-mark-unavailable", observedAt,
-    reason: String(failure?.reason || "executable exit mark unavailable"), witnesses: 1,
+    kind: "executable-mark-unavailable", failureClass, observedAt, firstObservedAt,
+    reason: String(failure?.reason || "executable exit mark unavailable"), witnesses,
   };
   return { confirmed: false, trigger: position.pendingExitMarkFailure };
 }

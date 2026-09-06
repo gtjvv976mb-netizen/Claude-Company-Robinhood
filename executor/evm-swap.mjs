@@ -47,11 +47,25 @@ export const NATIVE_SENTINEL = NATIVE;
    with "Invalid msg.value". Native in means the sentinel, and it means value. */
 export const isNative = (t) => String(t).toLowerCase() === NATIVE.toLowerCase();
 
+/* TRANSPORT FAILURE AND ROUTING VERDICT ARE DIFFERENT EVIDENCE, and the exit path
+   treats them very differently — see confirmExitMarkFailureWitness. An HTTP 500, a
+   429 or a DNS timeout is a fact about the NETWORK. "The aggregator answered and has
+   no route at this size" is a fact about the POSITION. Untagged, they were the same
+   thrown Error, and two network blips fifteen seconds apart market-sold every open
+   position with no stop re-check. */
+const tagged = (message, kind) => Object.assign(new Error(message), { failureClass: kind });
+
 const jsonFetch = async (url, init, timeoutMs = 20_000) => {
-  const r = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs),
-    headers: { "x-client-id": CLIENT, ...(init?.headers ?? {}) } });
+  let r;
+  try {
+    r = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs),
+      headers: { "x-client-id": CLIENT, ...(init?.headers ?? {}) } });
+  } catch (e) {
+    /* DNS, TLS, connection refused, AbortSignal.timeout — never a verdict on a pool. */
+    throw tagged(`${url.split("?")[0]} unreachable: ${e?.message || e}`, "transport");
+  }
   const body = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(`${url.split("?")[0]} ${r.status}: ${body?.message ?? "no body"}`);
+  if (!r.ok) throw tagged(`${url.split("?")[0]} ${r.status}: ${body?.message ?? "no body"}`, "transport");
   return body;
 };
 
@@ -61,7 +75,8 @@ export async function quote({ tokenIn, tokenOut, amountIn, to }) {
     to, gasInclude: "true" });
   const body = await jsonFetch(`${AGG}/routes?${qs}`);
   const route = body?.data?.routeSummary;
-  if (!route?.amountOut) throw new Error(`no route for ${tokenIn} -> ${tokenOut} at ${amountIn}`);
+  /* The service answered. No route at this size IS a statement about the position. */
+  if (!route?.amountOut) throw tagged(`no route for ${tokenIn} -> ${tokenOut} at ${amountIn}`, "no-route");
   return route;
 }
 

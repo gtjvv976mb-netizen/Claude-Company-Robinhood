@@ -88,7 +88,16 @@ export const CANCEL_GAS_LIMIT = 21_000n;
 
 const DEFAULT_CONFIG = Object.freeze({
   slippageBps: null,             // from the thresholds registry; null refuses to arm
-  maxPriceImpactPct: null,       // ditto
+  maxPriceImpactPct: null,       // ditto — the ENTRY cap
+  /* THE EXIT CAP. MAX_EXIT_PRICE_IMPACT_PCT was parsed, clamped, documented and
+     allowlisted, and read by nothing: the sell called prepareSwap with no
+     maxPriceImpactPct, so evm-swap's impact block was skipped on every exit and
+     the whole position went out at whatever the route paid. Against pools measured
+     at a 84.2% median round-trip loss under $10k liquidity, that is the difference
+     between a stop and a donation. Wiring it also revives poller.mjs's
+     manualExitRequired branch, which could never fire because nothing produced the
+     "price impact ... exceeds cap" message on an exit. */
+  maxExitPriceImpactPct: null,
   maxNetworkFeeWei: null,        // the GATE: gasLimit × maxFeePerGas above this refuses
   expectedNetworkFeeWei: null,   // the COST MODEL, used by sizing; never the gate
   maxTransferTaxBps: 0,
@@ -294,9 +303,15 @@ export class EvmExecutor {
        starts carrying "Robinhood Token", a beacon slot that reads unreadable for one
        tick — must never strand its own exit. The output is asserted native/WETH below,
        so there is nothing left to scope. (Review, 2026-09-05.) */
+    /* The cap REFUSES this attempt; it does not strand the position. The refusal
+       carries "price impact ... exceeds cap", which poller.mjs turns into
+       manualExitRequired — a human decision on a position that can only be sold at a
+       catastrophic price, rather than an automatic dump into an empty pool. Null
+       (paper, or an operator who cleared it) keeps the old unbounded behaviour. */
     const prepared = await prepareSwap(this.primary, {
       tokenIn: intent.mint, tokenOut: NATIVE_SENTINEL, amountIn: BigInt(intent.amountRaw),
       sender: this.address, slippageBps: this.cfg.slippageBps, direction: "sell", scopeCheck: false,
+      maxPriceImpactPct: this.cfg.maxExitPriceImpactPct,
     });
     if (lower(prepared.to) !== lower(spender))
       throw new Error(`the sell routed through ${prepared.to} but the allowance was granted to ${spender}; refusing to sign a swap the allowance does not cover`);
