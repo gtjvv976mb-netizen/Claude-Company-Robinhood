@@ -437,6 +437,66 @@ section("submitted → ambiguous  (txCount > N on both, none of our hashes lande
   ok("no cancel was attempted at a nonce that is already gone", w.chain.sends.length === 1);
 }
 
+section("a safety exit may consume an ambiguous BUY's nonce to clear its runway");
+{
+  /* THE RUNWAY IS PER-WALLET AND CANNOT BE MINT-SCOPED: nonces are sequential, so any
+     unresolved attempt at a lower nonce holds everything behind it, including a stop
+     on a different token. The cancel that frees such a nonce used to require the
+     BLOCKER itself to be a safety exit, so a dropped, ambiguous BUY could never have
+     its nonce consumed and the whole book's stops queued behind it forever.
+     A cancel is a same-nonce replacement: exactly one of the two can land, so the
+     ambiguity resolves either way. Holding resolves nothing and leaves real positions
+     unstopped.
+     Tested at the decision itself. Driving it through executeIntent needs a second
+     token, and this harness models one — balanceOf ignores which contract was called —
+     so that route stops at a balance check before the runway is ever reached, and a
+     test written that way passed with the fix REVERTED. Mutation testing caught it. */
+  /* An ambiguous buy with its cancel budget INTACT. "wronghash" quarantines the intent
+     on the first attempt — the node acknowledged different bytes than we journaled — so
+     no cancel has been spent and freeing the nonce is still possible. (Driving it to
+     ambiguity by repeated drops instead exhausts maxCancelResends, and then nothing can
+     send a cancel regardless of authorisation; that scenario cannot show this fix.) */
+  const mkBlocker = async () => {
+    const w = makeWorld();
+    w.chain.sendPolicy = "wronghash";
+    await caught(() => w.executor.executeIntent(entrySpec(w)));
+    w.chain.sendPolicy = "ok";
+    w.chain.head = 1_400;
+    return w;
+  };
+
+  const a = await mkBlocker();
+  const blocker = a.journal.getIntent("entry:50:1");
+  ok("the blocking BUY is ambiguous and is not itself a safety exit",
+    blocker.state === "ambiguous" && !a.executor._isSafetyExit(blocker), blocker.state);
+
+  /* WITHOUT the runway authorisation — the old behaviour — no cancel is sent. */
+  a.chain.sendPolicy = "ok";
+  const sendsBefore = a.chain.sends.length;
+  await a.executor._reconcile(blocker, a.journal.latestAttempt(blocker.id),
+    { finalityTimeoutMs: 0, allowCancel: true, cancelAmbiguousForRunway: false });
+  ok("without the runway authorisation the ambiguous buy keeps its nonce",
+    a.chain.sends.length === sendsBefore, `${a.chain.sends.length - sendsBefore} sends`);
+
+  /* WITH it — a safety exit is waiting behind this nonce — the nonce is consumed. */
+  const b = await mkBlocker();
+  const blockerB = b.journal.getIntent("entry:50:1");
+  b.chain.sendPolicy = "ok";
+  const beforeB = b.chain.sends.length;
+  await b.executor._reconcile(blockerB, b.journal.latestAttempt(blockerB.id),
+    { finalityTimeoutMs: 0, allowCancel: true, cancelAmbiguousForRunway: true });
+  ok("with a safety exit waiting, the wedged nonce IS consumed by a cancel",
+    b.chain.sends.length > beforeB, `${b.chain.sends.length - beforeB} sends`);
+
+  /* And the authorisation is only ever handed out by the runway when the WAITING
+     intent is a safety exit — never by default. */
+  const src = fs.readFileSync(new URL("./evm-executor.mjs", import.meta.url), "utf8");
+  ok("the option defaults to false, so no other caller gains this power",
+    /cancelAmbiguousForRunway = false \} = \{\}\) \{/.test(src));
+  ok("and the runway passes it only as mayCancel (a safety exit or its approval)",
+    /cancelAmbiguousForRunway: mayCancel,/.test(src));
+}
+
 section("providers disagree → HOLD, never a guess");
 {
   const w = makeWorld({ overlayB: { eth_getTransactionCount: async (p, chain) => hex(p[1] === "latest" ? chain.minedNonce + 1 : chain.pendingNonce()) } });

@@ -375,7 +375,12 @@ export class EvmExecutor {
       // "cancelled — may be rebuilt" is thrown by design so no caller mistakes a cancel
       // for a fill; for THIS caller it is the outcome it was waiting for.
       try {
-        await this._reconcile(pending, latest, { finalityTimeoutMs: mayCancel ? this.cfg.cancelTimeoutMs : 0, allowCancel: mayCancel });
+        await this._reconcile(pending, latest, {
+          finalityTimeoutMs: mayCancel ? this.cfg.cancelTimeoutMs : 0, allowCancel: mayCancel,
+          /* A safety exit clearing its runway may consume an ambiguous blocker's nonce
+             whatever KIND that blocker is — see the note in _reconcile. */
+          cancelAmbiguousForRunway: mayCancel,
+        });
       } catch (error) {
         this.log(`nonce runway ${intent.id}: ${pending.id}: ${String(error.message).slice(0, 160)}`);
       }
@@ -484,7 +489,8 @@ export class EvmExecutor {
       .map((a) => ({ attempt: a.attempt, txHash: a.txHash, role: a.order?.role === "cancel" ? "cancel" : "tx", cancelOf: a.order?.cancelOf ?? null }));
   }
 
-  async _reconcile(intent, attempt, { finalityTimeoutMs = this.cfg.receiptTimeoutMs, allowCancel = true, allowSend = true } = {}) {
+  async _reconcile(intent, attempt, { finalityTimeoutMs = this.cfg.receiptTimeoutMs, allowCancel = true,
+    allowSend = true, cancelAmbiguousForRunway = false } = {}) {
     if (!attempt || attempt.nonce == null) return this.journal.getIntent(intent.id);
     const deadlineAt = this.now() + Math.max(0, finalityTimeoutMs);
     const swapRow = this._hashesAtNonce(intent, attempt).find((h) => h.role === "tx") ??
@@ -553,7 +559,19 @@ export class EvmExecutor {
       }
       // DROPPED on both. The safe transition is not "rebuild at N": the old bytes never
       // expire and two transactions at N would race. Consume N with a cancel.
-      if (current.state === "ambiguous" && !(allowCancel && this._isSafetyExit(current))) return current;
+      /* WHOSE nonce this is decides who may free it. `current` here is the BLOCKER, so
+         requiring the blocker to be a safety exit meant a dropped, ambiguous ENTRY could
+         never have its nonce consumed — and because the runway is strictly sequential,
+         every later intent held behind it. That includes every exit on every other
+         token: one stuck buy disarmed the whole book's stops, permanently, with no
+         automated way out.
+         cancelAmbiguousForRunway is set only when the intent WAITING for the runway is
+         itself a safety exit, and a cancel cannot make the blocker's outcome worse —
+         it is a same-nonce replacement, so exactly one of the two can land, and either
+         way the ambiguity resolves. Holding forever resolves nothing and leaves real
+         positions unstopped, which is the worse of the two risks. */
+      if (current.state === "ambiguous" &&
+          !(allowCancel && (cancelAmbiguousForRunway || this._isSafetyExit(current)))) return current;
       if (!allowCancel || !allowSend) return current;
       if (this.hardStop()) {
         this.log(`reconcile ${intent.id}: nonce ${n} is dropped but HARD STOP is present; no cancel sent`);
