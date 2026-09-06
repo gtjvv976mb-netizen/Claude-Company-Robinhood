@@ -672,8 +672,12 @@ cat <<DONE
   Max $MAX_ETH ETH/trade · $DAILY_CAP ETH/rolling 24h deploy
   Realized-loss entry brake $DAILY_LOSS_CAP ETH/rolling 24h
   Watch:          sudo journalctl -u cc-executor -f
-  Pause entries:  touch $PAUSE_FILE
-  Hard stop:      touch $HARD_STOP_FILE
+  Stop OPENING (stops stay armed, open positions still exit):
+      touch $PAUSE_FILE
+  Stop EVERYTHING, INCLUDING EXITS — open positions keep their money at risk
+  with no stop-loss until you remove it:
+      touch $HARD_STOP_FILE
+  To let the bot close a position again:  rm $HARD_STOP_FILE
   Stop process:   sudo systemctl stop cc-executor
   Protected env:  $ENV_FILE
   Durable state:  $STATE_DB

@@ -1073,7 +1073,16 @@ async function sellAll(pos, why, fraction = 1, suppliedIntentId = null, trigger 
     return log(`EXIT ${pos.symbol} remains durably latched — ${existingIntent.state} attempt is ` +
       "handled by bounded recovery without blocking other position checks");
   if (!EXECUTE) return log(`PAPER EXIT ${pos.symbol} — ${why} — position retained; no transaction sent`);
-  if (hardStop()) throw new Error("HARD STOP is present — automated exits are blocked; manage the wallet manually");
+  /* The message used to end at "manage the wallet manually", which sounds like a
+     wallet is the only way out and is misleading: removing this sentinel re-arms the
+     bot's own exits, and that is almost always what the operator wants. Naming the
+     other sentinel matters too — an operator reaching for a kill switch reads "hard
+     stop" as the stronger, safer one and thereby disarms every stop-loss they have. */
+  if (hardStop()) throw new Error(
+    `HARD STOP is present at ${HARD_STOP_FILE} — it blocks EXITS as well as entries, so this ` +
+    "position has no stop-loss while it is there. Remove it to let the bot close the position " +
+    "(rm the file), or sell from the burner wallet yourself. To stop only NEW entries and keep " +
+    `stops armed, use the entry-pause sentinel at ${PAUSE_ENTRIES_FILE} instead.`);
 
   const tracked = BigInt(pos.qtyRaw || 0);
   const balance = await inspectTrackedBalance(pos);

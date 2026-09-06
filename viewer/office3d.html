@@ -11103,8 +11103,13 @@ async function loadWallsteDashboard({ background = false } = {}) {
         lastFeedAt ? dashWhen(lastFeedAt) : "from outbound heartbeat"),
       dashMetric("Entry pause", health?.entriesPaused === true ? "Paused" : health ? "Not paused" : "Unknown",
         "self-reported control state"),
+      /* An ACTIVE hard stop is not a neutral state: it blocks exits too, so every open
+         position is unstopped for as long as it is set. "self-reported control state"
+         does not say that, and this panel is where an owner checks in a hurry. */
       dashMetric("Hard stop", health?.hardStop === true ? "ACTIVE" : health ? "Clear" : "Unknown",
-        "self-reported control state"),
+        health?.hardStop === true
+          ? "BLOCKS EXITS TOO — open positions have no stop-loss until it is removed"
+          : "self-reported control state"),
       dashMetric("Blocking intent", health?.blockingIntent === true ? "PRESENT" : health ? "Clear" : "Unknown",
         "unresolved local journal intent"),
       dashMetric("Feed / tick failures", health ? String(health.consecutiveFeedFailures ?? 0) + " / " + String(health.consecutiveTickFailures ?? 0) : "\u2014",
