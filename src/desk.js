@@ -225,6 +225,40 @@ export async function workup(cycle, mint, hook = "", opts = {}) {
 
   // --- Stage 7-9: adversary, risk, decision. ---
   const weighted = composite(analysts);
+
+  /* ── DO NOT BUY TWO OPUS SEATS TO CONFIRM A NO ──────────────────────────────────
+   * The red team and the PM are the two Opus seats on this desk and the largest line
+   * items in a workup — the note beside redteam's effort setting records xhigh thinking
+   * alone as a third of the whole bill. Both ran unconditionally, so a coin all five
+   * analysts had already scored into the ground still bought an adversary to attack a
+   * thesis nobody held, and then a PM to decline it.
+   *
+   * `weighted` is a confidence-weighted 0-100 composite where 50 is neutral. Below the
+   * floor there is no PM decision that publishes: the seats have said no, and the
+   * mandate declines on the team's no rather than ranking past it. So the only thing
+   * the expensive stages can add is a more expensive way to record the same answer.
+   *
+   * THIS CANNOT PUBLISH ANYTHING IT SHOULD NOT. It only ever SKIPS, never approves, and
+   * what it skips is a coin already headed for a decline. The floor is deliberately low
+   * (30 against a neutral 50) so it cuts the clearly-dead rather than the marginal — the
+   * desk was just told to be MORE open, and a cost saving that quietly tightens the bar
+   * would be the wrong trade. DESK_CONVICTION_FLOOR tunes it; 0 disables it. */
+  const convictionFloor = Number(process.env.DESK_CONVICTION_FLOOR ?? 30);
+  if (convictionFloor > 0 && weighted < convictionFloor) {
+    const rec = { mint, symbol: ev.symbol, outcome: "killed", killedBy: "conviction floor",
+      reason: `the five analysts scored this ${weighted.toFixed(1)} of 100, under the ${convictionFloor} floor — ` +
+        `the adversary and the PM were not bought to confirm a no`,
+      ev, analysts, seatFailures, weighted, finalDecision: "killed" };
+    rec.reportFile = writeReport(cycle, rec);
+    emit("stage", { stage: "conviction_floor", mint, symbol: ev.symbol,
+      weighted: Number(weighted.toFixed(1)), floor: convictionFloor,
+      note: "skipped the two Opus seats — nothing they could return would publish this" });
+    emit("token:end", { mint, symbol: ev.symbol, outcome: "killed",
+      detail: `conviction floor: ${weighted.toFixed(1)} < ${convictionFloor}`, report: rec.reportFile });
+    recordEvaluation(rec);
+    return rec;
+  }
+
   emit("stage", { stage: "redteam", mint, symbol: ev.symbol, weighted: Number(weighted.toFixed(1)) });
   const redteamRaw = await runRedTeam(ev, analysts);
   let redteam = redteamRaw;
