@@ -300,6 +300,7 @@ export async function gather(address, hook = "") {
     phase, hasLaunchLog: !!launchLog,
     verifiedAmmPool: holders?.verifiedAmmPool === true,
     sellSimOk: sellSim?.ok === true,
+    curveHolder: holders?.curveHolder === true,
   });
 
   /* Cost of the round trip in dollars, priced at the gas price read on this tick. */

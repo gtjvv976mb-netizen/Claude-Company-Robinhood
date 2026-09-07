@@ -103,9 +103,13 @@ export const TRADEABLE_PHASES = new Set(["graduated", "amm"]);
  * It can only ever turn "unknown" into "amm". A known "curve" stays a curve, and a coin
  * with a launch log is judged on that log, not on this.
  */
-export function resolveAmmPhase({ phase, hasLaunchLog, verifiedAmmPool, sellSimOk }) {
+export function resolveAmmPhase({ phase, hasLaunchLog, verifiedAmmPool, sellSimOk, curveHolder = false }) {
   if (phase !== "unknown") return phase;
   if (hasLaunchLog) return phase;
+  /* A CURVE CONTRACT AMONG THE LARGEST HOLDERS VETOES THE UPGRADE, even if a pool is
+     also present. Absence of a curve is not proof of anything and is not treated as
+     such — this is only here so that POSITIVE evidence of one can never be outvoted. */
+  if (curveHolder === true) return phase;
   if (verifiedAmmPool !== true) return phase;
   if (sellSimOk !== true) return phase;
   return "amm";

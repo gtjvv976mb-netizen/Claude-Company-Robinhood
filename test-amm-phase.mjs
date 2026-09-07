@@ -42,6 +42,14 @@ for (const bad of [null, undefined, "true", 1, {}]) {
     assert.equal(resolveAmmPhase({ ...proven, sellSimOk: bad }), "unknown"));
 }
 
+console.log("\nPOSITIVE EVIDENCE OF A CURVE VETOES THE UPGRADE");
+ok("a curve contract among the top holders blocks it even WITH both proofs", () =>
+  assert.equal(resolveAmmPhase({ ...proven, curveHolder: true }), "unknown"));
+ok("a LOCKER is not a curve — a graduated PONS coin holds one and must still pass", () =>
+  assert.equal(resolveAmmPhase({ ...proven, curveHolder: false }), "amm"));
+ok("the veto defaults to off, so a bundle without the field is not silently refused", () =>
+  assert.equal(resolveAmmPhase({ phase: "unknown", hasLaunchLog: false, verifiedAmmPool: true, sellSimOk: true }), "amm"));
+
 console.log("\nIT CAN ONLY EVER UPGRADE 'UNKNOWN' — A CURVE STAYS A CURVE");
 ok("a known curve is untouched even with both proofs", () =>
   assert.equal(resolveAmmPhase({ ...proven, phase: "curve" }), "curve"));
@@ -92,6 +100,14 @@ ok("no dex id feeds the upgrade", () => {
 const bs = fs.readFileSync(new URL("src/data/blockscout.js", import.meta.url), "utf8");
 ok("verifiedAmmPool requires the contract to be VERIFIED, not merely named", () =>
   assert.match(bs, /is_contract && it\?\.address\?\.is_verified/));
+ok("Uniswap V4's singleton is matched by ADDRESS, not by its generic name", () =>
+  assert.match(bs, /addr === lower\(V4_POOL_MANAGER\)/),
+);
+ok("the curve veto does not fire on a LOCKER", () =>
+  assert.match(bs, /!\/locker\/i\.test/),
+);
+ok("the explorer retries transient failures rather than losing the coin", () =>
+  assert.match(bs, /TRANSIENT_HTTP/));
 
 console.log(`\n${fail ? "FAIL" : "PASS"} — ${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

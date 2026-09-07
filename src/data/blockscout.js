@@ -32,7 +32,7 @@
  *
  * Blockscout answers 403 to a default fetch UA and 200 to a browser one.
  */
-import { shapeHolders } from "./evm.js";
+import { shapeHolders, V4_POOL_MANAGER } from "./evm.js";
 
 const BASE = process.env.RH_EXPLORER_BASE || "https://robinhoodchain.blockscout.com";
 /* A browser User-Agent is REQUIRED. Without it this host 403s, which is why the
@@ -41,13 +41,34 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const lower = (a) => String(a ?? "").toLowerCase();
 
-async function get(path, { timeoutMs = 12_000 } = {}) {
-  const r = await fetch(`${BASE}${path}`, {
-    headers: { accept: "application/json", "user-agent": UA },
-    redirect: "error", signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!r.ok) throw new Error(`explorer HTTP ${r.status}`);
-  return r.json();
+/* A HICCUP MUST NOT COST A COIN. This is on the critical path now — it is what supplies
+   holder concentration for every token older than the 3.4-hour ledger budget, which is
+   essentially all of them — and the screen correctly REFUSES when holders are
+   unverified. So a single 429 or a dropped connection turns into a coin the desk never
+   looks at. Observed live: one SIZE run returned unverified_holders and the next two
+   returned clean. Retried on transient conditions only; a 404 is an answer and is
+   returned at once. Bounded at three waits, then the failure stands honestly. */
+const TRANSIENT_HTTP = new Set([408, 425, 429, 500, 502, 503, 504]);
+async function get(path, { timeoutMs = 12_000, retries = 3 } = {}) {
+  let last;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const r = await fetch(`${BASE}${path}`, {
+        headers: { accept: "application/json", "user-agent": UA },
+        redirect: "error", signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (r.ok) return r.json();
+      last = new Error(`explorer HTTP ${r.status}`);
+      if (!TRANSIENT_HTTP.has(r.status)) throw last;
+    } catch (e) {
+      last = e;
+      /* An explicit non-transient HTTP answer is final; anything else (abort, socket,
+         DNS) is worth one more try. */
+      if (/explorer HTTP/.test(String(e.message)) && !TRANSIENT_HTTP.has(Number(String(e.message).match(/\d+/)?.[0]))) throw e;
+    }
+    if (attempt < retries) await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+  }
+  throw last ?? new Error("explorer unreachable");
 }
 
 /** Token metadata: supply, decimals and the TRUE holder count. */
@@ -118,10 +139,31 @@ export async function holdersFromExplorer(address, { supply = null, decimals = 1
        DexScreener reports a live PONS bonding curve as dexId "uniswap" (review,
        2026-09-05), so the label cannot distinguish a curve from a pool and this can. */
     poolContracts: inferred.map((e) => e.label),
-    verifiedAmmPool: items.slice(0, top).some((it) =>
-      it?.address?.is_contract && it?.address?.is_verified &&
-      /uniswap|pancake|sushi|ramses|velodrome|aerodrome/i.test(String(it?.address?.name ?? "")) &&
-      /pool|pair/i.test(String(it?.address?.name ?? ""))),
+    /* POSITIVE EVIDENCE OF A LIVE CURVE, which must veto the "amm" upgrade even when a
+       pool is also present. A graduated PONS coin legitimately holds both a V4 pool and
+       a launch LOCKER (SIZE holds "poolmanager" and "ponsv2launchlocker" — a locker is
+       locked LP, which is benign and is not a curve). A coin still ON its curve holds the
+       CURVE contract, and that is a different word. Named narrowly on purpose: matching
+       "locker" here would refuse exactly the graduated coins this desk wants. */
+    curveHolder: items.slice(0, top).some((it) =>
+      it?.address?.is_contract && /curve|bonding/i.test(String(it?.address?.name ?? "")) &&
+      !/locker/i.test(String(it?.address?.name ?? ""))),
+    /* AN ADDRESS BEATS A NAME. Uniswap V4 holds every pool's liquidity in ONE singleton
+       the explorer labels "PoolManager" — a name that matches no AMM word, so a
+       name-only test refused every V4-only token, and uniswap-v4-robinhood is one of the
+       two venues carrying this chain's volume. The canonical V4 PoolManager address is
+       known (evm.V4_POOL_MANAGER), so it is matched exactly rather than by string.
+       Measured on SIZE, which holds "poolmanager" and "ponsv2launchlocker": the locker
+       is the PONS float, and that coin is still correctly refused because a locker is
+       not a pool — the address test does not weaken that, it only stops V4 being
+       invisible. */
+    verifiedAmmPool: items.slice(0, top).some((it) => {
+      const addr = lower(it?.address?.hash);
+      if (addr === lower(V4_POOL_MANAGER)) return true;
+      const name = String(it?.address?.name ?? "");
+      return it?.address?.is_contract && it?.address?.is_verified &&
+        /uniswap|pancake|sushi|ramses|velodrome|aerodrome/i.test(name) && /pool|pair/i.test(name);
+    }),
     complete: true,
   };
 }
