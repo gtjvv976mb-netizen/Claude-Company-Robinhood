@@ -3,6 +3,7 @@ import * as kyber from "./kyber.js";
 import * as evm from "./evm.js";
 import * as pons from "./pons-live.js";
 import * as blockscout from "./blockscout.js";
+import { resolveAmmPhase } from "../agents/risk-rails.js";
 import { ethUsd as ethUsdRead, coingecko } from "./eth-usd.js";
 import { cfg, TOKENS, TOKEN_DECIMALS, floorsFor } from "../config.js";
 import { bandForMarketCap, holdWindowFor } from "../bands.js";
@@ -222,7 +223,7 @@ export async function gather(address, hook = "") {
      dexId "uniswap" labels ["v4"], so a coin still on its curve would have read as
      graduated whenever its launch log sat outside the scan budget (review, 2026-09-05).
      Without the log the phase is unknown, and the screen refuses unknown. */
-  const phase = launchLog ? (graduation?.graduated === true ? "graduated" : graduation?.graduated === false ? "curve" : "unknown")
+  let phase = launchLog ? (graduation?.graduated === true ? "graduated" : graduation?.graduated === false ? "curve" : "unknown")
     : onCurve ? "curve" : "unknown";
 
   const excluded = [
@@ -267,6 +268,39 @@ export async function gather(address, hook = "") {
     candlesFor(best?.pairAddress ?? null),
     symbolCollisions(best?.baseSymbol, a),
   ]);
+
+  /* ── "AMM" — THE PHASE THIS CHAIN NEEDS, PROVEN ON CHAIN, NOT READ OFF A LABEL ──
+   *
+   * not_graduated exists to keep the desk off bonding curves. On pump.fun every coin
+   * has a curve and a graduation, so `phase` is always knowable. On Robinhood Chain
+   * roughly 92% of the traded book never touched a PONS curve at all: they are ordinary
+   * ERC-20s whose liquidity has always been a Uniswap v3/v4 pool. For those, `graduated`
+   * is not false — it is meaningless, and the fork answered "unknown", which the gate
+   * refuses. Measured 2026-09-07 on the live desk: not_graduated fired on 24 of 24
+   * sampled workups and the desk has never published a call.
+   *
+   * WHAT THIS DOES NOT DO IS TRUST THE DEX LABEL. The 2026-09-05 review closed exactly
+   * that hole: DexScreener reports a live PONS V2 curve as dexId "uniswap" with labels
+   * ["v4"], so a coin still on its curve would read as graduated the moment its launch
+   * log fell outside the scan budget. Nothing below reads a dex id.
+   *
+   * Two independent pieces of evidence are required, and both are measurements:
+   *   1. The explorer has a VERIFIED contract named as an AMM pool (UniswapV3Pool,
+   *      PoolManager, …) among the token's largest holders — i.e. the float is sitting
+   *      in a real pool contract, indexed from chain state.
+   *   2. The sell SIMULATES — evm.sellSim eth_calls the actual Kyber route and gets ETH
+   *      back. That is a direct proof of exit, which is the property the gate protects,
+   *      and it is strictly stronger than any phase string.
+   *
+   * A coin on a curve fails (1): its float is in the curve contract, not an AMM pool.
+   * A honeypot fails (2). If either is missing the phase stays "unknown" and the screen
+   * refuses exactly as it does today — this can only ever turn an "unknown" into an
+   * "amm", never a "curve" into anything. */
+  phase = resolveAmmPhase({
+    phase, hasLaunchLog: !!launchLog,
+    verifiedAmmPool: holders?.verifiedAmmPool === true,
+    sellSimOk: sellSim?.ok === true,
+  });
 
   /* Cost of the round trip in dollars, priced at the gas price read on this tick. */
   const gasUsdRoundTrip = rt.ok && gasPrice != null && ethUsd.value

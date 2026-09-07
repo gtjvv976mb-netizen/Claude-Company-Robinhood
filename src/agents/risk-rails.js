@@ -67,6 +67,50 @@ export const contractFlagNames = (ev) => (ev?.contract?.flags || []).map((f) => 
  * Run the EVM gates against a bundle. Returns { fails: [{code, detail}], unverified: [path] }.
  * Pure and exported so the three callers and the tests read one truth.
  */
+/**
+ * The phases a position may be opened in.
+ *
+ * "graduated" is a PONS coin that left its bonding curve — the pump.fun lifecycle, read
+ * from a chain log. "amm" is the Robinhood-native case the fork had no word for: a token
+ * that never had a PONS curve, whose float the explorer finds in a VERIFIED AMM pool
+ * contract and whose sell SIMULATES on chain (both proven in evidence.js — neither is a
+ * dex label, because DexScreener reports a live PONS curve as "uniswap"). Roughly 92% of
+ * this chain's traded book is that case; before it existed the gate refused all of it and
+ * the desk published nothing, ever.
+ *
+ * "curve" and "unknown" remain refusals. Exported so the rails, the screen, the mandate
+ * and the board read ONE definition — four copies of `!== "graduated"` is how a fifth
+ * caller silently keeps refusing what the other four now allow.
+ */
+export const TRADEABLE_PHASES = new Set(["graduated", "amm"]);
+
+/**
+ * May an UNKNOWN phase be resolved to "amm" — a token that never had a PONS curve?
+ *
+ * Pure and exported so the decision can be tested directly, and so there is exactly one
+ * copy of it. Both pieces of evidence are measurements taken from chain state, and
+ * NEITHER is a dex label: DexScreener reports a live PONS V2 bonding curve as dexId
+ * "uniswap" with labels ["v4"] (review, 2026-09-05), so a label can never distinguish a
+ * curve from a pool, and both of these can.
+ *
+ *   verifiedAmmPool — the explorer finds a VERIFIED contract named as an AMM pool among
+ *     the token's largest holders. A coin on a curve fails this: its float sits in the
+ *     curve contract, not in a pool.
+ *   sellSimOk — evm.sellSim eth_calls the real Kyber route and gets ETH back. This is a
+ *     direct proof of exit, which is the property not_graduated exists to protect, and
+ *     is strictly stronger evidence than any phase string.
+ *
+ * It can only ever turn "unknown" into "amm". A known "curve" stays a curve, and a coin
+ * with a launch log is judged on that log, not on this.
+ */
+export function resolveAmmPhase({ phase, hasLaunchLog, verifiedAmmPool, sellSimOk }) {
+  if (phase !== "unknown") return phase;
+  if (hasLaunchLog) return phase;
+  if (verifiedAmmPool !== true) return phase;
+  if (sellSimOk !== true) return phase;
+  return "amm";
+}
+
 export function evmGateFailures(ev, { now = Date.now(), gates = EVM_GATES } = {}) {
   const fails = [];
   const unverified = [];
@@ -74,7 +118,7 @@ export function evmGateFailures(ev, { now = Date.now(), gates = EVM_GATES } = {}
 
   const launch = ev?.launch;
   if (!launch || launch.phase == null) unverified.push("launch.phase");
-  else if (launch.phase !== "graduated")
+  else if (!TRADEABLE_PHASES.has(launch.phase))
     fail("not_graduated", `launch.phase is "${launch.phase}" — the desk trades graduated pools only, never the curve`);
 
   if (launch?.phase === "graduated") {

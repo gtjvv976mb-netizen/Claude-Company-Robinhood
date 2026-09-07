@@ -49,6 +49,63 @@ export const EXIT_PROBE_NOISE_PCT = defineThreshold("probe.quoteNoisePct", 0.9,
   { ...M("2026-09-04", "spread of 9 round trips that should all have been positive: -0.869% to +0.665%"),
     unit: "%", live: false });
 
+/* PONS ITSELF, MEASURED. The rows above were sampled chain-wide; these are the venue the
+   desk is pointed at. 18 KyberSwap-quoted round trips (buy, then sell the exact quoted
+   output) across six pons-v2-dex pools spanning three liquidity tiers, 2026-09-07:
+     0.005 ETH — WHATC 2.664, NODAL 5.972, STOCKKIT 6.147, BELL 4.055, PORT -0.962, ZZZ 0.326
+     0.05  ETH — 8.363, 9.865, 8.250, 4.926, 6.673, 0.387
+     0.5   ETH — 42.200, 36.251, 25.045, 12.795, 12.329, 1.627
+   Medians below. These are IMPACT ONLY — quote in, quote out — and exclude gas, which is
+   flat and must be added at the clip being traded. PORT's negative reading is inside the
+   0.9% quote-noise floor and is not a rebate. */
+export const PONS_ROUND_TRIP_PCT = defineThreshold("roundTrip.ponsMedianPct",
+  Object.freeze({ 0.005: 4.055, 0.05: 8.250, 0.5: 25.045 }),
+  { ...M("2026-09-07", "18 KyberSwap-quoted round trips across 6 pons-v2-dex pools and 3 liquidity tiers; " +
+    "medians 4.055% at 0.005 ETH, 8.250% at 0.05 ETH, 25.045% at 0.5 ETH (worst rows 6.147/9.865/42.200)"),
+    unit: "%", live: false,
+    note: "impact only, gas excluded. Interpolate on log clip between the measured points; " +
+      "below 0.005 ETH hold the smallest measured row rather than extrapolating toward zero, " +
+      "because the probe cannot resolve below its 0.9% noise floor." });
+
+/**
+ * What a round trip costs, all-in, at a given clip — impact from the measured PONS table
+ * plus the flat gas the chain charges whatever the size.
+ *
+ * This exists because strategy.mjs's costPct is the ONLY cost term in the +EV gate
+ * (R_net = (target - cost) / (stop + cost)), and it shipped as Solana's 0.06 — a Jupiter
+ * round trip on a chain where gas was proportional and negligible. Here gas is FLAT:
+ * 660,996 units is 5.1% of a 0.004 ETH position and 0.4% of a 0.05 ETH one. A single
+ * inherited constant cannot express that, and the direction of the error is the dangerous
+ * one — 0.06 understates the true cost at every clip the operator is permitted to trade.
+ *
+ * A STARTUP ESTIMATE, NOT A PER-TRADE TRUTH. The live protection is the per-entry fee
+ * gate and the round-trip loss ceiling, both of which read the actual quote. This only
+ * has to be close enough that the +EV gate is not lying to itself.
+ */
+export function expectedRoundTripPct(clipEth, { gasGwei = GAS_PRICE_GWEI, impactPct = null } = {}) {
+  const clip = Number(clipEth);
+  if (!Number.isFinite(clip) || clip <= 0) throw new Error("clip must be a positive number of ETH");
+  const rows = Object.entries(PONS_ROUND_TRIP_PCT).map(([k, v]) => [Number(k), Number(v)])
+    .sort((a, b) => a[0] - b[0]);
+  let impact = impactPct;
+  if (impact == null) {
+    if (clip <= rows[0][0]) impact = rows[0][1];
+    else if (clip >= rows[rows.length - 1][0]) impact = rows[rows.length - 1][1];
+    else {
+      impact = rows[rows.length - 1][1];
+      for (let i = 0; i + 1 < rows.length; i++) {
+        const [x0, y0] = rows[i], [x1, y1] = rows[i + 1];
+        if (clip < x0 || clip > x1) continue;
+        const t = (Math.log(clip) - Math.log(x0)) / (Math.log(x1) - Math.log(x0));
+        impact = y0 + t * (y1 - y0);
+        break;
+      }
+    }
+  }
+  const gasEth = ROUND_TRIP_GAS * Number(gasGwei) * 1e-9;
+  return impact + (gasEth / clip) * 100;
+}
+
 export const ROUND_TRIP_DEEP_PCT = defineThreshold("roundTrip.deepPct", 0.017,
   { ...M("2026-09-04", "CASHCAT (~$5.9M liquidity), 0.1 ETH clip, three consecutive passes: 0.015-0.018%"),
     unit: "%", live: true });

@@ -20,6 +20,7 @@ import { recordCandidateBoard } from "./candidate-board.js";
 import * as funnel from "./funnel.js";
 import * as ds from "./data/dexscreener.js";
 import { eligibility, contenderScore, pickOne, bookState, SEQUENTIAL, MAX_LIVE_CALLS, CALLS_PER_CYCLE } from "./mandate.js";
+import { TRADEABLE_PHASES } from "./agents/risk-rails.js";
 import { runBestPick } from "./agents/decision.js";
 import { linkPublishedCall } from "./evaluation.js";
 
@@ -1323,7 +1324,7 @@ export async function trendHandoff(candidates = []) {
   if (liveCallFor(top.mint)) return { workedUp: 0, note: "already live" };
   // Same phase rule as every other lane: a curve coin is watched, never paid for.
   const phase = launchPhaseOf(top);
-  if (phase != null && phase !== "graduated")
+  if (phase != null && !TRADEABLE_PHASES.has(phase))
     return { workedUp: 0, note: `on its curve (launch.phase = ${phase}) — watch only` };
   const book = bookState();
   if (book.full) return { workedUp: 0, halted: `book full at ${book.live}` };

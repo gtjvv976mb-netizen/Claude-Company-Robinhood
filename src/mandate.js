@@ -40,6 +40,7 @@
  * cannot be exited is not a trade, it is a donation.
  */
 import { liveCalls } from "./calls.js";
+import { TRADEABLE_PHASES } from "./agents/risk-rails.js";
 
 /**
  * How many house calls may be live at once. One means strictly sequential.
@@ -160,7 +161,7 @@ export function eligibility(rec) {
    * graduation itself is a discontinuity no stop survives. `unknown` is refused too —
    * unverified is not graduated. Only an explicit "graduated" passes. */
   const phase = rec.ev?.launch?.phase ?? null;
-  if (phase != null && phase !== "graduated")
+  if (phase != null && !TRADEABLE_PHASES.has(phase))
     return decline(`still on its bonding curve (launch.phase = ${phase}) — the desk trades graduates; a curve coin may only be watched`, true);
 
   /* ---- THE TEAM'S EXPLICIT NO. Not a safety fact, but not rankable either. ---- */

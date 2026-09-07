@@ -112,6 +112,16 @@ export async function holdersFromExplorer(address, { supply = null, decimals = 1
     bundleScannedTop: Math.min(top, items.length),
     sampledHolders: balances.size,
     inferredPools: inferred.length,
+    /* THE POOLS THEMSELVES, not just how many. A token whose float sits in a contract the
+       explorer has VERIFIED and named "UniswapV3Pool" is trading on a real AMM, and that
+       is chain-indexed evidence rather than a DEX label — which matters because
+       DexScreener reports a live PONS bonding curve as dexId "uniswap" (review,
+       2026-09-05), so the label cannot distinguish a curve from a pool and this can. */
+    poolContracts: inferred.map((e) => e.label),
+    verifiedAmmPool: items.slice(0, top).some((it) =>
+      it?.address?.is_contract && it?.address?.is_verified &&
+      /uniswap|pancake|sushi|ramses|velodrome|aerodrome/i.test(String(it?.address?.name ?? "")) &&
+      /pool|pair/i.test(String(it?.address?.name ?? ""))),
     complete: true,
   };
 }

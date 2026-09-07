@@ -29,7 +29,7 @@ import {
 } from "./journal.mjs";
 import { EvmExecutor, EXECUTION_READINESS_ROUTE, walletFromKeyFile } from "./evm-executor.mjs";
 import { createRpc, erc20Balance, gasPriceConsensus, isAddress, fromHex, plainEthUnits } from "./evm-rpc.mjs";
-import "./live-thresholds.mjs";
+import { expectedRoundTripPct } from "./live-thresholds.mjs";
 import { assertLiveReady, threshold } from "./thresholds.mjs";
 import {
   RpcBalanceUnavailableError, verifyTrackedBalanceWithFailover,
@@ -326,7 +326,24 @@ const CFG = {
   maxSolPerTrade: configuredTradeCap.value,
   dailySolCap: configuredDailyCap.value,
   dailyLossLimitSol: configuredLossCap.value,
-  fixedSol: PAPER_DEFAULTS.fixedEth,
+  /* THE SIZE THE OPERATOR CHOSE, not a constant from the paper block.
+   *
+   * This was `PAPER_DEFAULTS.fixedEth` — 0.0016 ETH — set unconditionally, in EXECUTE
+   * mode as well as paper. planEntry treats fixedSol as an OVERRIDE, not a ceiling:
+   * `if (c.fixedSol > 0) want = c.fixedSol` lands before every rail and discards the
+   * Kelly size above it. So the number below is the size of every entry this bot makes.
+   *
+   * Two things were wrong with hardcoding it. Under the canary (0.0004) it is clamped
+   * back down by maxSolPerTrade, so it did no harm but no good either. Above 0.0016 it
+   * SILENTLY DEFEATS THE CAPS CEREMONY: an operator who types the acknowledgement to
+   * raise MAX_ETH_PER_TRADE to 0.004 still gets 0.0016 ETH trades, and on a chain where
+   * gas is flat that is the difference between a 16.8% round trip and a 9.1% one.
+   *
+   * Tracking the configured cap makes the ceremony mean what it says: paper trades the
+   * paper cap, a canary trades the canary, and a raised cap actually raises the size.
+   * It raises nothing on its own — configuredTradeCap is already bounded by
+   * LIVE_CEILINGS and cannot exceed what the operator acknowledged. */
+  fixedSol: configuredTradeCap.value,
   minSolPerTrade: 0.0001,
   maxOpenPositions: openPositions(process.env.MAX_OPEN_POSITIONS ?? DEFAULTS.maxOpenPositions),
   trailPct: number("TRAIL_PCT", process.env.TRAIL_PCT || DEFAULTS.trailPct, { min: 0.01, max: 0.95 }),
@@ -335,7 +352,26 @@ const CFG = {
   bookHeatMax: number("BOOK_HEAT_MAX", process.env.BOOK_HEAT_MAX || DEFAULTS.bookHeatMax, { min: 0.00001, max: 1 }),
   maxAgeHours: number("MAX_AGE_HOURS", process.env.MAX_AGE_HOURS || DEFAULTS.maxAgeHours, { min: 0.01, max: 720 }),
   scaleOutPct: 0,
+  /* THE +EV GATE'S ONLY COST TERM, MEASURED HERE RATHER THAN INHERITED.
+   *
+   * strategy.mjs ships costPct 0.06 — a Jupiter round trip on Solana, where cost was
+   * proportional to size and gas was negligible. On this chain gas is FLAT (660,996
+   * units both legs), so the true cost is a U in the clip size: 55% at the 0.0004 canary,
+   * 9.2% at 0.004, a minimum of 7.35% around 0.0112 ETH, then rising again on impact.
+   *
+   * R_net = (target - cost) / (stop + cost) is the whole of the desk's +EV test, and 0.06
+   * understates the truth at EVERY size the operator may trade — the direction that makes
+   * a losing bracket look profitable. On a -15%/+35% bracket the inherited constant claims
+   * break-even at 42% wins; at the real cost for a 0.004 clip it is 48%, and at the canary
+   * the cost exceeds the target outright and no win rate clears it.
+   *
+   * Derived from the configured clip so it moves with the caps ceremony. It is a STARTUP
+   * ESTIMATE: the live protections are the per-entry fee gate and the round-trip loss
+   * ceiling, both of which read the actual quote before signing. */
+  costPct: expectedRoundTripPct(configuredTradeCap.value) / 100,
 };
+log(`sizing: ${CFG.fixedSol} ETH per entry (the configured cap), expected round trip ` +
+  `${(CFG.costPct * 100).toFixed(2)}% — measured on PONS, not inherited`);
 if (EXECUTE && configuredDailyCap.units < configuredTradeCap.units)
   fatal(`DAILY_ETH_CAP (${CFG.dailySolCap}) is below MAX_ETH_PER_TRADE (${CFG.maxSolPerTrade}) — the day would refuse the first trade`);
 

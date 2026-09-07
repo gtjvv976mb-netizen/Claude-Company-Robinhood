@@ -98,14 +98,39 @@ const padMarket = [
   padded(700_000, PAD, "PF3", 50),     padded(3_000_000, PAD, "PF4", 45),
 ];
 const padBoard = buildBoard(padMarket, { perCell: 5 });
-const padPick = selectAcrossBoard(padBoard, 6);
+/* THE MECHANISM IS TESTED AT AN EXPLICIT QUOTA, NOT AT THE DEFAULT.
+ *
+ * These assertions describe what a quota DOES. They used to read the default, so when
+ * chain 4663's default became 0 they failed — reporting a correct change as a broken
+ * one. That is the shape of a test that pins the wrong market: it made the right fix
+ * look like a regression. The default itself is asserted separately below, with the
+ * measurement that chose it. */
+const padPick = selectAcrossBoard(padBoard, 6, { padQuota: 1 });
 const pf = padPick.filter((p) => p.launchpad === PAD).length;
-ok("the preferred pad is the MAJORITY of a cycle's workups", pf / padPick.length > 0.5,
+ok("at a full quota the preferred pad is the MAJORITY of a cycle's workups", pf / padPick.length > 0.5,
   `${pf} of ${padPick.length} — where the preferred pad carries the volume, it gets the attention`);
 const padAvailable = padMarket.filter((c) => c.launchpad === PAD).length;
 ok("...and it meets the quota, up to what the board actually holds",
-  pf >= Math.min(padAvailable, Math.ceil(6 * PAD_QUOTA)),
-  `${pf} of ${padAvailable} available, quota ${Math.ceil(6 * PAD_QUOTA)}`);
+  pf >= Math.min(padAvailable, 6),
+  `${pf} of ${padAvailable} available at a full quota`);
+
+/* ── THE DEFAULT ON THIS CHAIN, AND WHY IT DIFFERS FROM THE SOLANA TOWER ──────
+ * pump.fun justified a full quota by ALREADY carrying the volume: 41% of everything
+ * surfaced, 53% of what survived the screen. Measured on chain 4663 (2026-09-07,
+ * GeckoTerminal pools pages 1-3 by 24h volume): pons-v2-dex is 5 of 60 pools carrying
+ * $50.8M of $1,506M — 3.4%. uniswap v3+v4 carry 83%. The premise is false here by an
+ * order of magnitude, so the conclusion cannot be ported: a full quota would aim every
+ * paid seat at 3.4% of the market. The towers are developed separately (owner,
+ * 2026-09-07) and the Solana tower keeps its 1. */
+ok("chain 4663 defaults to NO preferred-pad wall", PAD_QUOTA === 0,
+  `PAD_QUOTA is ${PAD_QUOTA} — PONS carries 3.4% of this chain's volume, not pump.fun's 41%`);
+const defaultPick = selectAcrossBoard(buildBoard(padMarket, { perCell: 5 }), 6);
+ok("...so the default pass studies the whole board, not one pad",
+  defaultPick.some((p) => p.launchpad !== PAD) && defaultPick.some((p) => p.launchpad === PAD),
+  defaultPick.map((p) => p.launchpad).join(", "));
+ok("...and the highest-scoring coin is reachable again at the default",
+  defaultPick.some((p) => p.score === 99),
+  "with no wall the free score decides the top of the list");
 /* AT A FULL QUOTA IT IS EXCLUSIVE. The owner's instruction is the preferred pad only, so a seat
    the pad cannot fill is left empty rather than handed to a launchpad the desk was told
    not to trade. Below 1 the quota stays a floor and the rest of the board fills in. */
@@ -120,7 +145,7 @@ if (PAD_QUOTA >= 1) {
     mixed.some((p) => p.launchpad !== PAD),
     mixed.map((p) => p.launchpad).join(", "));
 }
-ok("a preferred-pad coin beats a HIGHER-SCORING coin from another pad",
+ok("at a full quota a preferred-pad coin beats a HIGHER-SCORING coin from another pad",
   padPick.some((p) => p.launchpad === PAD && p.score < 99) &&
   padPick.findIndex((p) => p.launchpad === PAD) === 0,
   "the quota is filled first, so the free score no longer decides the top of the list alone");
@@ -140,10 +165,17 @@ console.log("\nAT A FULL QUOTA, AN EMPTY SEAT BEATS THE WRONG LAUNCHPAD");
  * full quota an unfillable seat is left unfilled. Lower PENTHOUSE_PAD_QUOTA and the old
  * behaviour comes back verbatim, which is what the second case here checks. */
 const noPump = buildBoard(padMarket.filter((c) => c.launchpad !== PAD), { perCell: 5 });
-const noPumpPick = selectAcrossBoard(noPump, 4);
-ok("a market with NO the preferred pad is not studied at all at a full quota",
-  PAD_QUOTA >= 1 ? noPumpPick.length === 0 : noPumpPick.length === 4,
-  `${noPumpPick.length} picked at quota ${PAD_QUOTA}`);
+/* AT AN EXPLICIT FULL QUOTA, not at whatever this chain's default happens to be. Reading
+   the default made this assertion's own message contradict its result — it printed "at a
+   full quota" while reporting "quota 0" — and a test whose label disagrees with what it
+   ran is worse than no test, because it is the label a future reader believes. */
+const noPumpPick = selectAcrossBoard(noPump, 4, { padQuota: 1 });
+ok("a market with NO preferred-pad coin is not studied at all at a full quota",
+  noPumpPick.length === 0,
+  `${noPumpPick.length} picked at an explicit quota of 1`);
+ok("...while at this chain's default of 0 the same market IS studied",
+  selectAcrossBoard(buildBoard(padMarket.filter((c) => c.launchpad !== PAD), { perCell: 5 }), 4).length === 4,
+  "no wall means no empty seats — the whole point of the 4663 default");
 ok("...and the same market fills the budget once the quota is lowered",
   selectAcrossBoard(buildBoard(padMarket.filter((c) => c.launchpad !== PAD),
     { perCell: 5 }), 4, { padQuota: 0.5 }).length === 4,

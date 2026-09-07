@@ -27,7 +27,30 @@ import { canonicalLaunchpad } from "./canonical.js";
    paid seats with the pad's coins, then fill the rest from anywhere — and the desk was
    spending 40% of its research on launchpads the owner does not want traded. At 1 it is
    the whole board. Set PENTHOUSE_PAD_QUOTA below 1 to let other launchpads back in. */
-export const PAD_QUOTA = Math.min(1, Math.max(0, Number(process.env.PENTHOUSE_PAD_QUOTA ?? 1)));
+/* ZERO ON CHAIN 4663, AND THE REASON IS THE MEASUREMENT THE OLD COMMENT ADMITTED IT
+ * LACKED. The note below selectAcrossBoard said, in the fork's own words: "On 4663 the
+ * same argument names PONS V2 (PREFERRED_PAD); the share here is UNMEASURED."
+ *
+ * It is measured now (2026-09-07, GeckoTerminal robinhood pools pages 1-3 by 24h volume):
+ * pons-v2-dex is 5 of 60 pools carrying $50.8M of $1,506M — 3.4% of the chain's volume.
+ * uniswap-v3-robinhood and uniswap-v4-robinhood carry 83%. The pump.fun argument for a
+ * full quota was that the pad ALREADY carried the volume — 41% of everything surfaced,
+ * 53% of what survived the screen. On this chain that premise is false by an order of
+ * magnitude, so porting the conclusion inverts it: a full quota here aims the entire
+ * research budget at 3.4% of the market and walls off the other 96.6%.
+ *
+ * Worse, the wall could never even be satisfied. The DexScreener sweep is the only lane
+ * that reaches the graduated book and it labels 68 of 69 RH pairs dexId "uniswap";
+ * pons-live.js DEX_VENUES maps every uniswap-*-robinhood id to venue "none", so
+ * launchpadOf returns null and `onPad` matches nothing. The quota pass took zero, and at
+ * padQuota >= 1 the general pass was filtered by the same predicate — so the board
+ * returned an empty shortlist and the paid seats went to the GeckoTerminal PONS feed,
+ * which is bonding-curve pools that then die at not_graduated after the money is spent.
+ *
+ * Zero restores the behaviour the code already has for "no preference": one unfiltered
+ * sweep of the whole board. PENTHOUSE_PAD_QUOTA still sets it, and the Solana tower
+ * keeps its own 1 — the two towers are developed separately (owner, 2026-09-07). */
+export const PAD_QUOTA = Math.min(1, Math.max(0, Number(process.env.PENTHOUSE_PAD_QUOTA ?? 0)));
 /* THE PAD THE QUOTA IS KEYED ON. On chain 4663 that is PONS V2 — 207,893 launches a
    month, 1.55% graduating, the pad that carries the volume (Bitquery, Sep 2026). The
    copy has promised a PONS preference since the port; until 2026-09-05 the code still
