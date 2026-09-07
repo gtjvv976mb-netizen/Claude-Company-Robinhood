@@ -439,7 +439,18 @@ export async function ignitionUniverse({ ethUsd = null, tapes = 40 } = {}) {
   }
 }
 
-export async function warmFunnel() {
+/**
+ * The keyword sweep and the ignition lane, merged and deduped.
+ *
+ * SPLIT OUT BECAUSE ONLY ONE CALLER EVER RAN IT. This lived inside warmFunnel(), and
+ * warmFunnel() is called ONLY from the `if (book.full)` branch — so on a desk whose book
+ * has never been full, ignitionUniverse() had never executed at all. The lane built
+ * specifically to see coins at birth on 4663, and the only lane that attaches a minute
+ * tape, produced nothing on every cycle the desk has ever run, while the paid path took
+ * its universe from the keyword sweep alone (which returns dexId "uniswap" for 68 of 69
+ * RH pairs and carries no launch data). Both paths draw from here now.
+ */
+export async function mergedUniverse() {
   const [swept, igniting] = await Promise.all([sweep(), ignitionUniverse()]);
   /* Ignition first so its richer row — the one carrying the minute tape — wins the
      dedupe against the same coin arriving from the keyword sweep. */
@@ -450,7 +461,11 @@ export async function warmFunnel() {
     const c = { ...raw, mint: canonicalAddress(raw.mint), launchpad: canonicalLaunchpad(raw.launchpad) };
     if (!merged.has(c.mint)) merged.set(c.mint, c);
   }
-  const universe = [...merged.values()];
+  return { universe: [...merged.values()], swept: swept.length, igniting: igniting.length };
+}
+
+export async function warmFunnel() {
+  const { universe, igniting: ignitingCount } = await mergedUniverse();
   const scored = [];
   for (const c of universe) {
     if (liveCallFor(c.mint)) continue;
@@ -471,7 +486,7 @@ export async function warmFunnel() {
 
   const shape = funnel.census();
   emit("funnel:warmed", {
-    swept: universe.length, igniting: igniting.length, ranked: scored.length,
+    swept: universe.length, igniting: ignitingCount, ranked: scored.length,
     screenPassed: passed, screenHeld: held,
     watch: shape.watch, screened: shape.screened, studied: shape.studied, ready: shape.ready,
     expired,
@@ -536,7 +551,10 @@ export async function runPenthouseCycle({
   emit("seat:verdict", { seat: "Regime", detail: `${wx.regime} · ${majorWeather(wx)} (25d)` });
 
   // 1-3. Everything free: sweep, classify, screen.
-  const universe = (await sweep()).map(canonicalCandidate);
+  /* THE PAID PATH GETS THE IGNITION ROWS TOO. It used to take `sweep()` alone, so the
+     one lane that can see a PONS launch — and the only source of a minute tape — never
+     reached the seats even on the cycles where it did run. */
+  const universe = (await mergedUniverse()).universe.map(canonicalCandidate);
   const scored = [];
   const repeats = [];
   for (const c of universe) {
