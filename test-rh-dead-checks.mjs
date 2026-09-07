@@ -102,5 +102,31 @@ ok("the direction is unchanged — more cost never means MORE size", () => {
   for (const rt of [0, 2, 4, 6, 6.3, 8, 9, 20]) { const v = f(rt); assert.ok(v <= prev, `rose at ${rt}%`); prev = v; }
 });
 
+console.log("\n6. ONE FACT, ONE POOL, ONE ANSWER");
+/* The rails gated pair_token_gate on pools[0] and called it "the deepest pool". That is
+   true of pools[0] by liquidity, but ev.pair is ds.shapePair(cons.deepest) — the deepest
+   among pools that survived the PRICE-CONSENSUS filter — and a pool excluded from that
+   vote can still be the deepest overall. So the rails and the free screen
+   (pair_token_unallowed, which matches ev.pair.pairAddress) could read different pools
+   and return different verdicts about one fact. */
+const { evmGateFailures } = await import("./src/agents/risk-rails.js");
+const gateOn = (pools, tradedAddr) => evmGateFailures({
+  launch: { phase: "amm" }, pair: { pairAddress: tradedAddr }, pairs: { pools },
+}).fails.some((f) => f.code === "pair_token_gate");
+const NATIVE = { address: "0xA", pairTokenClass: "native", pairToken: "ETH" };
+const EQUITY = { address: "0xB", pairTokenClass: "equity", pairToken: "TSLA" };
+ok("the deepest pool being an equity does not condemn a native pool the desk trades", () =>
+  assert.equal(gateOn([EQUITY, NATIVE], "0xA"), false));
+ok("the desk trading an EQUITY pool is caught even when the deepest pool is native", () =>
+  assert.equal(gateOn([NATIVE, EQUITY], "0xB"), true,
+    "this is the dangerous case pools[0] cleared — an equity pair passing the rails"));
+ok("an unknown traded pool falls back to pools[0] rather than passing blind", () =>
+  assert.equal(gateOn([EQUITY, NATIVE], "0xZZ"), true));
+ok("the rails and the screen key on the same field", () => {
+  const ev = fs.readFileSync(new URL("./src/data/evidence.js", import.meta.url), "utf8");
+  assert.match(rails, /q\.address === ev\?\.pair\?\.pairAddress/);
+  assert.match(ev, /q\.address === ev\.pair\.pairAddress/);
+});
+
 console.log(`\n${fail ? "FAIL" : "PASS"} — ${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

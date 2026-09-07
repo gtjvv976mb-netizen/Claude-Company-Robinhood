@@ -138,10 +138,20 @@ export function evmGateFailures(ev, { now = Date.now(), gates = EVM_GATES } = {}
   const pools = ev?.pairs?.pools;
   if (!Array.isArray(pools) || !pools.length) unverified.push("pairs.pools[].pairTokenClass");
   else {
-    const cls = pools[0]?.pairTokenClass;
+    /* JUDGE THE POOL THE DESK WILL ACTUALLY TRADE, which is ev.pair — the same one the
+       free screen's pair_token_unallowed judges. This read pools[0] and CALLED it "the
+       deepest pool", which is true of pools[0] by liquidity but is not necessarily
+       ev.pair: ev.pair is ds.shapePair(cons.deepest), the deepest among the pools that
+       survived the PRICE-CONSENSUS filter, and a pool excluded from that vote can still
+       be the deepest overall. So the two gates could read different pools and return
+       different verdicts about one fact — the screen refusing a pool the rails cleared,
+       or worse the reverse. One fact, one pool, one answer; pools[0] remains the fallback
+       when the traded pool is unknown. */
+    const traded = pools.find((q) => q?.address && q.address === ev?.pair?.pairAddress) ?? pools[0];
+    const cls = traded?.pairTokenClass;
     if (cls == null) unverified.push("pairs.pools[].pairTokenClass");
     else if (!gates.allowedPairTokenClasses.includes(String(cls)))
-      fail("pair_token_gate", `deepest pool is quoted in ${pools[0]?.pairToken ?? "an unknown asset"} (${cls}) — ` +
+      fail("pair_token_gate", `the traded pool is quoted in ${traded?.pairToken ?? "an unknown asset"} (${cls}) — ` +
         `the bot may hold only ${gates.allowedPairTokenClasses.join("/")} as a pair asset`);
   }
 
