@@ -97,6 +97,21 @@ cost as a share of the position is a U in the clip size:
 pessimism: a 55% round trip cannot be recovered by a 35% target. The desk's measured
 win rate is 50%.
 
+### Two independent derivations agree the floor is ~0.01 ETH
+
+This is not one model's opinion. Two different pieces of the desk, reasoning from
+different premises, land on the same boundary:
+
+| source | reasoning | answer |
+|---|---|---|
+| `src/copy.js` `MIN_EXECUTABLE_ETH` | gas must be ≤5% of the position (desk policy), at measured round-trip gas | **0.01 ETH** |
+| the measured cost curve | clip that minimises gas **+** measured PONS impact | **0.0112 ETH** |
+| the operator cap today | — | **0.004 ETH** |
+
+At 0.004 ETH gas is **5.11%** of the position — already over the desk's own 5% policy
+ceiling, which is why the tenant copy lane refuses to execute at that size. The two lanes
+currently disagree, and the copy lane is the one that is right.
+
 To raise the caps, all three must be set explicitly and `LIVE_CAPS_ACK` must match
 exactly. For the cheapest clip:
 

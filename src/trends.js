@@ -87,10 +87,29 @@ async function padCoinsForTheme(terms, { maxAgeHours }) {
   return out;
 }
 
-export async function coinsForTheme(theme, { maxAgeHours = 72 } = {}) {
+/* HOW OLD A COIN MAY BE AND STILL BE "WEARING" A CURRENT STORY.
+ *
+ * 72 hours is a pump.fun number: there, a coin riding a narrative is days old at most,
+ * because everything is born on a curve and resolves within hours. On Robinhood Chain the
+ * token wearing a story is typically WEEKS old — measured 2026-09-07 across the desk's own
+ * DexScreener universe, age p10 6h / p50 543h / p90 1595h, and a 72-hour ceiling admits
+ * just 31% of it. The theme lane was searching a tenth of the market for a narrative the
+ * rest of it was carrying.
+ *
+ * 60 days is not a new invention: it is the ignition lane's hunt window (holdMaxMs x 12
+ * with this chain's re-measured 120h clocks). Both lanes answer the same question — how
+ * long after birth is the desk still interested — and a desk that says 60 days in one
+ * lane and 3 days in the other is not expressing a view, it is carrying two chains'
+ * assumptions at once. At 60 days this admits 79% of the measured universe.
+ *
+ * Age is a weak proxy for theme-relevance here in any case: a story can be current while
+ * the token carrying it is old. This ceiling exists to bound the search, not to judge. */
+const THEME_MAX_AGE_HOURS = Number(process.env.DESK_THEME_MAX_AGE_HOURS || 1440);
+
+export async function coinsForTheme(theme, { maxAgeHours = THEME_MAX_AGE_HOURS } = {}) {
   const terms = (theme.search_terms ?? []).filter((t) => typeof t === "string" && t.trim().length >= 2).slice(0, 5);
   const seen = new Map();
-  // pump.fun first: its rows are the youngest, and the first entry for a mint wins.
+  // The pad rows first: they are the youngest, and the first entry for a mint wins.
   for (const c of await padCoinsForTheme(terms, { maxAgeHours }).catch(() => []))
     if (!seen.has(c.mint)) seen.set(c.mint, c);
   for (const term of terms) {
