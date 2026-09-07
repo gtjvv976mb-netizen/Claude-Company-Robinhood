@@ -232,7 +232,16 @@ export async function scanFills({ floorNo, callId, wallet, mint, limit = 40 }) {
     try {
       const txr = await evmRpc("eth_getTransactionByHash", [hash]);
       if (txr.ok && txr.data && canonicalAddress(txr.data.from) === w) nativeWei = hexToBigInt(txr.data.value ?? "0x0");
-    } catch { nativeWei = 0n; }
+    } catch (e) {
+      /* A REFUSED METHOD IS A BUG, NOT WEATHER — evmRpc says so in as many words, and it
+         THROWS for that reason. Catching it into 0n turned a deliberate alarm into silent
+         data corruption: the buyer's ETH read as zero and the trade was recorded as a
+         non-trade. Genuine network weather still degrades to 0 (the read is best-effort
+         and a missing value only costs one fill's precision), but a refusal is re-thrown
+         so it surfaces where it belongs instead of quietly rewriting the track record. */
+      if (/refused non-read method/.test(String(e?.message))) throw e;
+      nativeWei = 0n;
+    }
     const fill = readFill(receipt, w, token, ethUsd, { nativeWei });
     if (!fill) continue;
     try {

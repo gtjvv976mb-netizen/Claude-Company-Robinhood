@@ -76,17 +76,35 @@ function confirmedByBundle(code, evidence, path, actual, now = Date.now()) {
         Number(evidence?.derived?.roundTripWalletPct) > 40 ||
         (evidence?.crosscheck?.verdicts || []).some((v) =>
           v?.verdict === "KILLED" && /volume|wash|trade/i.test(`${v?.check} ${v?.detail}`));
-    case "deployer_misconduct":
-      return (Number(evidence?.deployer?.priorLaunches) >= FARM_LAUNCHES && Number(evidence?.deployer?.graduated) === 0) ||
-        evidence?.xRead?.serial_rugger === true;
+    case "deployer_misconduct": {
+      /* `Number(null)` IS 0, AND graduated IS PERMANENTLY NULL HERE — it is a pump.fun
+         field. So the "zero graduations" half of this test was satisfied by the absence of
+         the data, and any creator with enough launches was confirmed as a launch farm even
+         if every one of those launches had graduated. Unverified must not read as damning
+         any more than it reads as clean; the conjunct is dropped when the number cannot be
+         read, so the attack stands only on evidence that exists. */
+      const grads = Number(evidence?.deployer?.graduated);
+      const farm = Number(evidence?.deployer?.priorLaunches) >= FARM_LAUNCHES &&
+        Number.isFinite(grads) && grads === 0;
+      return farm || evidence?.xRead?.serial_rugger === true;
+    }
     case "liquidity_collapse": {
       const mcap = evidence?.pair?.marketCap ?? evidence?.pair?.fdv ?? null;
       const liq = evidence?.pairs?.totalLiquidityUsd ?? evidence?.pair?.liquidityUsd;
       return Number.isFinite(Number(liq)) && Number(liq) < floorsFor(mcap).liq;
     }
     case "unlock_risk":
+      /* THIS COULD NEVER CONFIRM ON A 4663 BUNDLE. All three original terms are Token-2022
+         extension names (transferFee, permanentDelegate, transferHook) read off a Solana
+         `mintAccount` that does not exist here, and the fourth — contract.feeSettable — is
+         hardcoded null in evm.js. So a red-team attack on a settable fee or a live
+         tax-raising role was ALWAYS downgraded as unconfirmed, whatever the contract
+         actually allows. That is a safety hole, not an over-strict gate.
+         The EVM fallback is the same one live_authority already carries three cases
+         above: the chain's own flag vocabulary. */
       return flags.some((f) => /mint_authority_live|transferFee|permanentDelegate|transferHook/i.test(f)) ||
         (evidence?.mintAccount?.extensions || []).some((x) => /transferFee|permanentDelegate|transferHook/i.test(String(x))) ||
+        cflags.some((f) => /fee_over_ceiling|mint_role_live|pausable|upgradeable_eoa/i.test(f)) ||
         contract.feeSettable === true;
     /* ---- the chain's own rug vectors ---- */
     case "upgrade_key_live": {

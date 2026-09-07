@@ -43,7 +43,15 @@ export const DECISION_MANIFEST_FILES = Object.freeze([
   "src/categories.js",
   "src/config.js",
   "src/copy.js",
+  /* THE FILE THAT NOW DECIDES HOLDER CONCENTRATION BELONGS IN THE FINGERPRINT.
+     blockscout.js supplies the holder distribution for every token older than the 3.4-hour
+     ledger budget — which is essentially all of them — and its verifiedAmmPool/curveHolder
+     reads decide the launch phase. A change to it alters live kill behaviour, so it must
+     change the manifest hash a reviewer verifies. eth-usd.js sets the mark every size and
+     cost figure is denominated in, for the same reason. */
+  "src/data/blockscout.js",
   "src/data/dexscreener.js",
+  "src/data/eth-usd.js",
   "src/data/evidence.js",
   "src/data/evm.js",
   "src/data/gmgn.js",

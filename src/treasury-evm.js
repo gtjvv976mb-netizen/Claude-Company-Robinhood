@@ -67,6 +67,16 @@ const setState = (k, v) => db.prepare("INSERT INTO scanner_state (key,value) VAL
 const ALLOWED = new Set([
   "eth_chainId", "eth_blockNumber", "eth_call", "eth_getBalance", "eth_getLogs",
   "eth_getBlockByNumber", "eth_getCode", "eth_getTransactionReceipt",
+  /* A NATIVE BUY'S ETH IS IN THE TRANSACTION, NOT IN ANY LOG. perf.js reads
+     eth_getTransactionByHash for exactly that — the comment there says so, and cites the
+     2026-09-05 review that added it "so a native buy is a fill and not a transfer_in that
+     can never settle". The method was never added to this list, so every one of those
+     reads threw, perf.js caught it, and nativeWei fell to 0: the ETH the buyer actually
+     spent read as zero, ethMoved as 0, isTrade as false, and the fill was written as
+     transfer_in. On a chain where PONS pools quote NATIVE ETH that is most buys. The
+     read has never once worked, and the list this was ported from was Solana's, where
+     one getTransaction covered both. It is a read method; it belongs here. */
+  "eth_getTransactionByHash",
 ]);
 
 async function post(endpoint, method, params, timeoutMs) {

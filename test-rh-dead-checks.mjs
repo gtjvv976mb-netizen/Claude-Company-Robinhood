@@ -1,0 +1,80 @@
+/**
+ * FOUR CHECKS THAT COULD NOT DO THEIR JOB ON THIS CHAIN.
+ *
+ * Each was ported intact from the Solana desk, reads a field that does not exist here,
+ * and therefore always returned the same answer. Two failed OPEN (a real risk downgraded
+ * to unconfirmed), one failed CLOSED (unverifiable data read as damning), and one turned
+ * a deliberate alarm into silent data corruption.
+ *
+ *   node test-rh-dead-checks.mjs
+ */
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+let pass = 0, fail = 0;
+const ok = (name, fn) => {
+  try { fn(); pass++; console.log(`  ok   ${name}`); }
+  catch (e) { fail++; console.log(`  FAIL ${name} — ${e.message}`); }
+};
+
+console.log("\n1. A NATIVE BUY'S ETH IS READABLE — OR THE FILL IS NOT A TRADE");
+const treasury = fs.readFileSync(new URL("./src/treasury-evm.js", import.meta.url), "utf8");
+const perf = fs.readFileSync(new URL("./src/perf.js", import.meta.url), "utf8");
+ok("eth_getTransactionByHash is on the read allowlist", () =>
+  assert.match(treasury, /"eth_getTransactionByHash",/,
+    "perf.js reads it for every native buy; unlisted, every one of those reads threw"));
+ok("the allowlist is still closed to writes", () => {
+  const set = treasury.slice(treasury.indexOf("const ALLOWED = new Set(["), treasury.indexOf("]);"));
+  assert.ok(!/eth_sendRawTransaction|eth_sendTransaction|eth_sign|personal_/.test(set),
+    "a write method must never be reachable from this process");
+  for (const m of set.match(/"eth_[a-zA-Z]+"/g) ?? [])
+    assert.match(m, /"eth_(chainId|blockNumber|call|getBalance|getLogs|getBlockByNumber|getCode|getTransactionReceipt|getTransactionByHash)"/,
+      `${m} is not a known read method`);
+});
+ok("a REFUSED method is re-thrown, not swallowed into a zero", () =>
+  assert.match(perf, /if \(\/refused non-read method\/\.test\(String\(e\?\.message\)\)\) throw e;/,
+    "evmRpc throws on a refusal deliberately — catching it into 0n rewrites the track record"));
+ok("...while genuine network weather still degrades to 0", () =>
+  assert.match(perf, /throw e;\s*\n\s*nativeWei = 0n;/,
+    "a missing value costs one fill's precision; a bug must not be treated the same way"));
+
+console.log("\n2. THE DECISION FINGERPRINT COVERS WHAT DECIDES");
+const manifest = fs.readFileSync(new URL("./src/manifest.js", import.meta.url), "utf8");
+ok("blockscout.js is in the manifest", () => assert.match(manifest, /"src\/data\/blockscout\.js",/),
+);
+ok("...because it now decides holder concentration and the launch phase", () => {
+  const ev = fs.readFileSync(new URL("./src/data/evidence.js", import.meta.url), "utf8");
+  assert.match(ev, /blockscout\.holdersFromExplorer/);
+  assert.match(ev, /verifiedAmmPool: holders\?\.verifiedAmmPool === true/);
+});
+ok("eth-usd.js is in the manifest", () => assert.match(manifest, /"src\/data\/eth-usd\.js",/));
+
+console.log("\n3. unlock_risk CAN FIRE ON AN EVM CONTRACT (it failed OPEN)");
+const { RED_TEAM_FACT_CODES } = await import("./src/agents/schemas.js");
+const rt = fs.readFileSync(new URL("./src/agents/redteam-policy.js", import.meta.url), "utf8");
+const unlock = rt.slice(rt.indexOf('case "unlock_risk":'), rt.indexOf('case "upgrade_key_live"'));
+ok("it tests the EVM flag vocabulary, not only Token-2022 names", () =>
+  assert.match(unlock, /cflags\.some\(\(f\) => \/fee_over_ceiling\|mint_role_live\|pausable\|upgradeable_eoa\/i\.test\(f\)\)/));
+ok("the Solana terms are kept, not replaced — the desk may still see a Token-2022 bundle", () =>
+  assert.match(unlock, /permanentDelegate\|transferHook/));
+ok("contract.feeSettable alone was never enough — it is hardcoded null", () => {
+  const evm = fs.readFileSync(new URL("./src/data/evm.js", import.meta.url), "utf8");
+  assert.match(evm, /feeSettable: null/, "if this ever gets populated, the fallback is belt and braces");
+});
+
+console.log("\n4. deployer_misconduct NO LONGER CONFIRMS ON MISSING DATA (it failed CLOSED)");
+const dep = rt.slice(rt.indexOf('case "deployer_misconduct"'), rt.indexOf('case "liquidity_collapse"'));
+ok("an unreadable graduation count cannot satisfy the farm test", () =>
+  assert.match(dep, /Number\.isFinite\(grads\) && grads === 0/,
+    "Number(null) is 0, so the absence of the field was reading as 'never graduated'"));
+ok("the old always-true form is gone", () =>
+  assert.ok(!/Number\(evidence\?\.deployer\?\.graduated\) === 0/.test(dep)));
+ok("a real serial rugger still confirms on its own", () =>
+  assert.match(dep, /evidence\?\.xRead\?\.serial_rugger === true/));
+ok("unlock_risk and deployer_misconduct are both still real fact codes", () => {
+  assert.ok(RED_TEAM_FACT_CODES.includes("unlock_risk"));
+  assert.ok(RED_TEAM_FACT_CODES.includes("deployer_misconduct"));
+});
+
+console.log(`\n${fail ? "FAIL" : "PASS"} — ${pass} passed, ${fail} failed\n`);
+process.exit(fail ? 1 : 0);
