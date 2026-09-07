@@ -198,10 +198,29 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),   // overridden by DESK_O
   models: {
     scout:      process.env.DESK_MODEL_SCOUT      || "claude-haiku-4-5",
     forensics:  process.env.DESK_MODEL_FORENSICS  || "claude-sonnet-5",
-    liquidity:  process.env.DESK_MODEL_LIQUIDITY  || "claude-sonnet-5",
+    /* MATCH THE TIER TO THE WEIGHT, which is this table's own stated principle —
+       "judgment seats keep Opus; evidence-shaped verdicts do not need it" — applied one
+       tier further down. The desk weights its analysts narrative 0.38, forensics 0.26,
+       flow 0.24, liquidity 0.09, technical 0.03. So two of the five seats decide 12% of
+       the verdict between them and were billed at the same rate as the seat that decides
+       38%.
+
+       Neither is a judgment seat. TECHNICAL reads price-change fields and reports a
+       shape; that is an evidence-shaped verdict on 3% of the vote. LIQUIDITY is more
+       interesting: most of what it examines — the exit probe, the round-trip loss, the
+       depth floors — is ALREADY computed deterministically by the free screen, which
+       kills cannot_exit and thin_liquidity before any seat is paid. It is the same
+       argument the forensics prompt makes to itself: do not spend a paid answer
+       re-deriving what a free gate already measured.
+
+       They keep their vote and their charter; only the bill changes. If seat_grades ever
+       shows either losing something at this tier, the env override moves it back in one
+       line — and that is a measurement worth having rather than an assumption worth
+       keeping. */
+    liquidity:  process.env.DESK_MODEL_LIQUIDITY  || "claude-haiku-4-5",
     flow:       process.env.DESK_MODEL_FLOW       || "claude-sonnet-5",
     narrative:  process.env.DESK_MODEL_NARRATIVE  || "claude-sonnet-5",
-    technical:  process.env.DESK_MODEL_TECHNICAL  || "claude-sonnet-5",
+    technical:  process.env.DESK_MODEL_TECHNICAL  || "claude-haiku-4-5",
     redteam:    process.env.DESK_MODEL_REDTEAM    || "claude-opus-5",
     risk:       process.env.DESK_MODEL_RISK       || "claude-sonnet-5",
     pm:         process.env.DESK_MODEL_PM         || "claude-opus-5",
@@ -211,10 +230,10 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),   // overridden by DESK_O
   effort: {
     scout: "low",
     forensics: "high",
-    liquidity: "medium",
+    liquidity: "low",     // 0.09 of the vote, and the free screen already measured the exit
     flow: "high",
     narrative: "medium",
-    technical: "medium",
+    technical: "low",     // 0.03 of the vote, reading price-change fields
     redteam: "high",    // the adversary keeps the strongest MODEL; xhigh thinking alone
                         // was ~14k output tokens a run and a third of the whole bill
     risk: "high",

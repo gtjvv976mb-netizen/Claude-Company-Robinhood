@@ -26,8 +26,10 @@ Percentages are of supply unless the name says otherwise; times are epoch millis
 | `pair.marketCap` / `pair.fdv` | all | USD market cap / fully diluted value (supply is fixed at 1e9 on PONS so they agree). | DexScreener |
 | `pair.liquidityUsd` | liquidity | the deepest pool's reported liquidity in USD — NOT depth (see `depth.*`). | DexScreener liquidity.usd |
 | `pair.ageHours` | scout, best pick | hours since pairCreatedAt. | gather() |
+| `pair.dex` | technical, liquidity | the deepest pool's venue id (`uniswap-v3-robinhood`, `pons-v2-dex`, …). On 4663 this is what tells a seat whether it is looking at a launchpad pool at all — pons-v2-dex is ~3.4% of volume against uniswap v3+v4's ~83%. | DexScreener dexId (src/data/dexscreener.js shapePair) |
 | `pair.socials` / `pair.websites` | narrative | links from the listing's own metadata. | DexScreener token-profiles |
 | `pairs.totalLiquidityUsd` | liquidity, red team | USD liquidity summed over every pool of this address. | DexScreener token-pairs, filtered chainId robinhood |
+| `pairs.venues` | technical, liquidity | the distinct venue ids across this token's pools, deduped. A coin quoted on several venues has more than one exit; one that lives on a single pool has one. | `[...new Set(px.pairs.map(p => p.dexId))]` in gather() |
 | `pairs.pools[].version` | liquidity | 'v2' \| 'v3' \| 'v4' \| 'curve' — decides whether reported liquidity is depth. | DexScreener dexId / GeckoTerminal dex id (uniswap-v4, pons-v2, …) |
 | `pairs.pools[].feeTierBps` | liquidity | the pool's fee tier; a PONS pool is 100 bps a side. | Uniswap V4 Initialize event `fee` field / GeckoTerminal |
 | `pairs.pools[].pairToken` | liquidity, execution, best pick | the quote asset's address — what a sell is paid in. | DexScreener quoteToken / V4 Initialize currency0/currency1 |
