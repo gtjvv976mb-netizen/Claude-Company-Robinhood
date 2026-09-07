@@ -281,8 +281,14 @@ if (!tradable.length) { log("no pool has continuous enough history to trade"); p
        live entry is 0.0016 ETH and the Kelly sizing above it never reaches a position.
        At 0.0016 ETH gas alone is 12.8% of the position.
      - scaleOutPct 0. */
-const LIVE_RAILS = { maxSolPerTrade: 0.004, dailySolCap: 0.04, dailyLossLimitSol: 0.012,
-  minSolPerTrade: 0.0001, fixedSol: 0.0016, scaleOutPct: 0 };
+const LIVE_RAILS = { maxSolPerTrade: CLIP_ETH, dailySolCap: Math.max(0.04, CLIP_ETH * 10),
+  dailyLossLimitSol: Math.max(0.012, CLIP_ETH * 3),
+  minSolPerTrade: 0.0001,
+  /* TRACKS THE CLIP, exactly as poller.mjs now does. Hardcoding 0.0016 here made --clip
+     inert: planEntry uses fixedSol as an OVERRIDE, so every simulated position was
+     0.0016 ETH whatever the flag said, and two runs at 0.0016 and 0.004 returned
+     byte-identical P&L. A size sweep that cannot change the size measures nothing. */
+  fixedSol: CLIP_ETH, scaleOutPct: 0 };
 const RAILS = (args.rails ?? "live") === "solana" ? {} : LIVE_RAILS;
 /* costPct is the +EV gate's ONLY cost term. Solana's 0.06 is a Jupiter round trip; the
    measured RH cost at this clip is impact (from the measured table) plus gas, and gas
