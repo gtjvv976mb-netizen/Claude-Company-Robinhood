@@ -128,8 +128,40 @@ Substitute your wallet address. The sentence is checked character for character.
 
 ---
 
+## 4b. One decision you may want to change: how often the desk cycles
+
+The quota, the hold and the book size are one arithmetic. To sustain **B** live calls each
+held for **H** while publishing **Q** per cycle, the cycle interval **C** must satisfy
+`C >= Q·H/B`. At Q=3, H=120h, B=24 that is **15 hours**, and the desk now derives it
+(`SUSTAINABLE_CYCLE_MINS`, src/mandate.js) rather than using a fixed 12 minutes.
+
+That was a bug fix, not a preference: at a 12-minute cycle the 24-slot book saturates in
+**1.6 hours** and then publishes nothing for the next 118, because nothing closes for five
+days. But 15 hours means the desk researches roughly twice a day, and you may want it
+livelier. The lever is the book size, and it is yours:
+
+| MAX_LIVE_CALLS | derived cycle | calls/day |
+|---|---|---|
+| 24 (today) | 15h | ~4.8 |
+| 60 | 6h | ~12 |
+| 120 | 3h | ~24 |
+
+`PENTHOUSE_MAX_LIVE_CALLS` sets it. Its own comment says it "bounds nothing about money —
+MAX_LIVE_CALLS and the executor's maxOpenPositions do", and the bot holds **4** positions
+whatever this is, so raising it widens the *published* book for tenants rather than the
+desk's own risk. I left it at 24 because it is a number you chose and the arithmetic, not
+the value, was what was broken.
+
+`PENTHOUSE_CYCLE_MINS` still overrides the derivation outright — but setting it faster than
+`MAX_LIVE_CALLS ÷ hold` re-creates the saturation, and `cycle:saturated` will say so in the
+chronicle when it does.
+
 ## 5. Order of operations
 
+0. **Top up the Anthropic account.** The desk halts at `desk:out_of_credit` — the API
+   answers "credit balance is too low" and `llm.js` throws. This is the ONLY thing between
+   the desk and publishing: it screens coins, ranks them and runs three analyst seats
+   before the balance runs out mid-workup. It is not the $90 desk cap (spend was $2.65).
 1. Paste the two measured thresholds (§1).
 2. Paste the gas line when the 24h probe finishes (§2).
 3. Decide the clip and do the caps ceremony (§4).
