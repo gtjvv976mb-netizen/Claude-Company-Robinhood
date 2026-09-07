@@ -160,5 +160,31 @@ await ok("an UNLABELLED contract is NOT assumed to be a pool", async () => {
 });
 
 globalThis.fetch = realFetch;
+console.log("\n5. THE SEATS ARE TOLD WHERE THE DATA CAME FROM");
+await ok("the note does NOT claim a complete Transfer ledger", async () => {
+  stub({ "/holders": { items: [holder("0x" + "1".repeat(40), SUPPLY / 25n)] },
+    ["/api/v2/tokens/" + TOKEN]: { total_supply: String(SUPPLY), decimals: "18", holders_count: "2078" } });
+  const r = await holdersFromExplorer(TOKEN, {});
+  /* shapeHolders stamps "Balances rebuilt from the complete Transfer ledger" on every
+     result — true of the path it was written for and FALSE here. That note reaches the
+     analyst seats, which read it as provenance: a seat told the ledger was complete will
+     treat a clean top-10 as stronger evidence than it is. */
+  assert.ok(!/rebuilt from the complete Transfer ledger/.test(r.note), r.note.slice(0, 120));
+  assert.match(r.note, /explorer index/);
+  assert.match(r.note, /NOT rebuilt from a Transfer ledger/);
+});
+await ok("...and it states the sample depth and the true holder count", async () => {
+  stub({ "/holders": { items: [holder("0x" + "1".repeat(40), SUPPLY / 25n)] },
+    ["/api/v2/tokens/" + TOKEN]: { total_supply: String(SUPPLY), decimals: "18", holders_count: "2078" } });
+  const r = await holdersFromExplorer(TOKEN, {});
+  assert.match(r.note, /top 1 holders of 2078/, r.note.slice(0, 140));
+});
+await ok("...and warns that a name-only contract was NOT excluded", async () => {
+  stub({ "/holders": { items: [holder("0x" + "1".repeat(40), SUPPLY / 25n)] },
+    ["/api/v2/tokens/" + TOKEN]: { total_supply: String(SUPPLY), decimals: "18", holders_count: "2078" } });
+  const r = await holdersFromExplorer(TOKEN, {});
+  assert.match(r.note, /nameOnlyContracts/);
+});
+
 console.log(`\n${fail ? "FAIL" : "PASS"} — ${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

@@ -66,27 +66,29 @@ const endpoints = () => [cfg.rhRpc, cfg.rhRpcSecondary].filter(Boolean);
  *
  * Falling through to the next endpoint is right, but with a single endpoint configured
  * there is nowhere to fall through TO, so a rate limit came back as a hard failure. That
- * used to be survivable because the flags it fed failed open; now that unverified_mint
- * and unverified_blacklist correctly REFUSE an unreadable probe, a busy minute on the
- * public RPC would refuse every coin — trading one outage (a screen that cannot see) for
- * another (a screen that cannot pass). Neither is the desk working.
+ * was survivable while the flags it fed failed open; now that unverified_mint and
+ * unverified_blacklist correctly REFUSE an unreadable probe, a busy minute on the public
+ * RPC would refuse every coin — trading a screen that cannot see for one that cannot
+ * pass. Neither is the desk working.
  *
- * So a rate limit is retried on the same endpoint with backoff before it becomes a
- * verdict. Bounded, because an unbounded retry is its own outage: three waits of
- * 400/800/1600ms, then the 429 stands and the probe honestly reports unverified. Only
- * rate limits are retried — a revert is the contract's answer and is returned at once. */
-const RATE_LIMITED = (e) => /429|Too many|rate limit/i.test(String(e));
-const napMs = (i) => 400 * 2 ** i;
+ * ONE RETRY POLICY, NOT TWO. This briefly wrapped readRpc in four more rounds with its
+ * own 400/800/1600ms backoff — but readRpc ALREADY retries a rate limit three times with
+ * a 700·i² wait (lib/http.js). Layering multiplied that to twelve attempts and roughly
+ * 17 seconds of blocking on one read, with no deadline above it, and quadrupled the
+ * request volume aimed at the limiter it was supposed to survive. More requests is not
+ * how you get past a rate limit.
+ *
+ * So the retry lives where it always lived and this only raises its budget: six attempts
+ * with readRpc's existing backoff, about 700+2800+6300+11200+17500ms in the worst case
+ * — long, and bounded, and stated here so the next reader knows the real number. Only
+ * rate limits are retried; a revert is the contract's answer and returns at once. */
 export async function read(method, params, opts = {}) {
   let last;
-  const rounds = Number.isInteger(opts.rateLimitRetries) ? opts.rateLimitRetries : 3;
-  for (let round = 0; round <= rounds; round++) {
-    for (const ep of endpoints()) {
-      last = await readRpc(ep, method, params, opts);
-      if (last.ok) return last;
-      if (!RATE_LIMITED(last.error)) return last;
-    }
-    if (round < rounds) await new Promise((r) => setTimeout(r, napMs(round)));
+  const withRetries = { attempts: 6, ...opts };
+  for (const ep of endpoints()) {
+    last = await readRpc(ep, method, params, withRetries);
+    if (last.ok) return last;
+    if (!/429|Too many|rate limit/i.test(String(last.error))) return last;
   }
   return last ?? { ok: false, error: "no RPC endpoint configured" };
 }

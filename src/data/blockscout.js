@@ -157,7 +157,21 @@ export async function holdersFromExplorer(address, { supply = null, decimals = 1
 
   const shaped = shapeHolders(balances, { supply, decimals, exclude: [...exclude, ...inferred] });
   if (!shaped.ok) return shaped;
+
   if (meta == null) meta = await tokenMeta(address).catch(() => null);
+  /* shapeHolders stamps every result with "Balances rebuilt from the complete Transfer
+     ledger" — true of the path it was written for, and FALSE here. This data is a top-N
+     page from the explorer's index, and that note goes to the analyst seats, which read
+     it as provenance when they weigh concentration. A seat told the ledger was complete
+     will treat a clean top-10 as stronger evidence than it is. Replaced with what
+     actually happened. */
+  shaped.note = `Balances read from the chain's explorer index (top ${Math.min(top, items.length)} ` +
+    `holders of ${meta?.holdersCount ?? "an unknown number"}), NOT rebuilt from a Transfer ledger — ` +
+    "the ledger cannot reach this token's launch block on a 100ms chain. Concentration " +
+    "(top1/top10) is exact because it only needs the largest holders; the bundle-cluster " +
+    "fingerprint scans that page only. Pool and burn addresses were excluded by ADDRESS " +
+    "where the caller supplied one, and by verified contract name otherwise; a large holder " +
+    "that merely NAMES itself like a pool is reported in nameOnlyContracts and is NOT excluded.";
   return {
     ...shaped,
     /* The page length is NOT the holder count. */
