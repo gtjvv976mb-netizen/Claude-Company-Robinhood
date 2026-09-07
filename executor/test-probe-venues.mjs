@@ -8,9 +8,13 @@ import fs from "node:fs";
  *
  *   - evm-swap.mjs routes through KyberSwap's AGGREGATOR. It is venue-agnostic;
  *     the only allowlist on the trading path is scope-guard.mjs, on TOKENS.
- *   - Measured 2026-09-06: of 60 pools, 15 carry WETH on a side. Those two venues
- *     hold one of them between them — pons-v2-dex holds zero, because its pair
- *     allowlist carries native ETH and not WETH.
+ *   - Measured 2026-09-06: of 60 pools, 15 carry the WETH ERC-20 on a side. Those
+ *     two venues held one of them between them. pons-v2-dex read as zero, which was
+ *     PARTLY a sampler defect and not a fact about the venue: its pools quote NATIVE
+ *     ETH, which GeckoTerminal also labels "WETH", and the sampler matched only the
+ *     ERC-20. Fixed in probe-pool-select.mjs; PONS has ~7 ETH-quoted pools. The
+ *     argument for sampling every venue survives the correction — one venue is still
+ *     one venue — but the number that motivated it was measured with a broken ruler.
  *
  * The result was a one-pool, one-tier sample. Across all venues the same run
  * samples seven pools spanning all four liquidity tiers, and the thin ones lose

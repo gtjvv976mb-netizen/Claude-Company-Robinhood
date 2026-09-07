@@ -51,6 +51,11 @@ const ALLOWED_ENV = new Set([
   /* How many blocks past the proving block a submitted transaction may go without a
      receipt before it is treated as dropped and cancelled. Bounded in poller.mjs. */
   "DEADLINE_BLOCKS", "ETH_USD_CACHE_MAX_AGE_MS", "EXECUTE", "EXECUTOR_SOURCE_COMMIT",
+  /* The retry queue's two dials. They tune how hard the bot tries to recover a call it
+     dropped to a transport or oracle fault; they cannot loosen a single gate, because a
+     retry re-enters through onEntry and faces all of them. The age ceiling is
+     deliberately absent: it defers to MAX_CALL_AGE_MIN rather than owning a door. */
+  "ENTRY_RETRY_BASE_MS", "ENTRY_RETRY_MAX_ATTEMPTS",
   "FEE_RESERVE_ETH", "F_DEFAULT", "F_NAME_MAX", "HARD_STOP_FILE",
   "INIT_ONLY", "KEY_FILE", "LIVE_CAPS_ACK",
   "LIVE_STATE_INIT_ACK", "LIVE_TRADING_ACK", "LOCK_FILE", "MAX_AGE_HOURS",

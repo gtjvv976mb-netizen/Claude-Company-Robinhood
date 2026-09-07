@@ -69,6 +69,26 @@ import { liveCalls } from "./calls.js";
  * executor's own maxOpenPositions and every per-trade cap are untouched, and those, not
  * this, are what bound the money at risk. */
 export const MAX_LIVE_CALLS = Math.max(1, Number(process.env.PENTHOUSE_MAX_LIVE_CALLS || 24));
+
+/**
+ * How many calls one cycle publishes — the desk's QUOTA, at the owner's instruction
+ * (2026-09-07): "at least 3 calls every cycle without fail".
+ *
+ * This is a floor on EFFORT, not a licence to invent. Everything above about the two
+ * kinds of "no" still holds without exception: the quota is filled from candidates
+ * that already cleared the safety screen, the five seats, the red team and compliance,
+ * and the cycle will keep interviewing down the ranked market to fill it. What it must
+ * never do is reach past a measured safety fact to make the number come out at three.
+ * A cycle that ends at two because the market only offered two holdable coins has
+ * obeyed the mandate; a cycle that ends at three by publishing a honeypot has not.
+ * Shortfalls are therefore not silent — the cycle emits `cycle:short` with what it
+ * managed and why, so "the market was thin" and "the desk stopped early" can never be
+ * confused for one another again.
+ *
+ * The bot consumes published calls independently and has its own caps; this number
+ * bounds nothing about money. MAX_LIVE_CALLS and the executor's maxOpenPositions do.
+ */
+export const CALLS_PER_CYCLE = Math.max(1, Number(process.env.PENTHOUSE_CALLS_PER_CYCLE || 3));
 /** Set PENTHOUSE_SEQUENTIAL=0 to let cycles run while a position is open. */
 export const SEQUENTIAL = process.env.PENTHOUSE_SEQUENTIAL !== "0";
 

@@ -19,7 +19,7 @@ import { buildBoard, selectAcrossBoard, CAP_BANDS, COIN_TYPES, PREFERRED_PAD } f
 import { recordCandidateBoard } from "./candidate-board.js";
 import * as funnel from "./funnel.js";
 import * as ds from "./data/dexscreener.js";
-import { eligibility, contenderScore, pickOne, bookState, SEQUENTIAL, MAX_LIVE_CALLS } from "./mandate.js";
+import { eligibility, contenderScore, pickOne, bookState, SEQUENTIAL, MAX_LIVE_CALLS, CALLS_PER_CYCLE } from "./mandate.js";
 import { runBestPick } from "./agents/decision.js";
 import { linkPublishedCall } from "./evaluation.js";
 
@@ -902,28 +902,44 @@ export async function runPenthouseCycle({
     try { funnel.retire(winner.rec?.mint, "published as a call"); } catch {}
   }
 
-  /* EVERY CYCLE ENDS IN A TRADE — and this is where that instruction is safe to obey.
+  /* EVERY CYCLE FILLS ITS QUOTA — and this is where that instruction is safe to obey.
    *
    * The eligible field has already cleared the free safety screen, all five analysts,
    * the red team and compliance. Nothing in it is a honeypot, nothing in it is
-   * unsellable, nothing in it was launched by a farm. So if the first choice could not
-   * be published for a reason that is NOT about the coin — the book filled, a weather
-   * veto, a race with another lane — the desk takes the next eligible candidate rather
-   * than ending the cycle empty.
+   * unsellable, nothing in it was launched by a farm. So the desk keeps publishing
+   * down the field until the cycle's quota is met, rather than stopping at the winner
+   * and calling the cycle done.
    *
-   * It walks the field in order and stops at the first one that lands. What it will
-   * never do is reach past eligibility: a cycle where every candidate failed a measured
-   * safety fact ends with no call, and says so. That is not the desk refusing to
-   * decide, it is the market not having offered anything holdable. */
-  if (!opened.length && eligible.length > 1) {
+   * This pass used to run ONLY when nothing had opened, and it stopped at the first
+   * call that landed — the shape of "one cycle, one trade". A quota of CALLS_PER_CYCLE
+   * makes it a fill: the winner is still the winner and still goes first, and the rest
+   * of the already-vetted field follows it out in ranked order.
+   *
+   * What it will never do is reach past eligibility. A cycle where the field runs out
+   * before the quota does ends short, and says so in cycle:short. Publishing a coin
+   * that failed a measured safety fact to make a number look right is the one thing
+   * the mandate has never been allowed to do — a forced call is a loss with paperwork. */
+  if (opened.length < CALLS_PER_CYCLE && eligible.length > 1) {
     for (const cand of eligible) {
+      if (opened.length >= CALLS_PER_CYCLE) break;
       if (cand === winner) continue;
       const pub = publishCall(cand.rec, { category: cand.category, launchpad: cand.launchpad, wx });
       if (pub.callId) {
         opened.push({ id: pub.callId, symbol: cand.rec?.symbol });
-        emit("mandate:fellback", { symbol: cand.rec?.symbol,
-          from: winner?.rec?.symbol ?? null,
-          note: "the first choice could not be published — took the next eligible rather than ending empty" });
+        emit("mandate:filled", { symbol: cand.rec?.symbol, opened: opened.length,
+          quota: CALLS_PER_CYCLE, from: winner?.rec?.symbol ?? null,
+          note: opened.length === 1
+            ? "the first choice could not be published — took the next eligible rather than ending empty"
+            : "filling the cycle's quota from the already-vetted field" });
+        continue;
+      }
+      /* A FULL BOOK ENDS THE PASS, it does not slow it down. book_full is a fact about
+         the desk rather than about this candidate, so every remaining publish would
+         refuse for the same reason; walking the rest of the field to be told so N more
+         times is pure noise in the record. */
+      if (pub.outcome === "book_full") {
+        emit("mandate:book_full", { opened: opened.length, quota: CALLS_PER_CYCLE,
+          note: "the book is full — the quota yields to the position limit, which is what bounds risk" });
         break;
       }
     }
@@ -936,7 +952,7 @@ export async function runPenthouseCycle({
    * the daily money brake calls time. Those are the only three exits: the
    * mandate can spend the whole day's budget hunting, but it cannot force a
    * seat to lie, because a forced call is just a loss with paperwork. */
-  if (!opened.length && process.env.PENTHOUSE_MUST_CALL !== "0") {
+  if (opened.length < CALLS_PER_CYCLE && process.env.PENTHOUSE_MUST_CALL !== "0") {
     const alreadyTried = new Set(shortlist.map((c) => c.mint));
     let hunted = 0;
     /* THE HUNT NEEDS A CLOCK TOO.
@@ -955,9 +971,13 @@ export async function runPenthouseCycle({
      * A cycle that ends without a call is a fine outcome and the record already says
      * so. A cycle that never ends says nothing at all. */
     const huntDeadline = Date.now() + Number(process.env.PENTHOUSE_HUNT_BUDGET_MS || 240_000);
-    const huntMax = Number(process.env.PENTHOUSE_HUNT_MAX || 12);
+    /* THE CAP SCALES WITH THE QUOTA. 12 was sized for a hunt that stopped at its first
+       call; a quota of three needs roughly three times the interviews to fill from the
+       same market, and a cap sized for one turns "publish 3" into "publish 1 and time
+       out". The time budget below is the real backstop either way. */
+    const huntMax = Number(process.env.PENTHOUSE_HUNT_MAX || 12 * CALLS_PER_CYCLE);
     for (const c of scored) {
-      if (opened.length) break;
+      if (opened.length >= CALLS_PER_CYCLE) break;
       if (hunted >= huntMax) {
         emit("cycle:hunt_capped", { hunted, note: `stopped after ${huntMax} candidates — the cycle must end` });
         break;
@@ -992,14 +1012,31 @@ export async function runPenthouseCycle({
       workedUp++;
       const pub = publishCall(rec, { category: c.category, launchpad: c.launchpad, wx });
       if (pub.callId) opened.push({ id: pub.callId, symbol: rec.symbol });
+      else if (pub.outcome === "book_full") {
+        emit("cycle:hunt_book_full", { opened: opened.length, quota: CALLS_PER_CYCLE,
+          note: "the book is full — hunting further cannot publish anything" });
+        break;
+      }
     }
     if (!opened.length && !stopped)
       emit("cycle:hunt_dry", { hunted, note: "the ranked market offered no coin that cleared the SAFETY gauntlet — " +
         "the mandate ranks conviction, it never overrides a measured fact, so a market of honeypots ends in no call" });
   }
 
+  /* A SHORTFALL IS A REPORTED OUTCOME, NEVER A SILENT ONE. The quota is a floor on how
+     hard the desk works, so falling under it is information: it says the safe market
+     was thin, the book was full, or the budget ran out — three very different facts
+     that a bare `count` collapses into one. Without this line "the desk published one
+     call" and "the desk stopped after one call" read identically in the record. */
+  if (opened.length < CALLS_PER_CYCLE)
+    emit("cycle:short", { cycle, opened: opened.length, quota: CALLS_PER_CYCLE,
+      shortBy: CALLS_PER_CYCLE - opened.length, stopped: stopped ?? null,
+      note: stopped ? `stopped early: ${stopped}`
+        : "the ranked market offered fewer holdable coins than the quota — the mandate never publishes past a safety fact to fill it" });
+
   const cost = spend.usd - startSpend;
-  emit("cycle:end", { cycle, count: opened.length, spendUsd: Number(cost.toFixed(4)), stopped });
+  emit("cycle:end", { cycle, count: opened.length, quota: CALLS_PER_CYCLE,
+    spendUsd: Number(cost.toFixed(4)), stopped });
   return { cycle, considered: universe.length, ranked: scored.length,
     workedUp, approved: picks.length, opened: opened.length, replacedUnreadable: replaced,
     costUsd: Number(cost.toFixed(4)), costPerWorkup: workedUp ? Number((cost / workedUp).toFixed(2)) : null,

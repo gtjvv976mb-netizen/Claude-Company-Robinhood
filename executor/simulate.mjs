@@ -21,7 +21,25 @@
  *
  *   node simulate.mjs [--trials 400] [--calls 60] [--winrate 0.28] [--seed 7]
  */
-import { DEFAULTS, planEntry, openPosition, stepPosition, rollDay, freshState } from "./strategy.mjs";
+import { DEFAULTS, planEntry, openPosition, stepPosition, freshState } from "./strategy.mjs";
+
+/* THE SIMULATOR'S OWN DAY ROLL. strategy.mjs exported rollDay once; it does not now —
+   the rolling 24h rails moved to the journal, which sums risk_events over a window, and
+   this file was never updated. Both repos' simulators have been dead on import ever
+   since, which is why nothing has been able to answer "what does the risk engine
+   contribute" for as long as that has been true.
+   Modelled here rather than re-added to strategy.mjs: trading code should not grow a
+   function that exists for a simulation. This is a discrete reset at the window
+   boundary — the shape the original call site (rollDay(state, now, 86400e3)) implies —
+   and it is the SIM's model of the rails, not a claim about the live implementation. */
+function rollDay(state, now, windowMs) {
+  if (state.dayStartedAt == null) state.dayStartedAt = now;
+  if (now - state.dayStartedAt < windowMs) return state;
+  state.dayStartedAt = now;
+  state.deployedTodaySol = 0;
+  state.realizedTodaySol = 0;
+  return state;
+}
 
 // deterministic RNG so a reported number can be reproduced
 function rng(seed) {

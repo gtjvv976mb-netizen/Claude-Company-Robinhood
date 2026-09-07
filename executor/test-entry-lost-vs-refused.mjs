@@ -15,12 +15,27 @@ import { executorHeartbeatHealth } from "./heartbeat-health.mjs";
  * unmeasurable, so it now has a counter on the heartbeat instead of a guess. */
 const poller = fs.readFileSync(new URL("./poller.mjs", import.meta.url), "utf8");
 
+/* THE WINDOW IS STRUCTURAL, NOT A BYTE COUNT. This file used to slice a fixed 1600/1800
+   characters from the comment anchor, which is a window that silently shrinks every time
+   a line is added inside the branch: adding the retry-queue call pushed the refused
+   branch out of the slice and failed an assertion about code that was still correct and
+   still right where it had always been. The branch runs from its comment to the
+   `continue` that ends it — that is the real extent, and it stays the real extent
+   however much is written inside it. */
+const BRANCH_START = "BUT A CALL REFUSED AND A CALL LOST";
+const branchBlock = () => {
+  const start = poller.indexOf(BRANCH_START);
+  assert.ok(start > 0, "could not locate the lost-vs-refused branch");
+  const end = poller.indexOf("continue;", poller.indexOf("S.cursor = Number(ev.id);", start));
+  assert.ok(end > start, "could not locate the end of the branch");
+  return poller.slice(start, end + "continue;".length);
+};
+
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`PASS  ${name}`); };
 
 ok("a transient failure class is counted as LOST, not as a refusal", () => {
-  const block = poller.slice(poller.indexOf("BUT A CALL REFUSED AND A CALL LOST"),
-    poller.indexOf("BUT A CALL REFUSED AND A CALL LOST") + 1600);
+  const block = branchBlock();
   assert.match(block, /const lost = cls === "transport" \|\| cls === "oracle";/,
     "the classes evm-swap already tags are what distinguish the two");
   assert.match(block, /S\.entriesLostToFailure = \(S\.entriesLostToFailure \|\| 0\) \+ 1;/);
@@ -31,8 +46,7 @@ ok("a transient failure class is counted as LOST, not as a refusal", () => {
 });
 
 ok("the cursor still advances in BOTH cases — exits are never held behind an entry", () => {
-  const block = poller.slice(poller.indexOf("BUT A CALL REFUSED AND A CALL LOST"),
-    poller.indexOf("BUT A CALL REFUSED AND A CALL LOST") + 1800);
+  const block = branchBlock();
   const advances = [...block.matchAll(/S\.cursor = Number\(ev\.id\);/g)];
   assert.equal(advances.length, 1, "one advance, taken on every path out of this branch");
   /* UNCONDITIONAL, and asserted as such. Counting the advances and checking they come

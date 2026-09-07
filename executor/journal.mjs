@@ -624,6 +624,51 @@ export class ExecutionJournal {
     return { complete: !(until > Number(now)), incompleteUntil: until || null };
   }
 
+  /* ── THE ENTRY RETRY QUEUE ───────────────────────────────────────────────────
+   * A published call that failed to execute for a TRANSIENT reason — an aggregator
+   * 500, an RPC hiccup, an oracle rotation — used to be counted and then forgotten:
+   * the poller advanced its cursor past the event and the call was gone for good.
+   * The desk and the bot are meant to be independent halves of one contract, and a
+   * half that silently drops the other's output is not independent, it is unreliable.
+   *
+   * So a lost entry is parked here instead, durably, and retried on later ticks. It
+   * lives in the journal rather than in memory because the failure that lost the call
+   * is exactly the kind that also restarts the process.
+   *
+   * This queue grants NO new authority. A retry re-enters through the same onEntry
+   * path and faces every gate the first attempt did — the scope guard, the fee gate,
+   * the caps, and entry-quote-guard.mjs, which refuses any entry whose mark has drifted
+   * past tolerance or whose preflight has gone stale. A retry that has become a
+   * different trade is therefore refused on its merits, which is the correct outcome
+   * and the reason this is safe to do at all. */
+  entryRetryQueue() {
+    const raw = this.getMeta("entry_retry_queue");
+    if (!raw) return [];
+    let list;
+    try { list = typeof raw === "string" ? JSON.parse(raw) : raw; }
+    catch { return []; }               // a corrupt queue must never block the poller
+    if (!Array.isArray(list)) return [];
+    return list.filter((e) => e && typeof e === "object" && e.event &&
+      Number.isSafeInteger(Number(e.attempts)) && Number(e.attempts) >= 0);
+  }
+
+  saveEntryRetryQueue(list, { max = 64 } = {}) {
+    if (!Array.isArray(list)) throw new Error("entry retry queue must be an array");
+    for (const e of list) {
+      if (!e?.event || typeof e.event !== "object") throw new Error("retry entry is missing its event");
+      if (!Number.isSafeInteger(Number(e.attempts)) || Number(e.attempts) < 0)
+        throw new Error("retry entry attempts must be a non-negative safe integer");
+      if (!Number.isSafeInteger(Number(e.firstAt)) || Number(e.firstAt) <= 0)
+        throw new Error("retry entry firstAt must be a positive safe integer");
+    }
+    /* BOUNDED, and the OLDEST are what survive a trim. A queue that grows without a
+       ceiling turns a provider outage into unbounded state; keeping the oldest means
+       the trim drops the calls most likely to be refused as stale anyway. */
+    const kept = [...list].sort((a, b) => Number(a.firstAt) - Number(b.firstAt)).slice(0, max);
+    this.immediate(() => this.setMeta("entry_retry_queue", json(kept)));
+    return kept;
+  }
+
   snapshot() {
     const positions = {};
     for (const row of this.db.prepare("SELECT mint,data FROM positions").all()) {

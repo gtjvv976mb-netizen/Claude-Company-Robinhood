@@ -934,6 +934,91 @@ function accountConfirmedIntents() {
   return count;
 }
 
+/* ── THE RETRY QUEUE: THE BOT'S HALF OF THE CONTRACT ──────────────────────────
+ * The desk publishes calls; this bot executes them. The two halves are deliberately
+ * independent — neither waits on the other — and that only works if neither silently
+ * drops the other's output. A call refused on its merits is the system working. A call
+ * lost to an aggregator 500, an RPC fault or an oracle rotation is this bot failing the
+ * desk, and until now it failed permanently: the counter went up and the cursor moved
+ * past the event for good.
+ *
+ * THE SEMANTICS THAT MAKE THIS SAFE ARE onEntry's OWN. It RETURNS for every refusal —
+ * already holding, call too old, entries paused, hard stop, book blocked — and only
+ * THROWS on a genuine failure. So "returned" means the call is handled and leaves the
+ * queue whatever the verdict was; "threw" means it is still owed. A retry re-enters
+ * through that identical function and faces every gate, including MAX_CALL_AGE_MS
+ * (45m) and the drift/staleness guards, so a call that has aged into a different trade
+ * is refused rather than executed late. The queue grants no authority of its own. */
+const RETRY_MAX_ATTEMPTS = Math.max(1, Number(process.env.ENTRY_RETRY_MAX_ATTEMPTS || 4));
+const RETRY_BASE_MS = Math.max(1_000, Number(process.env.ENTRY_RETRY_BASE_MS || 15_000));
+/* The age ceiling is deliberately NOT a second clock of its own invention: it defers to
+   MAX_CALL_AGE_MS, the bound onEntry already enforces. A queue that outlived the thing
+   it feeds would just be storage. */
+const retryExpired = (e, now) => now - Number(e.firstAt) > MAX_CALL_AGE_MS;
+const retryBackoffMs = (attempts) => RETRY_BASE_MS * Math.pow(2, Math.max(0, attempts - 1));
+
+function enqueueEntryRetry(ev, error, failureClass) {
+  try {
+    const queue = journal.entryRetryQueue();
+    const key = String(ev.event_id || `${FLOOR}:${ev.id}`);
+    if (queue.some((e) => String(e.key) === key)) return true;   // already owed
+    const now = Date.now();
+    queue.push({
+      key, event: ev, attempts: 1, firstAt: now, nextAt: now + retryBackoffMs(1),
+      failureClass: failureClass ?? null,
+      lastError: String(error?.message ?? error).slice(0, 200),
+      symbol: ev.symbol ?? null,
+    });
+    journal.saveEntryRetryQueue(queue);
+    return true;
+  } catch (e) {
+    /* A queue that cannot be written must never take the tick down with it — the call
+       is already lost at that point and the log is what is left to say so. */
+    log(`retry queue write failed for ${ev.symbol || ev.id}: ${e.message}`);
+    return false;
+  }
+}
+
+async function drainEntryRetries() {
+  let queue;
+  try { queue = journal.entryRetryQueue(); } catch { return; }
+  if (!queue.length) return;
+  const now = Date.now();
+  const keep = [];
+  for (const e of queue) {
+    if (retryExpired(e, now)) {
+      S.entriesRetryExpired = (S.entriesRetryExpired || 0) + 1;
+      log(`RETRY EXPIRED ${e.symbol || e.key}: still unexecuted ${Math.round((now - Number(e.firstAt)) / 60_000)}m ` +
+        `after the desk published it (${e.attempts} attempt(s), last: ${e.lastError}) — the call is abandoned`);
+      continue;
+    }
+    if (now < Number(e.nextAt)) { keep.push(e); continue; }
+    try {
+      await onEntry(e.event);
+      /* RETURNED — handled. It either traded or was refused on its merits by a gate
+         inside onEntry, and either way this bot no longer owes the desk anything. */
+      S.entriesRecovered = (S.entriesRecovered || 0) + 1;
+      log(`RETRY RESOLVED ${e.symbol || e.key} on attempt ${e.attempts + 1}`);
+    } catch (error) {
+      const cls = error?.failureClass ?? null;
+      const transient = cls === "transport" || cls === "oracle";
+      const attempts = Number(e.attempts) + 1;
+      if (transient && attempts < RETRY_MAX_ATTEMPTS) {
+        keep.push({ ...e, attempts, nextAt: now + retryBackoffMs(attempts),
+          failureClass: cls, lastError: String(error.message).slice(0, 200) });
+        log(`RETRY ${e.symbol || e.key} attempt ${attempts} failed (${cls}): ${error.message}`);
+      } else {
+        S.entriesRetryExhausted = (S.entriesRetryExhausted || 0) + 1;
+        log(`RETRY GAVE UP ${e.symbol || e.key} after ${attempts} attempt(s): ${error.message}` +
+          (transient ? "" : ` — ${cls || "non-transient"} failure, not retryable`));
+      }
+    }
+  }
+  try { journal.saveEntryRetryQueue(keep); } catch (e) { log(`retry queue save failed: ${e.message}`); }
+  if (keep.length) S.entriesRetryPending = keep.length;
+  else delete S.entriesRetryPending;
+}
+
 async function onEntry(ev) {
   const intentId = `entry:${ev.event_id || `${FLOOR}:${ev.id}`}`;
   const existingIntent = journal.getIntent(intentId);
@@ -1419,6 +1504,13 @@ function sendHeartbeat() {
          their merits — the pair is what says whether a retry queue is needed. */
       entriesLostToFailure: S.entriesLostToFailure || 0,
       entriesRefused: S.entriesRefused || 0,
+      /* The three numbers that say whether the retry queue is doing its job: how many
+         lost calls it won back, how many are still owed, and how many it gave up on.
+         entriesLostToFailure alone cannot distinguish "dropped and recovered" from
+         "dropped and gone", which is the whole question. */
+      entriesRecovered: S.entriesRecovered || 0,
+      entriesRetryPending: S.entriesRetryPending || 0,
+      entriesRetryAbandoned: (S.entriesRetryExpired || 0) + (S.entriesRetryExhausted || 0),
       blockingIntent: Boolean(journal.hasBlockingIntent()), positions: openList(),
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
@@ -1436,6 +1528,13 @@ function sendHeartbeat() {
       entriesPaused: pauseEntries(), hardStop: hardStop(), blockingIntent: true,
       entriesLostToFailure: S.entriesLostToFailure || 0,
       entriesRefused: S.entriesRefused || 0,
+      /* The three numbers that say whether the retry queue is doing its job: how many
+         lost calls it won back, how many are still owed, and how many it gave up on.
+         entriesLostToFailure alone cannot distinguish "dropped and recovered" from
+         "dropped and gone", which is the whole question. */
+      entriesRecovered: S.entriesRecovered || 0,
+      entriesRetryPending: S.entriesRetryPending || 0,
+      entriesRetryAbandoned: (S.entriesRetryExpired || 0) + (S.entriesRetryExhausted || 0),
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
       consecutiveFeedFailures: runtimeHealth.consecutiveFeedFailures,
@@ -1506,6 +1605,12 @@ async function tick() {
     // emergency-impact block must update the durable book before an entry from this
     // feed tick can pass sizing and loss gates.
     await manageOpen();
+    /* RETRIES BEFORE NEW WORK. A call the desk already published and this bot already
+       dropped is older than anything in the next batch, and it is the one the contract
+       says must not be lost. It runs after manageOpen for the same reason entries do —
+       existing risk outranks new exposure — and before the feed drain so a busy market
+       can never starve it. */
+    await drainEntryRetries();
     try {
       const response = await fetch(`${API}/api/floor/${FLOOR}/executor/feed?after=${S.cursor}`, {
         headers: { authorization: `Bearer ${SECRET}` }, redirect: "error", signal: AbortSignal.timeout(10_000),
@@ -1625,16 +1730,25 @@ async function tick() {
                    heartbeat so the answer is measured rather than guessed. */
                 const cls = error?.failureClass ?? null;
                 const lost = cls === "transport" || cls === "oracle";
+                let queued = false;
                 if (lost) {
                   S.entriesLostToFailure = (S.entriesLostToFailure || 0) + 1;
                   S.entriesLostLast = { symbol: ev.symbol || String(ev.id), at: Date.now(),
                     failureClass: cls, reason: String(error.message).slice(0, 200) };
+                  /* AND PARK IT FOR RETRY. Counting a dropped call told us how often the
+                     bot failed the desk; it did not stop it failing. A transport or
+                     oracle fault is by definition not a verdict on the coin, so the call
+                     is retried on later ticks through the identical onEntry path — every
+                     gate, including the drift and staleness guards that refuse an entry
+                     which has become a different trade. */
+                  queued = enqueueEntryRetry(ev, error, cls);
                 } else {
                   S.entriesRefused = (S.entriesRefused || 0) + 1;
                 }
                 log(`${lost ? "LOST" : "SKIP"} ${ev.symbol || ev.id}: ${error.message} — ` +
                   (lost
-                    ? `the desk published this call and it was dropped to a ${cls} failure, not refused on its merits`
+                    ? `the desk published this call and it was dropped to a ${cls} failure, not refused on its merits` +
+                      (queued ? " — queued for retry" : " — NOT queued; this call is gone")
                     : "entry acknowledged without a trade"));
                 S.cursor = Number(ev.id);
                 save();

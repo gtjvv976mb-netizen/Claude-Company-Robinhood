@@ -29,6 +29,7 @@
 import { createRpc, fromHex, fromHexNumber } from "./evm-rpc.mjs";
 import { quote, NATIVE_SENTINEL } from "./evm-swap.mjs";
 import { classifyToken, SELECTOR_NAME } from "./scope-guard.mjs";
+import { tokenSide } from "./probe-pool-select.mjs";
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith("--") ? [a.slice(2), all[i + 1] ?? "1"] : []).filter(Boolean));
 const SECONDS = Number(args.seconds || 300);
@@ -43,9 +44,11 @@ const PER_TIER = Number(args.perTier || 2);
    through KyberSwap's aggregator, and the only allowlist on the trading path is the
    scope guard on TOKENS. Defaulting to pons-v2-dex + uniswap-v4-robinhood measured a
    market this bot does not trade — and measured almost nothing: of 60 pools, 15 have
-   WETH on a side, and those two venues hold ONE of them between them (pons-v2 has zero;
-   its pair allowlist carries native ETH, not WETH). The sample came back as a single
-   pool in a single liquidity tier, which is an anecdote, not a measurement. Across all
+   the WETH ERC-20 on a side, and those two venues held ONE of them between them. The
+   sample came back as a single pool in a single liquidity tier, which is an anecdote,
+   not a measurement. (pons-v2-dex read as ZERO there for a second reason, since fixed:
+   its pools quote NATIVE ETH, which GeckoTerminal also labels "WETH", and the sampler
+   matched only the ERC-20 — see probe-pool-select.mjs.) Across all
    venues the same run samples 7 pools spanning all four tiers, and the thin ones lose
    84-99% on a round trip — exactly the fact screen.minLiquidityUsd exists to encode,
    and exactly what one pool could never have shown. --dexes still narrows it. */
@@ -85,12 +88,24 @@ const gasLoop = (async () => {
 })();
 
 /* ── 2. the sample: liquidity-stratified live pools from GeckoTerminal ─── */
+/* THE POPULATION MUST CONTAIN THE VENUE YOU ASKED FOR. The chain-wide /pools feed is
+   ranked by 24h volume, so three pages are the chain's top 60 — and a small venue is
+   represented there only by its handful of loudest pools. Measured 2026-09-07: those
+   60 carried 5 pons-v2-dex pools, every one of them USDG-quoted, so `--dexes
+   pons-v2-dex` sampled ZERO ETH-quoted pools and looked, for the second time and for
+   a second unrelated reason, like a venue with no ETH market. It has seven; they sit
+   below the chain's top 60. When --dexes narrows the venues, the population is drawn
+   from each venue's OWN pool feed, which is the only place a small venue is complete. */
 async function geckoPools(pages = 3) {
   const out = [];
+  const feeds = DEXES.size
+    ? [...DEXES].map((d) => ({ label: d, url: (pg) => `https://api.geckoterminal.com/api/v2/networks/robinhood/dexes/${encodeURIComponent(d)}/pools?page=${pg}&sort=h24_volume_usd_desc` }))
+    : [{ label: "chain-wide", url: (pg) => `https://api.geckoterminal.com/api/v2/networks/robinhood/pools?page=${pg}&sort=h24_volume_usd_desc` }];
+  for (const feed of feeds) {
   for (let page = 1; page <= pages; page++) {
-    const r = await fetch(`https://api.geckoterminal.com/api/v2/networks/robinhood/pools?page=${page}&sort=h24_volume_usd_desc`,
+    const r = await fetch(feed.url(page),
       { headers: { accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
-    if (!r.ok) { log(`GeckoTerminal page ${page}: HTTP ${r.status}`); break; }
+    if (!r.ok) { log(`GeckoTerminal ${feed.label} page ${page}: HTTP ${r.status}`); break; }
     const body = await r.json();
     for (const p of body?.data ?? []) {
       const a = p.attributes ?? {};
@@ -102,11 +117,12 @@ async function geckoPools(pages = 3) {
     }
     await sleep(1_500);                    // GeckoTerminal's public tier is ~30 req/min
   }
+  }
   return out;
 }
 const PAGES = Number(args.pages || 3);
 const pools = await geckoPools(PAGES);
-log(`GeckoTerminal returned ${pools.length} pools across ${PAGES} pages`);
+log(`GeckoTerminal returned ${pools.length} pools across ${PAGES} pages of ${DEXES.size ? [...DEXES].join("/") : "the chain-wide feed"}`);
 
 /* population quantiles → bands.floors / bands.holdWindows inputs */
 {
@@ -125,20 +141,17 @@ log(`GeckoTerminal returned ${pools.length} pools across ${PAGES} pages`);
     `age p10/p50/p90 ${a10?.toFixed(1)}h/${a50?.toFixed(1)}h/${a90?.toFixed(1)}h")  # bands.floors input, NOT the floors themselves`);
 }
 
-/* stratify by liquidity; WETH-quoted pools on the chosen venues, and only tokens the
+/* stratify by liquidity; ETH-quoted pools on the chosen venues, and only tokens the
    desk could actually hold: the scope guard reads each base token's beacon slot and
-   name() before it is sampled, so an equity cannot end up in the round-trip table. */
-const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73";
+   name() before it is sampled, so an equity cannot end up in the round-trip table.
+   The ETH-side test lives in probe-pool-select.mjs and is tested there — it has to
+   accept NATIVE ETH as well as the WETH ERC-20, and getting that wrong is what made
+   pons-v2-dex look like it had no ETH pools at all. */
 const tiers = [[0, 10_000], [10_000, 100_000], [100_000, 1_000_000], [1_000_000, Infinity]];
 const readSlot = (a, slot) => rpc("eth_getStorageAt", [a, slot, "latest"]);
 const readName = (a) => rpc("eth_call", [{ to: a, data: SELECTOR_NAME }, "latest"]);
 const sample = [];
 const refused = [];
-/* GeckoTerminal lists a pool as base/quote in the order the DEX registered them, so a
-   memecoin pool can read "WETH / MEME"; the second run (2026-09-05) found only USDG
-   because it required WETH on the quote side. Either side is accepted and the OTHER
-   side is the token under test. */
-const tokenSide = (p) => p.quote.toLowerCase() === WETH ? p.base : p.base.toLowerCase() === WETH ? p.quote : null;
 for (const [lo, hi] of tiers) {
   const inTier = pools.filter((p) => p.reserveUsd >= lo && p.reserveUsd < hi && tokenSide(p) &&
     /^0x[0-9a-f]{40}$/i.test(tokenSide(p)) && (DEXES.size === 0 || DEXES.has(p.dex)))
@@ -154,7 +167,7 @@ for (const [lo, hi] of tiers) {
     taken++;
   }
 }
-log(`sample: ${sample.length} WETH-quoted pools on ${[...DEXES].join("/") || "any dex"} — ${sample.map((p) => `${p.name} [${p.tier}]`).join("; ")}`);
+log(`sample: ${sample.length} ETH-quoted pools (WETH ERC-20 or native) on ${[...DEXES].join("/") || "any dex"} — ${sample.map((p) => `${p.name} [${p.tier}]`).join("; ")}`);
 if (refused.length) log(`scope guard refused ${refused.length} candidate(s): ${refused.join("; ")}`);
 
 /* ── 3. round trips and drift ──────────────────────────────────────────── */
