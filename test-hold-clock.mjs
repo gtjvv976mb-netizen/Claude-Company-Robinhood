@@ -33,13 +33,24 @@ for (const [band, b] of Object.entries(CAP_BANDS)) {
     expired.action === "sell" && new RegExp(`the ${band} window closed`).test(expired.reason), expired.reason);
 }
 
-console.log("\nA NANO CALL DOES NOT SIT FOR TWELVE HOURS");
-// The exact regression: before the clock, the only age rule was maxAgeHours = 12, so a
-// coin the desk expected to resolve in half an hour was still open at lunchtime.
+console.log("\nA CALL IS CLOSED ON ITS OWN BAND WINDOW, NOT ON A GLOBAL CLOCK");
+/* Derived from CAP_BANDS rather than written as a literal. The original read "a nano
+   position is closed 31 minutes in", which pinned pump.fun's 30-minute clock into the
+   test — so when the RH clocks were re-measured (see src/bands.js) this failed while
+   describing correct behaviour. A test that hardcodes the value it is meant to protect
+   fails the day that value is legitimately updated. */
 const nano = { hold_band: "nano", hold_max_ms: CAP_BANDS.nano.holdMaxMs };
-ok("a nano position is closed 31 minutes in", held(nano, 31 * MIN).action === "sell",
-  held(nano, 31 * MIN).reason);
-ok("...where the old 12-hour rule alone would still be holding",
+const justPast = CAP_BANDS.nano.holdMaxMs + MIN;
+ok(`a nano position is closed just past its ${CAP_BANDS.nano.holdMaxMs / HOUR}h window`,
+  held(nano, justPast).action === "sell", held(nano, justPast).reason);
+/* THE CONTRAST NEEDS A BAND SHORTER THAN THE BACKSTOP, and on this chain every band is
+   now 120h — the same as the backstop, deliberately (src/bands.js). So the distinction is
+   shown with an explicitly short window instead of with the nano band, which no longer
+   differs from the fallback at that instant. */
+const shortWindowed = { hold_band: "nano", hold_max_ms: 30 * MIN };
+ok("a call WITH a short window closes on it", held(shortWindowed, 31 * MIN).action === "sell",
+  held(shortWindowed, 31 * MIN).reason);
+ok("...where a call carrying NO window is still holding at the same instant",
   held({}, 31 * MIN).action === "hold", held({}, 31 * MIN).reason);
 
 console.log("\nTHE SHORTER OF THE TWO ALWAYS WINS");
@@ -51,14 +62,20 @@ ok("an operator's 1-hour age exit beats a 24-hour band window",
   held(long, 61 * MIN, { maxAgeHours: 1 }).action === "sell", held(long, 61 * MIN, { maxAgeHours: 1 }).reason);
 ok("...and reports itself as the age exit, not the band",
   /age exit/.test(held(long, 61 * MIN, { maxAgeHours: 1 }).reason));
-ok("a 30-minute band window beats the operator's 12 hours",
-  held(nano, 31 * MIN, { maxAgeHours: 12 }).action === "sell");
+/* A band window SHORTER than the operator's ceiling governs — the other direction of
+   "the shorter of the two wins". Both sides derived, so neither can go stale. */
+const shortBand = { hold_band: "nano", hold_max_ms: 30 * MIN };
+ok("a band window shorter than the operator's ceiling governs",
+  held(shortBand, 31 * MIN, { maxAgeHours: DEFAULTS.maxAgeHours }).action === "sell",
+  held(shortBand, 31 * MIN, { maxAgeHours: DEFAULTS.maxAgeHours }).reason);
 
 console.log("\nA CALL WITHOUT A WINDOW FALLS BACK, NEVER FORWARD");
+const pastBackstop = (DEFAULTS.maxAgeHours + 1) * HOUR;
+const insideBackstop = (DEFAULTS.maxAgeHours - 1) * HOUR;
 ok("no window means the configured age exit still governs",
-  held({}, 25 * HOUR).action === "sell" && /age exit/.test(held({}, 25 * HOUR).reason));
-ok("a zero window is not a window", held({ hold_max_ms: 0 }, 25 * HOUR).action === "sell");
-ok("a nonsense window is ignored", held({ hold_max_ms: "soon" }, 23 * HOUR).action === "hold");
+  held({}, pastBackstop).action === "sell" && /age exit/.test(held({}, pastBackstop).reason));
+ok("a zero window is not a window", held({ hold_max_ms: 0 }, pastBackstop).action === "sell");
+ok("a nonsense window is ignored", held({ hold_max_ms: "soon" }, insideBackstop).action === "hold");
 ok("the backstop is never shorter than the longest band",
   DEFAULTS.maxAgeHours * 3600e3 >= CAP_BANDS.very_high.holdMaxMs,
   `${DEFAULTS.maxAgeHours}h backstop vs a ${CAP_BANDS.very_high.holdMaxMs / HOUR}h band`);
@@ -69,7 +86,8 @@ console.log("\nTHE CLOCK RUNS EVEN WHEN THE PRICE DOES NOT");
  * mark cannot be read is exactly the one that must not be held indefinitely. */
 const posNoMark = openPosition({ call: { mint: "m", symbol: "T", stop: 0.5, target: 2,
   openedAtMs: T0, ...nano }, sol: 0.05, fillPrice: 1, cfg: DEFAULTS });
-const noMark = stepPosition({ pos: posNoMark, mark: null, cfg: DEFAULTS, nowMs: T0 + 31 * MIN });
+const noMark = stepPosition({ pos: posNoMark, mark: null, cfg: DEFAULTS,
+  nowMs: T0 + CAP_BANDS.nano.holdMaxMs + MIN });
 ok("an unreadable mark does not stop the clock", noMark.action === "sell", noMark.reason);
 
 console.log("\nA STOP STILL OUTRANKS NOTHING — THE CLOCK IS AN ADDITION");

@@ -24,11 +24,22 @@ import { emit } from "./lib/bus.js";
 /* HOW LONG A BAND IS WORTH HUNTING IN.
  *
  * A coin's hold window says how long the desk stays in; this says how long after birth
- * the desk is still interested in getting in. They are deliberately different numbers:
- * a nano coin four hours old has already had its move, whatever its market cap says,
- * and a $5m coin two days old is perfectly ordinary. The multiple is generous —
- * twelve times the hold window — because the point is to exclude the archaeology the
- * old keyword sweep was returning (median age twenty-five days), not to be clever. */
+ * the desk is still interested in getting in. Twelve times the hold window.
+ *
+ * THE ORIGINAL REASONING WAS pump.fun's AND DOES NOT HOLD HERE. It read: "a nano coin
+ * four hours old has already had its move" and the multiple exists "to exclude the
+ * archaeology the old keyword sweep was returning (median age twenty-five days)". On
+ * Solana that is right — everything is born at ~$5k and resolves within hours, so age is
+ * a good proxy for "too late". On Robinhood Chain it is backwards: measured 2026-09-07
+ * on the desk's own DexScreener universe, ZERO of eighteen sub-$1m coins were under an
+ * hour old, thirteen were over a week, and the median was 539 hours. Twenty-five days is
+ * not archaeology here, it is the middle of the market — excluding it excludes the desk's
+ * entire universe.
+ *
+ * The multiple is unchanged, but it now rides re-measured hold clocks (src/bands.js:
+ * 120h everywhere), so the window is ~60 days rather than ~6 hours. That is the right
+ * order for a chain whose typical tradeable coin is three weeks old. Age still orders
+ * the shortlist — younger first — it just no longer disqualifies the market. */
 const HUNT_WINDOW_MULTIPLE = 12;
 const huntWindowMs = (band) => (CAP_BANDS[band]?.holdMaxMs ?? 0) * HUNT_WINDOW_MULTIPLE;
 

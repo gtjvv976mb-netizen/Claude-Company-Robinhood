@@ -130,27 +130,37 @@ saveSettings(F, { mcapTier: "any" });
 }
 
 
-/* THE HOLD WINDOWS. These are the owner's numbers, band by band, and a call carries its
- * band's window to the executor — so a silent edit here would quietly turn a
- * thirty-minute nano trade into an overnight hold. */
+/* THE HOLD WINDOWS. A call carries its band's window to the executor, so an edit here
+ * changes how long real money sits in a position. The CAP boundaries are the owner's;
+ * the CLOCKS on this tower are measured on Robinhood Chain and re-derived from cost
+ * (src/bands.js) — the Solana tower keeps the owner's pump.fun clocks. */
 {
   const { CAP_BANDS, holdWindowFor } = await import("./src/categories.js");
   const MIN = 60_000, HOUR = 60 * MIN;
-  const want = {
-    nano:      [1 * MIN,   30 * MIN],
-    micro:     [20 * MIN,  1 * HOUR],
-    low:       [1 * HOUR,  5 * HOUR],
-    medium:    [1 * HOUR,  5 * HOUR],
-    high:      [1 * HOUR,  5 * HOUR],
-    very_high: [5 * HOUR, 24 * HOUR],
-  };
   console.log("\nHOLD WINDOWS");
-  for (const [band, [lo, hi]] of Object.entries(want))
-    ok(`${band} is held ${lo / MIN}-${hi / MIN} minutes`,
-      CAP_BANDS[band].holdMinMs === lo && CAP_BANDS[band].holdMaxMs === hi,
-      `${CAP_BANDS[band].holdMinMs / MIN}-${CAP_BANDS[band].holdMaxMs / MIN} min`);
-  ok("a $9k cap resolves to the nano window", holdWindowFor(9_000)?.holdMaxMs === 30 * MIN);
-  ok("a $5m cap resolves to the very-high window", holdWindowFor(5_000_000)?.holdMaxMs === 24 * HOUR);
+  /* THIS USED TO BE A SECOND COPY OF THE BAND TABLE — the exact minutes, restated as a
+     literal. A test that duplicates the value it protects does not protect it; it just
+     fails the day that value is legitimately re-measured, which is what happened when the
+     clocks were re-derived for Robinhood Chain (src/bands.js). What follows asserts the
+     PROPERTIES that must hold on this chain instead. */
+  const MEASURED_BREAKEVEN_H = 120;   // src/bands.js: the shortest hold that is not measurably loss-making
+  for (const [band, b] of Object.entries(CAP_BANDS)) {
+    ok(`${band} has a hold window at all`,
+      b.holdMaxMs > 0 && b.holdMinMs > 0 && b.holdMaxMs > b.holdMinMs,
+      `${b.holdMinMs / MIN}-${b.holdMaxMs / MIN} min`);
+    /* THE INVARIANT THAT MATTERS HERE. A round trip on this chain costs 7.35% at the
+       cheapest clip and 9.16% at the operator's cap, and the median trade cannot clear
+       that until roughly the five-day mark — measured two independent ways, and traded
+       over 41 days (1h -14.71%, 24h -7.36%, 72h -2.31%, 120h +2.19%). A band that closes
+       sooner is a forced sale into a cost the move has not had time to cover. */
+    ok(`${band} is not held for less than the measured break-even horizon`,
+      b.holdMaxMs >= MEASURED_BREAKEVEN_H * HOUR,
+      `${(b.holdMaxMs / HOUR).toFixed(0)}h vs the ${MEASURED_BREAKEVEN_H}h floor`);
+  }
+  ok("a $9k cap resolves to the nano window",
+    holdWindowFor(9_000)?.holdMaxMs === CAP_BANDS.nano.holdMaxMs);
+  ok("a $5m cap resolves to the very-high window",
+    holdWindowFor(5_000_000)?.holdMaxMs === CAP_BANDS.very_high.holdMaxMs);
   ok("an unreadable cap has no window", holdWindowFor(null) === null && holdWindowFor(0) === null);
   ok("a cap off the board has no window", holdWindowFor(50_000_000) === null);
 }

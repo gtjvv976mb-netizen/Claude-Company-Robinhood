@@ -3,12 +3,23 @@ export const POLICY_VERSION = "snipe-v3";
 
 export const POLICY_DEFAULTS = Object.freeze({
   takeProfitX: 2,
-  /* THE BACKSTOP, not the policy. Each call now carries its own band window (nano half
-     an hour, very high a day) and that is what closes a position; this is only the
-     ceiling for a call that carried none, and it matches the longest band so it can
-     never cut a very-high hold short. An operator setting MAX_AGE_HOURS lower still
-     wins everywhere: the shorter of the two governs. */
-  maxAgeHours: 24,
+  /* THE BACKSTOP, not the policy. Each call carries its own band window and that is what
+     closes a position; this is only the ceiling for a call that carried none, and BY
+     DESIGN IT MATCHES THE LONGEST BAND so it can never cut a hold short. An operator
+     setting MAX_AGE_HOURS lower still wins everywhere: the shorter of the two governs.
+     
+     IT MUST MOVE WHEN THE BANDS MOVE, and that is why this is 120 and not 24. The clocks
+     in src/bands.js were re-measured on Robinhood Chain (see the long note there): every
+     band now closes at 120 hours, because holding for less than that cannot clear a round
+     trip on this chain — measured two independent ways, and traded over the same 41 days
+     at 1h -14.71%, 24h -7.36%, 72h -2.31%, 120h +2.19%.
+     
+     Leaving this at 24 would have made that change do NOTHING. trade-policy takes
+     Math.min(bandHoldMs, configuredHoldMs), so a 120-hour band against a 24-hour backstop
+     is a 24-hour hold — the exact horizon measured at -7.36% a trade. The band table and
+     this number are one decision written in two files; test-hold-clock.mjs pins them
+     together so they cannot drift apart again. */
+  maxAgeHours: 120,
   trailPct: 0.25,
   breakevenArmX: 1.35,
   trailArmX: 1.5,

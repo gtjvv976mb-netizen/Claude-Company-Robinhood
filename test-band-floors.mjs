@@ -232,8 +232,17 @@ console.log("\nTHE PAID SCREEN READS THE BAND'S FLOORS, NOT A FLAT ONE");
 console.log("\nTHE EVIDENCE BUNDLE STATES THE BAND AND THE HOLD WINDOW");
 {
   const { bandForMarketCap, holdWindowFor } = await import("./src/bands.js");
-  ok("a nano cap resolves to a 30-minute window",
-    bandForMarketCap(9_000) === "nano" && holdWindowFor(9_000).holdMaxMs === 30 * 60_000);
+  /* Derived, not written as a literal: the clocks on this tower are measured on
+     Robinhood Chain and will move again when a better measurement arrives. What the
+     test protects is that a nano cap RESOLVES to the nano band's window, whatever it
+     currently is — and that the window is not shorter than the horizon at which a trade
+     can clear a round trip here (120h, see src/bands.js). */
+  const { CAP_BANDS } = await import("./src/bands.js");
+  ok("a nano cap resolves to the nano window",
+    bandForMarketCap(9_000) === "nano" && holdWindowFor(9_000).holdMaxMs === CAP_BANDS.nano.holdMaxMs);
+  ok("...and that window clears this chain's measured break-even horizon",
+    holdWindowFor(9_000).holdMaxMs >= 120 * 60 * 60_000,
+    `${holdWindowFor(9_000).holdMaxMs / 3_600_000}h`);
   const src = fs.readFileSync("./src/data/evidence.js", "utf8");
   ok("gather() puts both on the bundle every seat reads",
     /band: bandForMarketCap\(/.test(src) && /hold: holdWindowFor\(/.test(src));

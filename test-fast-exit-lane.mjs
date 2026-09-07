@@ -37,10 +37,17 @@ console.log("\nWHICH CALLS CANNOT WAIT FOR THE SLOW TIMER");
       needsFastExitLane(call, { monitorMs: slow }) === fastWanted,
       `${(b.holdMaxMs / slow).toFixed(0)} chances on the slow timer`);
   }
-  ok("nano and micro are the fast ones today",
-    needsFastExitLane({ hold_max_ms: CAP_BANDS.nano.holdMaxMs }, { monitorMs: slow }) &&
-    needsFastExitLane({ hold_max_ms: CAP_BANDS.micro.holdMaxMs }, { monitorMs: slow }) &&
-    !needsFastExitLane({ hold_max_ms: CAP_BANDS.very_high.holdMaxMs }, { monitorMs: slow }));
+  /* WHICH bands are fast is a consequence of the clocks, not a fact to pin. This used to
+     assert "nano and micro are the fast ones", which was true of pump.fun's half-hour
+     nano window; on Robinhood Chain every band holds 120h (src/bands.js), so at a
+     ten-minute monitor NOTHING needs the fast lane — 720 chances is not a squeeze. The
+     rule itself is what matters, so that is what is asserted. */
+  ok("with this chain's clocks no band needs the fast lane at a 10-minute monitor",
+    Object.values(CAP_BANDS).every((b) => !needsFastExitLane({ hold_max_ms: b.holdMaxMs }, { monitorMs: slow })),
+    `every band gets ${(CAP_BANDS.nano.holdMaxMs / slow).toFixed(0)} chances on the slow timer`);
+  ok("...but a genuinely short window still takes it, so the lane is not dead code",
+    needsFastExitLane({ hold_max_ms: 30 * MIN }, { monitorMs: slow }),
+    "a 30-minute hold gets 3 chances — that is a squeeze");
   ok("a call with no clock is never fast-laned, rather than defaulting into one",
     !needsFastExitLane({ hold_max_ms: null }) && !needsFastExitLane({ hold_max_ms: 0 }) &&
     !needsFastExitLane({}) && !needsFastExitLane(null));
@@ -58,19 +65,25 @@ console.log("\nTHE CLOCKS ARE STATED IN THE CHAIN'S BLOCKS");
    * comparison is read in blocks. The numbers below are the ones the code must print. */
   ok("the block clock is 100 ms", BLOCK_MS === 100, `${BLOCK_MS} ms`);
   ok("a ten-minute monitor pass is 6,000 blocks", blocksFor(10 * MIN) === 6_000, `${blocksFor(10 * MIN)}`);
-  ok("a nano hold (30 m) is 18,000 blocks", blocksFor(CAP_BANDS.nano.holdMaxMs) === 18_000,
-    `${blocksFor(CAP_BANDS.nano.holdMaxMs)}`);
-  const nanoClocks = exitClockBlocks({ hold_max_ms: CAP_BANDS.nano.holdMaxMs }, { monitorMs: 10 * MIN, subTickSecs: 45 });
-  ok("a nano call gets 3 slow passes and 40 sub-ticks",
-    nanoClocks.slowPasses === 3 && nanoClocks.subTicks === 40,
-    `hold ${nanoClocks.holdBlocks} blocks / slow ${nanoClocks.slowBlocks} = ${nanoClocks.slowPasses}; ` +
-    `/ sub-tick ${nanoClocks.subTickBlocks} = ${nanoClocks.subTicks}`);
-  const vh = exitClockBlocks({ hold_max_ms: CAP_BANDS.very_high.holdMaxMs }, { monitorMs: 10 * MIN });
-  ok("a very-high call gets 144 slow passes over its 864,000 blocks",
-    vh.holdBlocks === 864_000 && vh.slowPasses === 144, `${vh.holdBlocks} blocks, ${vh.slowPasses} passes`);
+  /* The block arithmetic is the thing under test, so it is exercised on a FIXED window
+     rather than on whichever clock the bands currently carry — that way re-measuring the
+     clocks (which is expected on this tower) cannot break a test about multiplication. */
+  ok("a 30-minute hold is 18,000 blocks", blocksFor(30 * MIN) === 18_000, `${blocksFor(30 * MIN)}`);
+  const shortClocks = exitClockBlocks({ hold_max_ms: 30 * MIN }, { monitorMs: 10 * MIN, subTickSecs: 45 });
+  ok("a 30-minute call gets 3 slow passes and 40 sub-ticks",
+    shortClocks.slowPasses === 3 && shortClocks.subTicks === 40,
+    `hold ${shortClocks.holdBlocks} blocks / slow ${shortClocks.slowBlocks} = ${shortClocks.slowPasses}; ` +
+    `/ sub-tick ${shortClocks.subTickBlocks} = ${shortClocks.subTicks}`);
+  const day = exitClockBlocks({ hold_max_ms: 24 * HOUR }, { monitorMs: 10 * MIN });
+  ok("a 24-hour call gets 144 slow passes over its 864,000 blocks",
+    day.holdBlocks === 864_000 && day.slowPasses === 144, `${day.holdBlocks} blocks, ${day.slowPasses} passes`);
+  /* And the bands' OWN clocks still resolve to blocks, whatever they are. */
+  const band = exitClockBlocks({ hold_max_ms: CAP_BANDS.nano.holdMaxMs }, { monitorMs: 10 * MIN });
+  ok("this chain's nano window resolves to blocks too",
+    band.holdBlocks === CAP_BANDS.nano.holdMaxMs / 100, `${band.holdBlocks} blocks, ${band.slowPasses} passes`);
   ok("the fast-lane verdict is the same ratio read in blocks",
-    needsFastExitLane({ hold_max_ms: CAP_BANDS.nano.holdMaxMs }, { monitorMs: 10 * MIN }) ===
-    (nanoClocks.slowPasses < FAST_LANE_MIN_PASSES));
+    needsFastExitLane({ hold_max_ms: 30 * MIN }, { monitorMs: 10 * MIN }) ===
+    (shortClocks.slowPasses < FAST_LANE_MIN_PASSES));
   ok("no clock, no blocks", exitClockBlocks({}) === null && blocksFor(0) === null && blocksFor("soon") === null);
 }
 

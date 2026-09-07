@@ -197,11 +197,19 @@ console.log("\nSCREEN(): EVERY NEW KILL FIRES ON ITS FLAG, AND ONLY ON ITS FLAG"
 {
   const clone = () => JSON.parse(JSON.stringify(cashcat));
   /* A base that PASSES: the recorded bundle is too big for the board and its ledger is
-     older than the scan budget, so both are set to values inside the floors. */
+     older than the scan budget, so both are set to values inside the floors.
+     The mint and blacklist probes are supplied for the same reason: this bundle was
+     RECORDED before evidence.js carried them, and unverified_mint / unverified_blacklist
+     now treat an ABSENT probe as unverified rather than as clean — which is the whole
+     point of that fix, and is why a stale fixture must state them rather than omit them.
+     `unverified: false` here means "the probe ran and found nothing", which is exactly
+     what a clean coin looks like. */
   const clean = () => {
     const ev = clone();
     ev.pair.marketCap = ev.pair.fdv = 400_000;
     ev.holders = { ok: true, top1Pct: 3.1, top10Pct: 14, count: 900, clusteredHolders: 1, bundleSuspect: false, excluded: [], poolShareOfSupplyPct: 3 };
+    ev.mintSim = { live: false, unverified: false, detail: "mint(address,uint256) reverts" };
+    ev.blacklist = { present: false, unverified: false, detail: "no blacklist selector answers" };
     return ev;
   };
   const kills = (ev) => screen(ev).fails.map((f) => f.code);

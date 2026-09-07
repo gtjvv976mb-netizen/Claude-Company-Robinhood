@@ -63,7 +63,11 @@ ok("2x sells in both paths", takeServer.code === "take_profit" &&
   `${takeServer.code} / ${takeExecutor.reason}`);
 
 console.log("\nTIME EXPIRY USES ONE POLICY ON BOTH SIDES");
-const pastBackstop = Date.now() - 25 * 3600e3;
+/* Derived from the backstop, not written as 25 hours. The literal was chosen to sit just
+   past the old 24-hour default; when that default was re-measured for Robinhood Chain
+   (120h, see executor/trade-policy.mjs) the literal fell INSIDE the window and this
+   assertion failed while describing correct behaviour. */
+const pastBackstop = Date.now() - (DEFAULTS.maxAgeHours + 1) * 3600e3;
 db.prepare("UPDATE calls SET opened_at=? WHERE id=?").run(pastBackstop, call.id);
 const agedCall = getCall(call.id);
 const ageServer = evaluateExit(agedCall, market(1.1));

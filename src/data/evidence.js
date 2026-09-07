@@ -383,6 +383,25 @@ export async function gather(address, hook = "") {
 
   return {
     ok: true,
+    /* ── TWO HONEYPOT PROBES THAT WERE FAILING OPEN ─────────────────────────────
+     * evidence.js:576-577 check `ev.mintSim?.unverified === true` and
+     * `ev.blacklist?.unverified === true` — but neither key existed on this object, so
+     * both read undefined and NEITHER CHECK COULD EVER FIRE.
+     *
+     * The probes themselves work and are already computed above. What was missing is
+     * only their unverified state reaching the screen. contractFlags is pushed on
+     * `mintSim.live` and `blacklist.present`, and on an RPC 429, a timeout or a closed
+     * socket both come back NULL with unverified:true — so no flag was pushed and the
+     * coin was screened as though the mint role and the blacklist had been checked and
+     * found absent. That is exactly the fail-open the 2026-09-05 review comment at
+     * evidence.js:501 says it closed for the other flags: "the second read as the
+     * first" turns "the probe could not run" into "the probe says no".
+     *
+     * Carried on the bundle now, so unverified_mint and unverified_blacklist refuse. */
+    mintSim, blacklist,
+    /* Was the LP-custody rail able to run at all? On v3/v4 it cannot (see the note at
+       lp_pullable), and a silent rail must not read as a satisfied one. */
+    lpCustodyUnclassified: lp?.kind !== "v2_lp_tokens",
     address: a,
     mint: a,                       // legacy alias; every new reader uses `address`
     token: a,
@@ -573,8 +592,17 @@ export function screen(ev) {
   const flags = (c?.flags ?? ev.mintAccount?.flags ?? []).map((f) => f.flag ?? f);
   const detailOf = (flag) => (c?.flags ?? []).find((f) => f.flag === flag)?.detail ?? null;
   check(String(ev.address ?? ev.mint ?? "").toLowerCase() === cfg.accessToken, "access_token", "this is the desk's own access token — it opens a floor and is never a position");
-  check(ev.mintSim?.unverified === true, "unverified_mint", ev.mintSim?.detail ?? "the mint probe could not be read");
-  check(ev.blacklist?.unverified === true, "unverified_blacklist", ev.blacklist?.detail ?? "the blacklist probe could not be read");
+  /* ABSENT IS NOT CLEAN. These read `?.unverified === true`, which is false both when the
+     probe ran and passed AND when the probe is not on the bundle at all — and it was not
+     on the bundle, so neither check could ever fire. Carrying the keys fixes today's
+     path, but `?.` would fail open again the moment any other lane built a bundle
+     without them. A successful probe returns {live:false} / {present:false} with no
+     `unverified` key, so "explicitly false" cannot be the test either; the honest
+     predicate is "missing OR unverified". */
+  check(ev.mintSim == null || ev.mintSim.unverified === true, "unverified_mint",
+    ev.mintSim?.detail ?? "the mint probe is absent from the bundle — refused, not assumed safe");
+  check(ev.blacklist == null || ev.blacklist.unverified === true, "unverified_blacklist",
+    ev.blacklist?.detail ?? "the blacklist probe is absent from the bundle — refused, not assumed safe");
   check(Number(ev.buySim?.effectiveTaxBps) > 800, "buy_tax", `the buy leg returns ${ev.buySim?.effectiveTaxBps} bps less than quoted — a tax or a hook on the way in`);
   check(flags.includes("equity_token"), "equity", detailOf("equity_token") ?? "a Robinhood Stock Token — this desk is scoped to memecoins only");
   check(flags.includes("unknown_beacon"), "unknown_beacon", detailOf("unknown_beacon"));
@@ -587,6 +615,22 @@ export function screen(ev) {
   check(flags.includes("upgraded"), "upgraded_recently", detailOf("upgraded"));
   check(ev.sellSim?.ok && ev.sellSim.effectiveTaxBps != null && ev.sellSim.effectiveTaxBps > cfg.maxRoundTripSlippagePct * 100,
     "sell_tax", `the chain kept ${ev.sellSim?.effectiveTaxBps}bps of a simulated sell against the quote — over the ${cfg.maxRoundTripSlippagePct}% ceiling`);
+  /* THE ONLY LP-RUG RAIL, AND IT ONLY SPEAKS UNISWAP V2 — 3 of 207 measured RH pairs.
+   *
+   * This is left as it is DELIBERATELY, and the reason is worth writing down so nobody
+   * "fixes" it into a rail that lies. On v2, liquidity is a fungible LP token, so
+   * "burned or locked" is a meaningful, checkable custody fact. On v3/v4 liquidity is a
+   * concentrated position NFT that its owner may withdraw AT ANY TIME BY DESIGN — there
+   * is no burn convention, and essentially all v3 liquidity is "pullable". A v3 version
+   * of this check would therefore either fire on every coin on the chain (killing the
+   * desk) or be tuned until it fired on none (a rail that exists only in prose).
+   *
+   * So the honest position is: on v3/v4 this rail does not run, the risk is real, and
+   * what actually carries it is the liquidity floor (thin_liquidity), the round-trip
+   * exit probe (cannot_exit) and the on-chain sell simulation — all of which measure
+   * whether the position can be got out of, which is the outcome the rail cares about.
+   * lpCustodyUnclassified is surfaced so the seats and the record can see the rail was
+   * silent rather than satisfied. */
   check(ev.lp?.pullableSharePct != null && ev.lp.pullableSharePct > 20 && ev.lp.kind === "v2_lp_tokens",
     "lp_pullable", `${ev.lp?.pullableSharePct}% of the v2 LP is neither burned nor classified as locked`);
   const unallowed = (ev.pairs?.pools ?? []).filter((q) => !q.pairAllowed);

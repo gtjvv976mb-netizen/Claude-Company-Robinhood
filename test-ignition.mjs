@@ -182,7 +182,19 @@ console.log("\nTHE SHORTLIST SPENDS ATTENTION, AND ONLY ATTENTION");
   ok("a live in-band coin is shortlisted", mints.includes("live"));
   ok("a coin off the board is not", !mints.includes("offboard"));
   ok("a coin with no trades in five minutes is not", !mints.includes("stale"));
-  ok("a month-old nano coin is not — that move is long over", !mints.includes("ancient"));
+  /* THE AGE CUTOFF IS RELATIVE TO THIS CHAIN, NOT TO pump.fun's. The window is
+     holdMaxMs x 12, and the RH clocks make that 60 days for every band — deliberately,
+     because a small-cap coin here has a MEDIAN AGE OF 22 DAYS (measured 2026-09-07, the
+     desk's own DexScreener universe: 0 of 18 sub-$1m coins under an hour old, 13 over a
+     week). "A month old, so the move is over" is a true statement about a pump.fun coin
+     and a false one here, where a month-old coin is an ordinary one. What the lane must
+     still do is exclude coins outside its window, whatever that window is. */
+  const windowMs = CAP_BANDS.nano.holdMaxMs * 12;
+  const beyond = shortlist([make({ mint: "beyond", ageMin: (windowMs / 60_000) * 2 })]).map((c) => c.mint);
+  ok("a coin past the hunt window is excluded, whatever the window is",
+    !beyond.includes("beyond"), `window is ${(windowMs / 3_600_000 / 24).toFixed(0)} days on this chain`);
+  ok("...and a month-old coin is INSIDE it here, because that is an ordinary age on 4663",
+    mints.includes("ancient"), "on pump.fun this coin would be archaeology; here it is the median");
 
   // Youth is the whole point of the lane, so it must actually win the ordering.
   const order = shortlist([make({ mint: "old", ageMin: 300 }), make({ mint: "young", ageMin: 2 })],
