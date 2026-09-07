@@ -29,9 +29,21 @@ const coin = ({ mcap = 50_000, liq, vol = 50_000, tx = 500, age = 5 } = {}) => {
 console.log("\nFLOORS SCALE WITH THE COIN, BECAUSE THE BANDS SPAN 2000x");
 /* The six sleeves, since 2026-09-03: nano $5k-$20k, micro $20k-$60k, low $60k-$100k,
    medium $100k-$500k, high $500k-$1m, very high $1m-$10m. */
-ok("a nano-cap is asked for $2k of depth", floorsFor(9_000).liq === 2_000);
-ok("a micro-cap is asked for $4k", floorsFor(30_000).liq === 4_000);
-ok("a very-high-cap is asked for $15k", floorsFor(5_000_000).liq === 15_000);
+/* THE SHAPE IS THE OWNER'S; THE LEVEL IS A DIAL. These asserted the strict level's exact
+   dollars ($2k nano, $4k micro, $15k very-high), so they failed the moment DESK_OPENNESS
+   moved the whole ladder — reporting a deliberate, measured change as a break. The
+   per-band SHAPE is what must hold: a bigger coin clears a proportionally higher bar,
+   whatever level the desk is set to. */
+ok("each cap resolves to its own band's floor",
+  floorsFor(9_000).liq === BAND_FLOORS.nano.liq &&
+  floorsFor(30_000).liq === BAND_FLOORS.micro.liq &&
+  floorsFor(5_000_000).liq === BAND_FLOORS.very_high.liq);
+ok("the ladder keeps its shape across the dial",
+  BAND_FLOORS.very_high.liq / BAND_FLOORS.nano.liq > 5,
+  `nano $${BAND_FLOORS.nano.liq} to very-high $${BAND_FLOORS.very_high.liq}`);
+ok("no floor is ever zero — an unmeasurable coin is not admitted by arithmetic",
+  Object.values(BAND_FLOORS).every((f) => f.liq > 0 && f.vol > 0 && f.txns >= 1),
+  JSON.stringify(BAND_FLOORS.nano));
 ok("the floor RISES with size", BAND_FLOORS.nano.liq < BAND_FLOORS.micro.liq
   && BAND_FLOORS.micro.liq < BAND_FLOORS.very_high.liq,
   "a $30k coin with $4k of depth is ordinary; a $5m coin with $4k of depth is a fiction");
@@ -39,16 +51,30 @@ ok("the floor RISES with size", BAND_FLOORS.nano.liq < BAND_FLOORS.micro.liq
    population the nano and micro sleeves exist for — a coin the desk is asked to hold
    for thirty minutes cannot be required to be ninety minutes old first. */
 ok("the nano sleeve looks at a coin about a minute old", floorsFor(9_000).ageH <= 0.02);
-ok("...while a $5m coin still has to be an hour and a half old", floorsFor(5_000_000).ageH === 1.5);
-ok("an UNREADABLE market cap gets the STRICT flat floor, not the loosest band",
-  floorsFor(null).liq === cfg.screen.minLiquidityUsd,
-  "an unknown number must never be handed the most permissive treatment");
+ok("...while a $5m coin has to clear its own band's age floor",
+  floorsFor(5_000_000).ageH === BAND_FLOORS.very_high.ageH &&
+  floorsFor(5_000_000).ageH > floorsFor(9_000).ageH,
+  `very-high ${floorsFor(5_000_000).ageH}h vs nano ${floorsFor(9_000).ageH}h`);
+/* The INTENT, not the constant. This compared against cfg.screen.minLiquidityUsd — a
+   value left behind at the old level when DESK_OPENNESS moved the ladder, which made the
+   fallback the strictest thing on the desk by accident rather than by design. What must
+   hold is the rule: an unknown cap is never handed the most permissive band. */
+ok("an UNREADABLE market cap gets the STRICTEST band, never the loosest",
+  floorsFor(null).liq === BAND_FLOORS.very_high.liq &&
+  floorsFor(null).liq > BAND_FLOORS.nano.liq,
+  `unknown gets $${floorsFor(null).liq}; the loosest band is $${BAND_FLOORS.nano.liq}`);
+ok("...and an OFF-BOARD cap is treated the same way",
+  floorsFor(50_000_000).liq === BAND_FLOORS.very_high.liq);
+ok("...but an explicit operator floor still wins over the dial",
+  !process.env.DESK_MIN_LIQUIDITY_USD || floorsFor(null).liq === cfg.screen.minLiquidityUsd,
+  "an operator who names a number means it");
 
 console.log("\nA POOL THAT CAN BE READ AND IS TOO THIN STILL DIES");
 ok("micro-cap with $1k of depth is refused",
-  wouldSurviveScreen(coin({ mcap: 30_000, liq: 1_000 })) === "thin_liquidity", "$1k < $5k floor");
+  wouldSurviveScreen(coin({ mcap: 30_000, liq: Math.floor(BAND_FLOORS.micro.liq / 2) })) === "thin_liquidity",
+  `half the micro floor of $${BAND_FLOORS.micro.liq}`);
 ok("...and a $5m coin with $12k of depth is refused too",
-  wouldSurviveScreen(coin({ mcap: 5_000_000, liq: 12_000, vol: 50_000 })) === "thin_liquidity",
+  wouldSurviveScreen(coin({ mcap: 5_000_000, liq: BAND_FLOORS.nano.liq * 2, vol: 50_000 })) === "thin_liquidity",
   "$12k clears the nano bar four times over and still fails up here — the band bar rises with size");
 
 console.log("\nUNKNOWN LIQUIDITY IS NOT THIN LIQUIDITY");
@@ -98,8 +124,9 @@ ok("and a READABLE pool below the band floor is still refused there",
 
 console.log("\nBUT AN UNREADABLE POOL MUST CLEAR A HIGHER BAR OF REAL TRADING");
 ok("unreadable pool with a thin tape is still refused",
-  wouldSurviveScreen(coin({ mcap: 40_000, liq: undefined, vol: 5_000, tx: 30 })) === "thin_liquidity",
-  "the tape is the only evidence of a market it has, so it must be strong");
+  wouldSurviveScreen(coin({ mcap: 40_000, liq: undefined,
+    vol: BAND_FLOORS.micro.vol * 2 - 1, tx: BAND_FLOORS.micro.txns * 2 + 1 })) === "thin_liquidity",
+  "the tape is the only evidence of a market it has, so it must be strong — and the bar is 2x, whatever the dial");
 ok("2x the volume floor is the bar for an unreadable pool",
   wouldSurviveScreen(coin({ mcap: 40_000, liq: undefined, vol: BAND_FLOORS.micro.vol * 2 + 1, tx: BAND_FLOORS.micro.txns * 2 + 1 })) === null &&
   wouldSurviveScreen(coin({ mcap: 40_000, liq: undefined, vol: BAND_FLOORS.micro.vol * 2 - 1, tx: BAND_FLOORS.micro.txns * 2 + 1 })) === "thin_liquidity",
@@ -116,9 +143,11 @@ ok("too_small still fires below the nano floor",
 /* Still fires — but on the BAND'S clock. A $5m coin half an hour old is refused; a
    $50k one is exactly what the micro sleeve is hunting. */
 ok("too_new still fires on a $5m coin half an hour old",
-  wouldSurviveScreen(coin({ mcap: 5_000_000, liq: 20_000, vol: 50_000, age: 0.5 })) === "too_new");
+  wouldSurviveScreen(coin({ mcap: 5_000_000, liq: 200_000, vol: 50_000,
+    age: BAND_FLOORS.very_high.ageH / 2 })) === "too_new");
 ok("...and does NOT fire on a micro-cap the same age",
-  wouldSurviveScreen(coin({ mcap: 50_000, liq: 9_000, vol: 50_000, age: 0.5 })) !== "too_new");
+  wouldSurviveScreen(coin({ mcap: 50_000, liq: 9_000, vol: 50_000,
+    age: BAND_FLOORS.very_high.ageH * 2 })) !== "too_new");
 ok("wash_suspect still fires on an absurd volume/depth ratio",
   wouldSurviveScreen(coin({ mcap: 50_000, liq: 6_000, vol: 6_000 * 41 })) === "wash_suspect");
 
@@ -152,7 +181,10 @@ ok("...and it is NOT given a bonus either — being early is neutral, not a lice
  * price up 30% - and it scored positive, correctly. A coin cannot be simultaneously
  * untraded and re-rating; the momentum bonuses were reading the only live signal I had
  * given it. Fixed to be genuinely dead. */
-const deadCurve = curveCoin({ vol: 200, buys: 4, h1buys: 0, h6buys: 1 });
+/* Below the CURRENT volume floor, whatever the dial is set to — the point is a tape
+   with no market in it, not a particular dollar figure. */
+const DEAD_VOL = Math.max(1, Math.floor(BAND_FLOORS.nano.vol / 2));
+const deadCurve = curveCoin({ vol: DEAD_VOL, buys: 4, h1buys: 0, h6buys: 1 });
 deadCurve.pair.priceChange = { h1: 0, h6: 0, h24: 0 };
 deadCurve.pair.txns.h24.sells = 3;
 ok("an on-curve coin with a genuinely dead tape still scores itself out",
@@ -163,8 +195,8 @@ ok("an on-curve coin with a genuinely dead tape still scores itself out",
  * behind it - is caught, just not by rank(). It is worth asserting WHERE, because
  * "rank does not catch it" was the shape of the objection and the answer is that rank
  * is not the thing that has to. */
-const ghostPump = curveCoin({ vol: 200, buys: 4, h1buys: 0, h6buys: 1 });
-ok("a coin up 30% on $200 of volume is killed by the SCREEN, not ranked away",
+const ghostPump = curveCoin({ vol: DEAD_VOL, buys: 4, h1buys: 0, h6buys: 1 });
+ok("a coin up 30% on a dead tape is killed by the SCREEN, not ranked away",
   rank(ghostPump).score > 0 && wouldSurviveScreen(ghostPump) === "no_volume",
   "the free screen is the net here — rank only decides what is worth screening");
 
@@ -214,7 +246,10 @@ console.log("\nTHE PAID SCREEN READS THE BAND'S FLOORS, NOT A FLAT ONE");
     && wouldSurviveScreen({ mint: "M", pair: liveEv(fresh).pair }) !== "too_new");
 
   // The floor did not go away; it went band-relative. A big coin still has to be old.
-  const bigYoung = { mcap: 5_000_000, ageH: 0.5, liq: 200_000, totalLiq: 200_000, vol: 300_000, tx: 900 };
+  /* Half its band's age floor, derived — 0.5h was written against the strict level's
+     1.5h and stopped being "young" the moment the dial moved. */
+  const bigYoung = { mcap: 5_000_000, ageH: BAND_FLOORS.very_high.ageH / 2,
+    liq: 200_000, totalLiq: 200_000, vol: 300_000, tx: 900 };
   ok("a $5m coin half an hour old is still too_new", paidCodes(bigYoung).includes("too_new"),
     paidCodes(bigYoung).join(","));
 
@@ -223,7 +258,8 @@ console.log("\nTHE PAID SCREEN READS THE BAND'S FLOORS, NOT A FLAT ONE");
      number nobody measured. The exit probe is what answers this question. */
   ok("a coin with no venue pool is not killed as thin on a zero nobody measured",
     !paidCodes(nano).includes("thin_liquidity"), paidCodes(nano).join(",") || "passes");
-  const genuinelyThin = { mcap: 9_300, ageH: 0.3, liq: 200, totalLiq: 200, vol: 18_600, tx: 40 };
+  const genuinelyThin = { mcap: 9_300, ageH: 0.3, liq: Math.max(1, Math.floor(BAND_FLOORS.nano.liq / 4)),
+    totalLiq: Math.max(1, Math.floor(BAND_FLOORS.nano.liq / 4)), vol: 18_600, tx: 40 };
   ok("...but a pool that IS readable and IS thin still dies",
     paidCodes(genuinelyThin).includes("thin_liquidity"), paidCodes(genuinelyThin).join(","));
 }

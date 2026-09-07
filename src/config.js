@@ -71,7 +71,7 @@ targetSizeUsd: num("DESK_TARGET_SIZE_USD", 75),
      * Note this is DEPTH, not market cap: a $1m-cap coin is a claim about price x
      * supply, while liquidity is the money actually in the pool to sell into. They
      * are routinely an order of magnitude apart. */
-minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),
+minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),   // overridden by DESK_OPENNESS below
     // 24h here quietly strangled the sniper lane: the free screen killed every
     // coin the ignition path is FOR. The research's floor is one hour past
     // migration (rugs express inside the first hour); 1.5h keeps a margin.
@@ -288,14 +288,54 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),
  * concentration and honeypot mechanics are unchanged and absolute. */
 import { bandForMarketCap } from "./bands.js";
 
-export const BAND_FLOORS = {
-  nano:      { liq: 2_000,  vol: 1_500,  txns: 10, ageH: 0.02 },  // $5k-$20k, from a minute old
-  micro:     { liq: 4_000,  vol: 3_000,  txns: 20, ageH: 0.05 },  // $20k-$60k
-  low:       { liq: 5_000,  vol: 4_000,  txns: 25, ageH: 0.25 },  // $60k-$100k
-  medium:    { liq: 8_000,  vol: 8_000,  txns: 40, ageH: 0.5 },   // $100k-$500k
-  high:      { liq: 12_000, vol: 12_000, txns: 60, ageH: 1 },     // $500k-$1m
-  very_high: { liq: 15_000, vol: 15_000, txns: 60, ageH: 1.5 },   // $1m-$10m
+/* ── HOW OPEN THE DESK IS, AS ONE DIAL ────────────────────────────────────────
+ * These floors are QUALITY bars, not safety facts. They say "too quiet to bother with",
+ * which is a preference; they do not say "you cannot get out", which is measured
+ * elsewhere and is not negotiable (cannot_exit, the sell simulation, the honeypot probes
+ * and the holder-concentration gate are all untouched by this setting).
+ *
+ * THE OLD NUMBERS WERE pump.fun's AND REJECTED 88% OF THIS MARKET. Measured 2026-09-07
+ * across the desk's own DexScreener universe, on-board RH coins run: liquidity p10 $6.6k
+ * / p50 $13.4k; volume p10 $2 / p50 $322 / p75 $6.4k; transactions p10 1 / p50 23 / p75
+ * 99. Against the medium band's $8,000 volume and 40 transactions that is 82% and 65%
+ * rejected respectively — 88% failing at least one. On pump.fun a live coin does $8k in
+ * an hour; here the median on-board coin does $322 in a DAY. The bar was not strict, it
+ * was scaled to another market.
+ *
+ * DESK_OPENNESS picks the level (owner, 2026-09-07: "more open ... to allow more coins
+ * to be published"). Measured admission on that same sample:
+ *
+ *     strict    $8,000 / $8,000 / 40      2 of 17   (12%)   the old pump.fun bar
+ *     balanced  $5,000 / $300   / 15      9 of 17   (53%)
+ *     open      $2,000 / $50    / 5      10 of 17   (59%)   <- default
+ *     wide      $1,000 / $10    / 2      14 of 17   (82%)
+ *
+ * `wide` is deliberately reachable and deliberately not the default: a coin with two
+ * trades and $10 of daily volume has no counterparty, and past that point "more open"
+ * stops meaning openness and starts meaning a position nobody can leave. That is the one
+ * direction this dial should not be turned without watching what comes back. */
+const OPENNESS_LEVELS = {
+  strict:   { liq: 8_000, vol: 8_000, txns: 40, ageH: 0.5 },
+  balanced: { liq: 5_000, vol:   300, txns: 15, ageH: 0.25 },
+  open:     { liq: 2_000, vol:    50, txns:  5, ageH: 0.1 },
+  wide:     { liq: 1_000, vol:    10, txns:  2, ageH: 0.02 },
 };
+export const OPENNESS = OPENNESS_LEVELS[process.env.DESK_OPENNESS] ? process.env.DESK_OPENNESS : "open";
+const BASE = OPENNESS_LEVELS[OPENNESS];
+/* The per-band shape is the owner's and is preserved exactly: a bigger coin must clear a
+   proportionally higher bar. Only the level moves. */
+const BAND_SHAPE = {
+  nano:      { liq: 0.25,  vol: 0.19,  txns: 0.25, ageH: 0.04 },
+  micro:     { liq: 0.5,   vol: 0.375, txns: 0.5,  ageH: 0.1 },
+  low:       { liq: 0.625, vol: 0.5,   txns: 0.625, ageH: 0.5 },
+  medium:    { liq: 1,     vol: 1,     txns: 1,    ageH: 1 },
+  high:      { liq: 1.5,   vol: 1.5,   txns: 1.5,  ageH: 2 },
+  very_high: { liq: 1.875, vol: 1.875, txns: 1.5,  ageH: 3 },
+};
+export const BAND_FLOORS = Object.fromEntries(Object.entries(BAND_SHAPE).map(([band, m]) => [band, {
+  liq: Math.round(BASE.liq * m.liq), vol: Math.round(BASE.vol * m.vol),
+  txns: Math.max(1, Math.round(BASE.txns * m.txns)), ageH: Number((BASE.ageH * m.ageH).toFixed(3)),
+}]));
 
 /**
  * The floors that apply to THIS coin.
@@ -305,8 +345,19 @@ export const BAND_FLOORS = {
  * That is the same rule the rest of the desk follows everywhere else.
  */
 export function floorsFor(mcap) {
-  const flat = { liq: cfg.screen.minLiquidityUsd, vol: cfg.screen.minVolume24hUsd,
-    txns: cfg.screen.minTxns24h, ageH: cfg.screen.minPairAgeHours };
+  /* THE FALLBACK MUST FOLLOW THE DIAL, or it becomes the strictest thing on the desk by
+     accident. Its intent is "an unknown cap never gets the most permissive band", and
+     that intent is served by the STRICTEST BAND OF THE CURRENT LEVEL — not by a constant
+     left behind at the old level, which is what it became when DESK_OPENNESS moved the
+     ladder. An explicit env override still wins, because an operator who names a number
+     means it. */
+  const strictest = BAND_FLOORS.very_high;
+  const flat = {
+    liq: process.env.DESK_MIN_LIQUIDITY_USD ? cfg.screen.minLiquidityUsd : strictest.liq,
+    vol: process.env.DESK_MIN_VOL24_USD ? cfg.screen.minVolume24hUsd : strictest.vol,
+    txns: process.env.DESK_MIN_TXNS24 ? cfg.screen.minTxns24h : strictest.txns,
+    ageH: process.env.DESK_MIN_PAIR_AGE_HOURS ? cfg.screen.minPairAgeHours : strictest.ageH,
+  };
   if (mcap == null || !(mcap > 0)) return flat;
   /* ONE TAXONOMY. These boundaries were hardcoded here and drifted a full rung out of
      step with CAP_BANDS on 2026-09-03: the screen called a $250k coin "low" while the

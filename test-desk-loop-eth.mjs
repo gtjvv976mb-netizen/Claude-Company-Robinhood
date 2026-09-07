@@ -58,6 +58,7 @@ console.log("\nTHE CREATOR-SOLD TRIPWIRE IS KEYED ON THE LAUNCHPAD, NOT AN ADDRE
 
 console.log("\nTHE PHASE GATE — A CURVE COIN IS WATCHED, NEVER PUBLISHED");
 {
+  const { BAND_FLOORS } = await import("./src/config.js");
   const healthy = (over = {}) => ({ mint: addr(0x21), pair: { marketCap: 40_000, liquidityUsd: 9_000, volume: { h24: 50_000 },
     txns: { h24: { buys: 400, sells: 200 } }, ageHours: 5, priceChange: {} }, ...over });
   ok("launch.phase is read first", launchPhaseOf({ launch: { phase: "curve" } }) === "curve" &&
@@ -66,7 +67,12 @@ console.log("\nTHE PHASE GATE — A CURVE COIN IS WATCHED, NEVER PUBLISHED");
   ok("...so is one the sweep flags onCurve", wouldSurviveScreen(healthy({ onCurve: true })) === "on_curve");
   ok("a graduated one passes", wouldSurviveScreen(healthy({ launch: { phase: "graduated" } })) === null);
   ok("no phase at all passes the FREE screen (judged on the paid bundle instead)", wouldSurviveScreen(healthy()) === null);
-  const dead = healthy({ launch: { phase: "curve" } }); dead.pair.volume.h24 = 100;
+  /* The tape must be dead RELATIVE TO THE CURRENT FLOOR — 100 was written against the
+     strict level's $8,000 volume bar and became perfectly healthy the moment
+     DESK_OPENNESS moved the ladder. The point of the assertion is ORDER (the tape is
+     reported before the phase), not the dollar figure. */
+  const dead = healthy({ launch: { phase: "curve" } });
+  dead.pair.volume.h24 = Math.max(0, Math.floor(BAND_FLOORS.nano.vol / 2));
   ok("a dead-tape curve coin is reported for its tape, not its phase", wouldSurviveScreen(dead) === "no_volume");
 
   const rec = (phase) => ({ mint: addr(0x22), symbol: "PH", outcome: "ok", finalDecision: "APPROVED",
