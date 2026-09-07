@@ -971,7 +971,26 @@ export async function runPenthouseCycle({
      *
      * A cycle that ends without a call is a fine outcome and the record already says
      * so. A cycle that never ends says nothing at all. */
-    const huntDeadline = Date.now() + Number(process.env.PENTHOUSE_HUNT_BUDGET_MS || 240_000);
+    /* THE TIME BUDGET SCALES WITH THE QUOTA, for the same reason the interview cap does.
+     *
+     * 240s was sized for a hunt that stopped at its FIRST call. Measured on this chain
+     * 2026-09-07, the free screen passes about 2 of 10 on-board coins, so reaching three
+     * publishable calls takes on the order of fifteen workups — and a workup is seats,
+     * not arithmetic. Fifteen of them do not fit in four minutes, so the quota would have
+     * been silently enforced by a stopwatch instead of by the market: cycle:short every
+     * time, reporting "the market was thin" when the truth was "the clock ran out".
+     *
+     * BUT IT IS ALSO BOUNDED BY THE CYCLE INTERVAL, which is 12 minutes. A flat
+     * 240s x quota would be 12 minutes of hunting inside a 12-minute cycle: cycles would
+     * run back to back and overlap, and this process does not reliably live that long —
+     * Render restarts it on every deploy, which is the failure recorded at the stamp in
+     * index.js (33 budget stops, 24 halts, no cycle:end for sixteen hours). So the hunt
+     * gets at most 60% of the interval, leaving room for the shortlist pass and the
+     * writes. PENTHOUSE_HUNT_BUDGET_MS overrides it outright. */
+    const cycleMs = Number(process.env.PENTHOUSE_CYCLE_MINS || 12) * 60_000;
+    const huntBudgetMs = Number(process.env.PENTHOUSE_HUNT_BUDGET_MS
+      || Math.min(240_000 * CALLS_PER_CYCLE, Math.floor(cycleMs * 0.6)));
+    const huntDeadline = Date.now() + huntBudgetMs;
     /* THE CAP SCALES WITH THE QUOTA. 12 was sized for a hunt that stopped at its first
        call; a quota of three needs roughly three times the interviews to fill from the
        same market, and a cap sized for one turns "publish 3" into "publish 1 and time

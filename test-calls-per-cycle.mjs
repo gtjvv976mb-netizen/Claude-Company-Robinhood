@@ -73,6 +73,11 @@ ok("the hunt's loop breaks on the quota, not on the first call",
   /for \(const c of scored\) \{\s*\n\s*if \(opened\.length >= CALLS_PER_CYCLE\) break;/.test(ph) &&
   !/for \(const c of scored\) \{\s*\n\s*if \(opened\.length\) break;/.test(ph),
   "this is the exact line that made the hunt a one-call hunt");
+ok("the hunt's TIME budget scales with the quota", /240_000 \* CALLS_PER_CYCLE/.test(ph),
+  "the screen passes ~2 of 10 here, so three calls need ~15 workups — a 240s box enforces the quota with a stopwatch");
+ok("...but never overruns the cycle interval", /Math\.min\(240_000 \* CALLS_PER_CYCLE, Math\.floor\(cycleMs \* 0\.6\)\)/.test(ph),
+  "a 12-minute hunt inside a 12-minute cycle would overlap cycles on a process Render restarts");
+ok("the interval it bounds against is the real one", /PENTHOUSE_CYCLE_MINS \|\| 12/.test(ph));
 ok("the hunt's interview cap scales with the quota",
   /PENTHOUSE_HUNT_MAX \|\| 12 \* CALLS_PER_CYCLE/.test(ph),
   "a cap sized for one call starves a quota of three");
