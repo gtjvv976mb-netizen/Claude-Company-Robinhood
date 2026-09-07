@@ -257,10 +257,46 @@ log(`history: ${STEPS} ${TF} bars (${new Date(t0).toISOString()} → ${new Date(
 log(`         ${tradable.length} of ${market.length} pools cover at least half of it and are selectable\n`);
 if (!tradable.length) { log("no pool has continuous enough history to trade"); process.exit(1); }
 
-const cfg = { ...DEFAULTS, maxOpenPositions: 4 };
+/* ── THE RAILS MUST BE THE ONES THE BOT ACTUALLY RUNS ON ─────────────────────
+ * This used to be `{ ...DEFAULTS, maxOpenPositions: 4 }`, and DEFAULTS is Solana's:
+ * maxSolPerTrade 0.05, dailySolCap 0.5, dailyLossLimitSol 0.15, costPct 0.06 (a
+ * Jupiter round trip). The Robinhood operator maxima are 0.004 / 0.04 / 0.012. So the
+ * simulation gave itself 125 clips a day where the live bot gets 10, a loss brake 12.5x
+ * looser than live, and a cost constant measured on another chain — then clamped the
+ * size afterwards with Math.min(CLIP_ETH, plan.sol), which silently discarded a
+ * planEntry that had authorised 0.0167 ETH. Every sizing figure the engine produced
+ * described a trade 4.17x larger than the one the sim actually booked.
+ *
+ * The P&L was still charged the real measured RH cost curve, so the headline was not
+ * fabricated — but throughput, the daily brake and book heat all bind at completely
+ * different points under the right rails, and those are what decide WHICH trades get
+ * taken. --rails solana restores the old behaviour for comparison. */
+/* Mirrored from poller.mjs's CFG, not guessed. The live bot overrides three DEFAULTS
+   the fork inherited, and a sim that uses raw DEFAULTS is not simulating it:
+     - minSolPerTrade 0.0001 (DEFAULTS says 0.005, which is ABOVE the 0.004 operator
+       ceiling — that mismatch is why an earlier run of this file refused all 730 calls
+       with "the sized position rounds to nothing". The live bot does not have it.)
+     - fixedSol = PAPER_DEFAULTS.fixedEth = 0.0016, set UNCONDITIONALLY, and planEntry
+       treats fixedSol as an override: `if (c.fixedSol > 0) want = c.fixedSol`. So every
+       live entry is 0.0016 ETH and the Kelly sizing above it never reaches a position.
+       At 0.0016 ETH gas alone is 12.8% of the position.
+     - scaleOutPct 0. */
+const LIVE_RAILS = { maxSolPerTrade: 0.004, dailySolCap: 0.04, dailyLossLimitSol: 0.012,
+  minSolPerTrade: 0.0001, fixedSol: 0.0016, scaleOutPct: 0 };
+const RAILS = (args.rails ?? "live") === "solana" ? {} : LIVE_RAILS;
+/* costPct is the +EV gate's ONLY cost term. Solana's 0.06 is a Jupiter round trip; the
+   measured RH cost at this clip is impact (from the measured table) plus gas, and gas
+   is 5.5% of a 0.004 ETH position. Defaulted from the measurement, not inherited. */
+const MEASURED_COST_PCT = (roundTripImpactPct(50_000, CLIP_ETH) + (2 * LEG_GAS_ETH) / CLIP_ETH * 100) / 100;
+const cfg = { ...DEFAULTS, maxOpenPositions: 4, ...RAILS,
+  costPct: args["cost-pct"] != null ? Number(args["cost-pct"]) : MEASURED_COST_PCT };
 const state = freshState(t0);
 state.equitySol = CLIP_ETH * 25;          // a book the clip is 4% of
 state.spendableSol = state.equitySol;
+log(`rails: ${(args.rails ?? "live") === "solana" ? "SOLANA DEFAULTS (comparison only)" : "the RH operator maxima"} — ` +
+  `${cfg.maxSolPerTrade} ETH/trade cap, fixedSol ${cfg.fixedSol} (what planEntry actually sizes to), ` +
+  `${cfg.dailySolCap} ETH/day, ${cfg.dailyLossLimitSol} ETH loss brake, ` +
+  `costPct ${(cfg.costPct * 100).toFixed(2)}%${args["cost-pct"] == null ? " (measured, not inherited)" : ""}`);
 let wallet = 0;                            // realized P&L in ETH
 const open = new Map();                    // address -> { pos, m, openedIdx, costEth }
 const closed = [];
@@ -374,6 +410,10 @@ for (let i = 10; i <= STEPS; i++) {
         entry: call.entry_ref, stop: call.stop, target: call.target };
       continue;
     }
+    /* THE ENGINE'S SIZE, NOT AN AFTERWARDS CLAMP. planEntry already honours
+       maxSolPerTrade, which is now the operator's real 0.004 ETH ceiling, so clamping
+       its answer again with Math.min(CLIP_ETH, ...) only hid the fact that the engine
+       had been sizing against Solana's 0.05. --clip still lowers the ceiling. */
     const notionalEth = Math.min(CLIP_ETH, plan.sol ?? CLIP_ETH);
     /* The clip leaves the wallet; impact and gas come out of it; what is left is what
        the price acts on. This is why a loss is bounded at the notional. */
