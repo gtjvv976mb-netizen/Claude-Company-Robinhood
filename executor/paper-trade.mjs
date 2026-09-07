@@ -19,6 +19,30 @@
  *     interpolated on log liquidity between the deep and thin anchors.
  *   - THE CAPS. The operator ceiling (0.004 ETH/trade) unless --clip overrides it.
  *
+ * WHAT IS BIASED, AND IN WHICH DIRECTION. All three of these flatter the result, and all
+ * three were found by auditing this file rather than by running it:
+ *
+ *   - SURVIVORSHIP. A pool must cover at least half the window to be selectable (the
+ *     `coverage >= 0.5` filter below). Measured on the cached hourly series: that drops
+ *     63% of pools, and the DROPPED ones have a median full-window return of 19.7%
+ *     against 522.3% for the ones it keeps. The filter systematically removes losers.
+ *   - LOOKAHEAD ON LIQUIDITY. `pool.liquidityUsd` is the depth GeckoTerminal reports
+ *     TODAY, applied to bars from up to 41 days ago. It feeds the entry filter, the
+ *     selection score AND the cost model — so a pool that is deep now is charged today's
+ *     cheap costs for a period when it may have been thin.
+ *   - SIGNAL AND FILL ON THE SAME BAR. The proxy decides on a bar's close and fills at
+ *     that same close. Standard in backtests, mildly optimistic.
+ *
+ * A DARK TAPE IS NO LONGER FREE, which was the fourth and worst of these until it was
+ * fixed: a position whose pool stopped printing used to be silently dropped — never
+ * marked, never exited, never counted — so rugs and quiet deaths cost nothing at all.
+ * They are force-exited at the last price actually seen and counted separately now.
+ *
+ * TAKEN TOGETHER: the ABSOLUTE P&L this file reports is not a profitability estimate. The
+ * RELATIVE comparisons are much stronger, because both arms carry the same bias — which
+ * is why the hold-window sweep (1h -14.71% ... 120h +2.19%, monotonic) is quoted as
+ * evidence for the clocks while the headline figure is not quoted as evidence of an edge.
+ *
  * WHAT IS A PROXY, stated plainly because the conclusion depends on it:
  *   - CALL SELECTION, in --calls-from proxy mode. The real desk decides with five LLM
  *     seats, a red team and compliance; none of that can be replayed over history at any
@@ -42,6 +66,16 @@ const CLIP_ETH   = Number(args.clip ?? 0.004);          // the operator per-trad
 const CYCLE_MIN  = Number(args["cycle-min"] ?? 30);
 const PER_CYCLE  = Number(args.calls ?? 3);
 const CALLS_FROM = args["calls-from"] ?? "proxy";
+/* `--calls-from desk` was accepted and then produced an empty pick list on every cycle,
+   so it reported a clean zero-trade run that looked like "the desk had no calls" rather
+   than "this mode was never implemented". A flag that silently does nothing is worse than
+   a missing one. It refuses until the desk's published calls are actually wired in. */
+if (CALLS_FROM !== "proxy") {
+  console.error(`--calls-from ${CALLS_FROM} is not implemented. Only "proxy" is.\n` +
+    "Scoring the desk's OWN published calls needs its call history joined to price series;\n" +
+    "until that exists this flag would report an empty run as a result.");
+  process.exit(2);
+}
 const STOP_PCT   = Number(args["stop-pct"] ?? 0.15);    // the call's authored stop
 const TARGET_X   = Number(args["target-x"] ?? 1.35);    // the call's authored target
 const MAX_HOLD_MIN = Number(args["max-hold-min"] ?? 60);
@@ -334,7 +368,39 @@ for (let i = 10; i <= STEPS; i++) {
      never once firing, was the tell. A probe against a known breach settled it. */
   for (const [addr, o] of [...open]) {
     const k = o.m.byIdx[i];
-    if (!k) continue;
+    /* A TAPE THAT GOES DARK IS AN OUTCOME, NOT AN EXEMPTION.
+     *
+     * This was `if (!k) continue;` — so a position whose pool stopped printing was never
+     * marked, never exited, and never counted. It simply vanished from the P&L. That is
+     * the single most flattering bug a backtest can have: the rug, the death and the
+     * quiet illiquid stretch are exactly the outcomes a memecoin strategy must be charged
+     * for, and they were free. byIdx nulls a bar whenever the pool has not printed within
+     * the staleness window, so this bit any position held across a quiet patch, not only
+     * a pool that died.
+     *
+     * A dark tape is now force-exited at the LAST PRICE ACTUALLY SEEN. That is a choice
+     * between two wrong answers — dropping it (infinitely generous) and marking it to
+     * zero (harsher than a real operator, who could often still sell something) — and the
+     * last print is the conservative one that does not invent a number. Counted
+     * separately so the report says how much of the result rests on it. */
+    if (!k) {
+      const darkFor = i - (o.lastSeenIdx ?? o.openedIdx);
+      if (darkFor <= STALE_MIN) continue;          // a brief gap; keep holding
+      const price = o.lastSeenPrice ?? o.pos.entry;
+      const grossEth = (price / o.pos.entry) * o.remainingEth;
+      const proceeds = grossEth * (1 - roundTripImpactPct(o.m.pool.liquidityUsd) / 100 / 2) - LEG_GAS_ETH;
+      const pnl = (o.proceedsEth + Math.max(0, proceeds)) - o.notionalEth;
+      wallet += pnl;
+      state.realizedTodaySol += pnl;
+      closed.push({ symbol: o.m.pool.symbol, liq: o.m.pool.liquidityUsd,
+        why: "tape went dark", heldMin: i - o.openedIdx,
+        movePct: (price / o.pos.entry - 1) * 100,
+        pnlEth: pnl, pnlPct: (pnl / o.notionalEth) * 100, exits: o.exits.length, dark: true });
+      open.delete(addr);
+      state.openCount = open.size;
+      continue;
+    }
+    o.lastSeenIdx = i; o.lastSeenPrice = k.c;
     const heldMin = i - o.openedIdx;
 
     /* THE STOP IS CHECKED AGAINST THE LOW AND IT IS CHECKED FIRST. A minute bar cannot
@@ -386,7 +452,7 @@ for (let i = 10; i <= STEPS; i++) {
   if (i % CYCLE_MIN !== 0) continue;
   cycles++;
   const held = new Set(open.keys());
-  const picks = CALLS_FROM === "proxy" ? proxyPicks(tradable, i, held, PER_CYCLE) : [];
+  const picks = proxyPicks(tradable, i, held, PER_CYCLE);
   published += picks.length;
   perCycle.push(picks.length);
 
@@ -459,6 +525,10 @@ if (closed.length) {
   const deployed = entered * CLIP_ETH;
   log(`ON DEPLOYED       ${eth(deployed)} deployed → ${pct((wallet / deployed) * 100)}`);
   log("");
+  const dark = closed.filter((c) => c.dark);
+  if (dark.length)
+    log(`  of which TAPE WENT DARK: ${dark.length} (${(dark.length / closed.length * 100).toFixed(1)}%), ` +
+      `avg ${pct(dark.reduce((s, c) => s + c.pnlPct, 0) / dark.length)} — these used to be dropped entirely`);
   log("BY EXIT REASON");
   const byWhy = {};
   for (const c of closed) (byWhy[c.why] ??= []).push(c);
