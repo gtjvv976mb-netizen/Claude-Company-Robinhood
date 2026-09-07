@@ -289,7 +289,27 @@ export function enforceRiskRails({ risk, ev, redteam, openRiskUsd = 0, config = 
     : redteam?.verdict === "wounded" ? 0.5 : 1;
   const tierMultiplier = ({ minimal: 0.10, quarter: 0.25, half: 0.50, full: 1 })[out.risk_tier] ?? 0.10;
   const confidenceMultiplier = clamp(finite(out.confidence) ?? 0.5, 0.25, 1);
-  const liquidityMultiplier = rtCost > 4 ? 0.5 : rtCost > 2 ? 0.75 : 1;
+  /* ── THE LIQUIDITY HAIRCUT, RE-DERIVED FROM THIS CHAIN'S COST DISTRIBUTION ────────
+   * The thresholds were 2% and 4%, set where a 4% round trip was an expensive coin —
+   * Solana, where four measured Jupiter round trips at $75 came back 3.70-5.58%.
+   *
+   * rtCost is measured at cfg.targetSizeUsd ($75 = 0.0167 ETH). Interpolating the 18
+   * KyberSwap-quoted PONS round trips of 2026-09-07 to that clip gives a MEDIAN of 6.25%
+   * and a WORST of 8.09%. So under the old thresholds the median coin and the worst coin
+   * both scored 0.5: the rule could not discriminate between them, and what called itself
+   * a liquidity multiplier was a flat 50% haircut on everything. A check whose output does
+   * not vary is not measuring anything — the same disease as a screen that kills 100%.
+   *
+   * Re-cut so the haircut means "worse than typical" again on this chain: above the worst
+   * measured round trip, half; above the median, three quarters; at or below the median,
+   * none. The MECHANISM is unchanged and so is its direction — this only moves the
+   * boundaries onto the distribution they are supposed to describe.
+   *
+   * (The sizing arithmetic below already handles flat gas correctly: gas is an additive
+   * term, and a budget the gas alone would exhaust refuses the position rather than
+   * shrinking it into a worse cost regime. That is why this is a threshold fix and not a
+   * mechanism one.) */
+  const liquidityMultiplier = rtCost > 8 ? 0.5 : rtCost > 6.25 ? 0.75 : 1;
   const maxBookRisk = config.equityUsd * ((config.maxBookRiskPct ?? 4) / 100);
   const remainingBookRisk = Math.max(0, maxBookRisk - Math.max(0, finite(openRiskUsd) ?? 0));
   const riskBudget = Math.min(

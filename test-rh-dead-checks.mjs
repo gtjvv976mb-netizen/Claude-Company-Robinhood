@@ -76,5 +76,31 @@ ok("unlock_risk and deployer_misconduct are both still real fact codes", () => {
   assert.ok(RED_TEAM_FACT_CODES.includes("deployer_misconduct"));
 });
 
+console.log("\n5. THE LIQUIDITY HAIRCUT MUST DISCRIMINATE, NOT HAIRCUT EVERYTHING");
+/* rtCost is measured at cfg.targetSizeUsd ($75 = 0.0167 ETH). Interpolating the 18
+   KyberSwap-quoted PONS round trips of 2026-09-07 to that clip: MEDIAN 6.25%, WORST
+   8.09%. Under the old Solana thresholds (>4 -> 0.5, >2 -> 0.75) BOTH scored 0.5, so a
+   rule named for liquidity was a flat 50% haircut that could not tell a typical coin from
+   the worst one. A check whose output does not vary is not measuring anything. */
+const rails = fs.readFileSync(new URL("./src/agents/risk-rails.js", import.meta.url), "utf8");
+const mult = rails.match(/const liquidityMultiplier = ([^;]+);/);
+ok("the multiplier is still a three-step function of the measured round trip", () =>
+  assert.ok(mult, "could not read liquidityMultiplier"));
+const f = new Function("rtCost", `return ${mult[1]};`);
+const PONS_MEDIAN = 6.25, PONS_WORST = 8.09;
+ok("the MEDIAN PONS coin is not haircut", () =>
+  assert.equal(f(PONS_MEDIAN), 1, `a typical coin scoring ${f(PONS_MEDIAN)} means every coin is penalised`));
+ok("the WORST measured PONS coin IS haircut", () =>
+  assert.equal(f(PONS_WORST), 0.5, "the rule must still bite on genuinely expensive exits"));
+ok("...so median and worst get DIFFERENT answers — the rule discriminates", () =>
+  assert.notEqual(f(PONS_MEDIAN), f(PONS_WORST)));
+ok("a cheap deep-pool round trip is untouched", () => assert.equal(f(0.5), 1));
+ok("something worse than anything measured is still capped at 0.5", () =>
+  assert.equal(f(25), 0.5, "the 0.5 floor is the mechanism's own; only the boundaries moved"));
+ok("the direction is unchanged — more cost never means MORE size", () => {
+  let prev = Infinity;
+  for (const rt of [0, 2, 4, 6, 6.3, 8, 9, 20]) { const v = f(rt); assert.ok(v <= prev, `rose at ${rt}%`); prev = v; }
+});
+
 console.log(`\n${fail ? "FAIL" : "PASS"} — ${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
