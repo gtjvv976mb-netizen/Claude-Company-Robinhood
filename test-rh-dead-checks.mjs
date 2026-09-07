@@ -34,6 +34,13 @@ ok("the allowlist is still closed to writes", () => {
 ok("a REFUSED method is re-thrown, not swallowed into a zero", () =>
   assert.match(perf, /if \(\/refused non-read method\/\.test\(String\(e\?\.message\)\)\) throw e;/,
     "evmRpc throws on a refusal deliberately — catching it into 0n rewrites the track record"));
+ok("the unattended sweep does not re-bin it one level up", () => {
+  /* readFill re-throws a refused method; the floor sweep's bare `catch {}` then swallowed
+     it again — on the unattended path, which is the one where nobody is watching. */
+  assert.match(perf, /if \(\/refused non-read method\/\.test\(String\(e\?\.message\)\)\) throw e;[\s\S]{0,40}\}/);
+  assert.ok(!/\} catch \{\}\s*\/\/ one floor's RPC trouble/.test(perf),
+    "a bare catch on that path cannot tell a bug from weather");
+});
 ok("...while genuine network weather still degrades to 0", () =>
   assert.match(perf, /throw e;\s*\n\s*nativeWei = 0n;/,
     "a missing value costs one fill's precision; a bug must not be treated the same way"));

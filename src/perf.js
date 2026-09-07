@@ -468,7 +468,14 @@ export async function autoSyncAll({ maxFloors = 6, maxCallsPerFloor = 8 } = {}) 
         if (sc.ok) fills += sc.fills ?? 0;
         const st = await settle({ floorNo: fl.floor_no, callId: r.call_id, wallet: fl.owner });
         if (st.ok) settled++;            // settle refuses open positions on its own
-      } catch {}                          // one floor's RPC trouble must not stall the rest
+      } catch (e) {
+        /* One floor's RPC trouble must not stall the rest — but a REFUSED METHOD is not
+           trouble, it is a bug, and evmRpc throws on it for exactly that reason. readFill
+           re-throws it rather than swallowing it into a zero; a bare catch here put it
+           straight back in the bin, one level up, on the unattended path where nobody is
+           watching. That is the path where it matters most. */
+        if (/refused non-read method/.test(String(e?.message))) throw e;
+      }
     }
   }
   return { floors: picked.length, fills, settled };
