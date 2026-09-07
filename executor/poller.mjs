@@ -1251,6 +1251,31 @@ async function handleDeskExitEvent(ev) {
   if (!isAddress(ev?.mint)) throw new Error("invalid ERC-20 address in desk exit event");
   requirePositiveCallId(ev?.call_id, "desk exit call_id");
   const eventId = ev.event_id || `${FLOOR}:${ev.id}`;
+  /* AN EXIT CANCELS ANY ENTRY STILL OWED FOR THE SAME CALL.
+   *
+   * The retry queue had no cancellation channel. A call could be dropped to a transport
+   * fault, parked for retry, and then CLOSED by the desk — and the queue would still be
+   * holding an entry for it, so the next drain would buy into a call the desk had already
+   * exited. Real money, on a position nobody wanted, with no exit instruction left in the
+   * feed to get it back out. The feed's own closed-call guard does not see it because the
+   * cursor moved past that entry when it was queued.
+   *
+   * Matched on call_id where both carry one, and on the mint otherwise. */
+  try {
+    const queued = journal.entryRetryQueue();
+    const survivors = queued.filter((q) => {
+      const sameCall = q?.event?.call_id != null && ev.call_id != null &&
+        Number(q.event.call_id) === Number(ev.call_id);
+      const sameMint = String(q?.event?.mint ?? "").toLowerCase() === String(ev.mint).toLowerCase();
+      return !(sameCall || sameMint);
+    });
+    if (survivors.length !== queued.length) {
+      journal.saveEntryRetryQueue(survivors);
+      S.entriesRetryCancelled = (S.entriesRetryCancelled || 0) + (queued.length - survivors.length);
+      log(`RETRY CANCELLED ${queued.length - survivors.length} queued entr(y|ies) for ` +
+        `${ev.symbol || ev.mint} — the desk closed the call before the retry could run`);
+    }
+  } catch (e) { log(`retry cancellation failed for ${ev.symbol || ev.mint}: ${e.message}`); }
   const reason = `desk exit (${ev.code || "exit"})`;
   const pos = S.positions[ev.mint];
   if (pos) {
@@ -1562,6 +1587,8 @@ function sendHeartbeat() {
       /* A retry that ran and was refused on its merits is neither a recovery nor a loss;
          counted apart so entriesRecovered cannot flatter itself. */
       entriesRetryRefused: S.entriesRetryRefused || 0,
+      /* Queued entries dropped because the desk closed the call first. */
+      entriesRetryCancelled: S.entriesRetryCancelled || 0,
       blockingIntent: Boolean(journal.hasBlockingIntent()), positions: openList(),
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
@@ -1589,6 +1616,8 @@ function sendHeartbeat() {
       /* A retry that ran and was refused on its merits is neither a recovery nor a loss;
          counted apart so entriesRecovered cannot flatter itself. */
       entriesRetryRefused: S.entriesRetryRefused || 0,
+      /* Queued entries dropped because the desk closed the call first. */
+      entriesRetryCancelled: S.entriesRetryCancelled || 0,
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
       consecutiveFeedFailures: runtimeHealth.consecutiveFeedFailures,

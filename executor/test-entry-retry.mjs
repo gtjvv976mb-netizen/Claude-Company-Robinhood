@@ -119,6 +119,23 @@ ok("retries run AFTER manageOpen so existing risk still outranks new exposure", 
   assert.ok(manage > 0 && manage < drain, "manageOpen must precede the retry drain");
 });
 
+console.log("\n4b. AN EXIT CANCELS AN ENTRY STILL OWED FOR THE SAME CALL");
+ok("the desk exit handler drains matching queued entries", () =>
+  assert.match(poller, /AN EXIT CANCELS ANY ENTRY STILL OWED FOR THE SAME CALL/));
+ok("it matches on call_id when both carry one", () =>
+  assert.match(poller, /Number\(q\.event\.call_id\) === Number\(ev\.call_id\)/));
+ok("...and falls back to the mint", () =>
+  assert.match(poller, /String\(q\?\.event\?\.mint \?\? ""\)\.toLowerCase\(\) === String\(ev\.mint\)\.toLowerCase\(\)/));
+ok("cancellation is counted, not silent", () =>
+  assert.match(poller, /S\.entriesRetryCancelled = \(S\.entriesRetryCancelled \|\| 0\) \+ /));
+ok("...and reaches the heartbeat", () =>
+  assert.equal((poller.match(/entriesRetryCancelled: S\.entriesRetryCancelled \|\| 0/g) || []).length, 2));
+ok("a cancellation failure cannot take the exit path down", () => {
+  const block = poller.slice(poller.indexOf("AN EXIT CANCELS ANY ENTRY"), poller.indexOf("const reason = `desk exit"));
+  assert.match(block, /catch \(e\) \{ log\(`retry cancellation failed/,
+    "an exit must still be processed even if the queue cannot be rewritten");
+});
+
 console.log("\n5. HONEST — abandonment is counted and visible");
 ok("expiry is counted", () => assert.match(poller, /S\.entriesRetryExpired = \(S\.entriesRetryExpired \|\| 0\) \+ 1/));
 ok("exhaustion is counted", () => assert.match(poller, /S\.entriesRetryExhausted = \(S\.entriesRetryExhausted \|\| 0\) \+ 1/));
