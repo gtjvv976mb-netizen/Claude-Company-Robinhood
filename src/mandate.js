@@ -40,6 +40,7 @@
  * cannot be exited is not a trade, it is a donation.
  */
 import { liveCalls } from "./calls.js";
+import { CAP_BANDS } from "./bands.js";
 import { TRADEABLE_PHASES } from "./agents/risk-rails.js";
 
 /**
@@ -90,6 +91,41 @@ export const MAX_LIVE_CALLS = Math.max(1, Number(process.env.PENTHOUSE_MAX_LIVE_
  * bounds nothing about money. MAX_LIVE_CALLS and the executor's maxOpenPositions do.
  */
 export const CALLS_PER_CYCLE = Math.max(1, Number(process.env.PENTHOUSE_CALLS_PER_CYCLE || 3));
+
+/**
+ * How often a cycle may run WITHOUT the book saturating — the fourth number in what is
+ * really one decision.
+ *
+ * THE FAILURE THIS EXISTS TO PREVENT, found by reviewing this session's own changes.
+ * Raising the quota to 3 and raising every hold to 120h were made separately, and neither
+ * touched MAX_LIVE_CALLS. Together: 3 calls per 12-minute cycle is 15 calls an hour, the
+ * 24-slot book saturates in 1.6 HOURS, and because nothing closes for five days the cycle
+ * then returns `skipped: "position_open"` on every tick for the next 118 hours. The commit
+ * that exists to guarantee "at least 3 calls every cycle without fail" would have produced
+ * zero for most of every week — and silently, because a saturated cycle reports
+ * cycle:holding, not the cycle:short telemetry added alongside the quota.
+ *
+ * The arithmetic is forced, not chosen. To sustain B live calls each held for H while
+ * publishing Q per cycle, the interval C must satisfy Q/C <= B/H, i.e. C >= Q*H/B. At
+ * Q=3, H=120h, B=24 that is 15 hours. The alternative — keeping a 12-minute cycle — needs
+ * B = Q*H/C = 1,800 live calls, which is not a book, it is a list.
+ *
+ * So the cadence follows the hold. Five days is how long a trade needs on this chain to
+ * clear its own round trip (src/bands.js), and a desk whose trades take five days is a
+ * desk that researches twice a day, not every twelve minutes. Publishing faster than the
+ * book can turn over does not produce more trades; it produces one burst and then silence.
+ *
+ * PENTHOUSE_CYCLE_MINS still overrides outright. The floor of 12 minutes keeps the old
+ * behaviour reachable for a desk configured with short holds.
+ */
+export const SUSTAINABLE_CYCLE_MINS = (() => {
+  const holdHours = Math.max(...Object.values(CAP_BANDS).map((b) => Number(b.holdMaxMs) || 0)) / 3_600_000;
+  if (!(holdHours > 0)) return 12;
+  return Math.max(12, Math.ceil((CALLS_PER_CYCLE * holdHours * 60) / MAX_LIVE_CALLS));
+})();
+
+/** The interval a cycle actually runs on: the operator's, else the sustainable one. */
+export const CYCLE_MINS = Number(process.env.PENTHOUSE_CYCLE_MINS || SUSTAINABLE_CYCLE_MINS);
 /** Set PENTHOUSE_SEQUENTIAL=0 to let cycles run while a position is open. */
 export const SEQUENTIAL = process.env.PENTHOUSE_SEQUENTIAL !== "0";
 

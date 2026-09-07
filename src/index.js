@@ -2,6 +2,7 @@ import { runCycle, workup } from "./desk.js";
 import { startOffice } from "./office.js";
 import { startScanner } from "./treasury-evm.js";
 import { runPenthouseCycle, monitorCalls, freshScan, promoteWatches, startSubTickMarks } from "./penthouse.js";
+import { CYCLE_MINS, CALLS_PER_CYCLE, MAX_LIVE_CALLS } from "./mandate.js";
 import { autoSyncAll, collectOwed } from "./perf.js";
 import { startWorld } from "./world.js";
 import { chroniclePrune } from "./lib/bus.js";
@@ -183,7 +184,13 @@ function startPenthouse() {
    * calls is throughput, not a lower bar: more distinct candidates studied per hour.
    * 12 minutes is ~1.7x the studies; the daily pacer in llm.js still caps the spend.
    * Render can override with PENTHOUSE_CYCLE_MINS. */
-  const cycleMins = Number(process.env.PENTHOUSE_CYCLE_MINS || 12);
+  /* Derived from the quota, the book ceiling and the hold clocks rather than fixed at 12
+     — see SUSTAINABLE_CYCLE_MINS in mandate.js. Publishing faster than the book can turn
+     over does not produce more trades, it produces one burst and then days of silence. */
+  const cycleMins = CYCLE_MINS;
+  if (cycleMins !== 12)
+    console.log(`[penthouse] cycle every ${cycleMins}m (${(cycleMins / 60).toFixed(1)}h) — ` +
+      `derived from ${CALLS_PER_CYCLE} calls/cycle against a ${MAX_LIVE_CALLS}-slot book at the measured hold clocks`);
   const monitorMins = Number(process.env.PENTHOUSE_MONITOR_MINS || 10);
   // Sub-tick price witnesses between full passes: the two-witness high needs
   // neighbours closer than the 10-minute monitor gap, and fresh close prints

@@ -19,7 +19,7 @@ import { buildBoard, selectAcrossBoard, CAP_BANDS, COIN_TYPES, PREFERRED_PAD } f
 import { recordCandidateBoard } from "./candidate-board.js";
 import * as funnel from "./funnel.js";
 import * as ds from "./data/dexscreener.js";
-import { eligibility, contenderScore, pickOne, bookState, SEQUENTIAL, MAX_LIVE_CALLS, CALLS_PER_CYCLE } from "./mandate.js";
+import { eligibility, contenderScore, pickOne, bookState, SEQUENTIAL, MAX_LIVE_CALLS, CALLS_PER_CYCLE, CYCLE_MINS } from "./mandate.js";
 import { TRADEABLE_PHASES } from "./agents/risk-rails.js";
 import { runBestPick } from "./agents/decision.js";
 import { linkPublishedCall } from "./evaluation.js";
@@ -537,6 +537,16 @@ export async function runPenthouseCycle({
      * a workup bought now is a verdict that will likely have expired before there is
      * anywhere to put it. */
     const warmed = await warmFunnelFn().catch((e) => ({ error: String(e?.message || e) }));
+    /* SATURATION IS NOT THE SAME AS HOLDING ONE POSITION, and it must not report as it.
+       A book at its ceiling publishes nothing until a slot frees, which at these hold
+       clocks is days — so if this fires repeatedly the cadence and the book ceiling
+       disagree and the quota is unreachable. That was live for exactly one commit and
+       showed up nowhere, because cycle:holding looks the same at 1 call and at 24. */
+    if (book.live >= MAX_LIVE_CALLS)
+      emit("cycle:saturated", { cycle, live: book.live, ceiling: MAX_LIVE_CALLS,
+        quota: CALLS_PER_CYCLE, cycleMins: CYCLE_MINS,
+        note: "the book is at its ceiling — no call can be published until one closes. If this " +
+          "repeats, PENTHOUSE_CYCLE_MINS is faster than MAX_LIVE_CALLS divided by the hold window." });
     emit("cycle:holding", { cycle, live: book.live,
       symbol: book.holding?.symbol, mint: book.holding?.mint,
       heldHours: book.holding ? Number(((Date.now() - book.holding.opened_at) / 3.6e6).toFixed(1)) : null,
@@ -1013,7 +1023,7 @@ export async function runPenthouseCycle({
      * index.js (33 budget stops, 24 halts, no cycle:end for sixteen hours). So the hunt
      * gets at most 60% of the interval, leaving room for the shortlist pass and the
      * writes. PENTHOUSE_HUNT_BUDGET_MS overrides it outright. */
-    const cycleMs = Number(process.env.PENTHOUSE_CYCLE_MINS || 12) * 60_000;
+    const cycleMs = CYCLE_MINS * 60_000;
     const huntBudgetMs = Number(process.env.PENTHOUSE_HUNT_BUDGET_MS
       || Math.min(240_000 * CALLS_PER_CYCLE, Math.floor(cycleMs * 0.6)));
     const huntDeadline = Date.now() + huntBudgetMs;
