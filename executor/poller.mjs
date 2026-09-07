@@ -369,6 +369,10 @@ const CFG = {
    * ESTIMATE: the live protections are the per-entry fee gate and the round-trip loss
    * ceiling, both of which read the actual quote before signing. */
   costPct: expectedRoundTripPct(configuredTradeCap.value) / 100,
+  /* And the same curve as a FUNCTION, so the +EV gate prices the clip it will actually
+     take rather than the cap. Conviction can scale a position to 35% of the cap, and on a
+     flat-gas chain that nearly doubles the round trip as a share of the position. */
+  costPctFor: (clipEth) => expectedRoundTripPct(clipEth) / 100,
 };
 log(`sizing: ${CFG.fixedSol} ETH per entry (the configured cap), expected round trip ` +
   `${(CFG.costPct * 100).toFixed(2)}% — measured on PONS, not inherited`);
@@ -1030,11 +1034,19 @@ async function drainEntryRetries() {
     }
     if (now < Number(e.nextAt)) { keep.push(e); continue; }
     try {
+      const heldBefore = !!S.positions[e.event?.mint];
       await onEntry(e.event);
       /* RETURNED — handled. It either traded or was refused on its merits by a gate
-         inside onEntry, and either way this bot no longer owes the desk anything. */
-      S.entriesRecovered = (S.entriesRecovered || 0) + 1;
-      log(`RETRY RESOLVED ${e.symbol || e.key} on attempt ${e.attempts + 1}`);
+         inside onEntry, and either way this bot no longer owes the desk anything.
+         BUT THOSE TWO ARE NOT THE SAME NUMBER. entriesRecovered counted both, so the
+         one metric that exists to prove the queue wins calls back could not fail: every
+         refusal — already holding, call too old, paused, hard-stopped — incremented it.
+         A position is the only evidence of a recovery, so that is what is counted. */
+      const recovered = !heldBefore && !!S.positions[e.event?.mint];
+      if (recovered) S.entriesRecovered = (S.entriesRecovered || 0) + 1;
+      else S.entriesRetryRefused = (S.entriesRetryRefused || 0) + 1;
+      log(`RETRY ${recovered ? "RECOVERED" : "RESOLVED (refused on its merits)"} ` +
+        `${e.symbol || e.key} on attempt ${e.attempts + 1}`);
     } catch (error) {
       const cls = error?.failureClass ?? null;
       const transient = cls === "transport" || cls === "oracle";
@@ -1547,6 +1559,9 @@ function sendHeartbeat() {
       entriesRecovered: S.entriesRecovered || 0,
       entriesRetryPending: S.entriesRetryPending || 0,
       entriesRetryAbandoned: (S.entriesRetryExpired || 0) + (S.entriesRetryExhausted || 0),
+      /* A retry that ran and was refused on its merits is neither a recovery nor a loss;
+         counted apart so entriesRecovered cannot flatter itself. */
+      entriesRetryRefused: S.entriesRetryRefused || 0,
       blockingIntent: Boolean(journal.hasBlockingIntent()), positions: openList(),
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
@@ -1571,6 +1586,9 @@ function sendHeartbeat() {
       entriesRecovered: S.entriesRecovered || 0,
       entriesRetryPending: S.entriesRetryPending || 0,
       entriesRetryAbandoned: (S.entriesRetryExpired || 0) + (S.entriesRetryExhausted || 0),
+      /* A retry that ran and was refused on its merits is neither a recovery nor a loss;
+         counted apart so entriesRecovered cannot flatter itself. */
+      entriesRetryRefused: S.entriesRetryRefused || 0,
       lastTickCompletedAt: runtimeHealth.lastTickCompletedAt,
       lastFeedSuccessAt: runtimeHealth.lastFeedSuccessAt,
       consecutiveFeedFailures: runtimeHealth.consecutiveFeedFailures,

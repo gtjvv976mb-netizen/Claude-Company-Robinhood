@@ -112,7 +112,25 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
 
   // ── R_net, with costs on BOTH sides. A bracket that looks like 1.25R gross is
   //    often under 1.0 once the round trip is paid for. ──
-  const cost = c.costPct;
+  /* COST FOLLOWS THE CLIP, because on a flat-gas chain it must.
+   *
+   * costPct was a single number priced at the per-trade CAP. But conviction scales the
+   * clip down by as much as convictionFloor (0.35), and gas is FLAT — so a low-conviction
+   * trade takes a 0.0014 ETH position whose real round trip is 18.64% while the +EV gate
+   * below was told 9.16%. A nine-point understatement, in the direction that makes a
+   * losing bracket look profitable, which is the direction this whole cost path exists to
+   * stop being wrong in.
+   *
+   * `costPctFor(clipEth)` is supplied by the operator's config (poller.mjs derives it from
+   * the measured PONS curve). When it is absent — every desk-side and test caller — the
+   * flat costPct is used exactly as before, so nothing that does not opt in changes. */
+  const convictionForCost = Number(call.conviction);
+  const scaleForCost = Number.isFinite(convictionForCost) && convictionForCost > 0
+    ? Math.max(c.convictionFloor, Math.min(1, convictionForCost / 100)) : 1;
+  const expectedClip = Math.min(c.fixedSol > 0 ? c.fixedSol : Infinity, c.maxSolPerTrade) * scaleForCost;
+  const cost = typeof c.costPctFor === "function" && Number.isFinite(expectedClip) && expectedClip > 0
+    ? c.costPctFor(expectedClip)
+    : c.costPct;
   const rNet = targetFrac != null ? (targetFrac - cost) / (stopFrac + cost) : null;
   if (rNet != null && !(rNet > 0))
     return { action: "skip", reason: `costs eat the target: R_net ${rNet.toFixed(2)}` };

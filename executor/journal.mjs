@@ -661,10 +661,19 @@ export class ExecutionJournal {
       if (!Number.isSafeInteger(Number(e.firstAt)) || Number(e.firstAt) <= 0)
         throw new Error("retry entry firstAt must be a positive safe integer");
     }
-    /* BOUNDED, and the OLDEST are what survive a trim. A queue that grows without a
-       ceiling turns a provider outage into unbounded state; keeping the oldest means
-       the trim drops the calls most likely to be refused as stale anyway. */
-    const kept = [...list].sort((a, b) => Number(a.firstAt) - Number(b.firstAt)).slice(0, max);
+    /* BOUNDED, and the FRESHEST are what survive a trim.
+     *
+     * This kept the OLDEST, on the reasoning that "the trim drops the calls most likely
+     * to be refused as stale anyway". That is backwards, and it took an adversarial read
+     * to see it: the oldest entries are the ones CLOSEST TO EXPIRY — they have the least
+     * remaining life under MAX_CALL_AGE_MS and are the likeliest to be refused as stale —
+     * while the newest are the ones still executable. Keeping the oldest therefore
+     * preserved exactly the calls that were about to be abandoned and discarded the ones
+     * that could still be won back, which inverts the purpose of the queue.
+     *
+     * A queue that grows without a ceiling still turns a provider outage into unbounded
+     * state, so the ceiling stays; it is now the newest `max` that survive. */
+    const kept = [...list].sort((a, b) => Number(b.firstAt) - Number(a.firstAt)).slice(0, max);
     this.immediate(() => this.setMeta("entry_retry_queue", json(kept)));
     return kept;
   }

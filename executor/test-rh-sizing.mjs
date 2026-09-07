@@ -87,6 +87,38 @@ ok("at the canary the bracket is unwinnable at ANY hit rate", () => {
   assert.match(plan.reason, /costs eat the target/);
 });
 
+console.log("\nCOST FOLLOWS THE CLIP, BECAUSE CONVICTION SHRINKS IT");
+/* costPct was a single number priced at the per-trade CAP. Conviction scales a position
+   to as little as convictionFloor (0.35) of that, and gas is FLAT — so a low-conviction
+   trade takes a 0.0014 ETH position whose real round trip is 18.64% while the +EV gate
+   was told 9.16%. Nine points understated, in the direction that makes a losing bracket
+   look profitable. */
+{
+  const cfg = { ...DEFAULTS, maxSolPerTrade: 0.004, fixedSol: 0.004, minSolPerTrade: 0.0001,
+    costPct: expectedRoundTripPct(0.004) / 100, costPctFor: (c) => expectedRoundTripPct(c) / 100 };
+  const st = () => { const s = freshState(0); s.equitySol = 0.1; s.spendableSol = 0.1; s.openCount = 0; return s; };
+  const call = (conviction) => ({ mint: "0x1", symbol: "T", ts: 0, entry_ref: 1, stop: 0.85, target: 1.35, conviction });
+  const wMinAt = (conviction) => planEntry({ call: call(conviction), cfg, state: st() }).wMin;
+  ok("a low-conviction trade demands a HIGHER hit rate than a full-conviction one", () =>
+    assert.ok(wMinAt(35) > wMinAt(100),
+      `floor ${(wMinAt(35) * 100).toFixed(0)}% vs full ${(wMinAt(100) * 100).toFixed(0)}%`));
+  ok("...and the gap is the flat-gas one, not a rounding difference", () =>
+    assert.ok(wMinAt(35) - wMinAt(100) > 0.1,
+      "0.0014 ETH costs 18.64% where 0.004 costs 9.16% — that must show in the gate"));
+  ok("a call with no conviction is priced at the full clip, not penalised", () =>
+    assert.equal(wMinAt(null), wMinAt(100), "the desk's silence is not evidence"));
+  ok("without costPctFor the flat costPct is used exactly as before", () => {
+    const flat = { ...cfg, costPctFor: undefined };
+    assert.equal(planEntry({ call: call(35), cfg: flat, state: st() }).wMin,
+      planEntry({ call: call(100), cfg: flat, state: st() }).wMin,
+      "callers that do not opt in must be unchanged");
+  });
+  ok("the poller supplies it", () => {
+    const poller = fs.readFileSync(new URL("./poller.mjs", import.meta.url), "utf8");
+    assert.match(poller, /costPctFor: \(clipEth\) => expectedRoundTripPct\(clipEth\) \/ 100,/);
+  });
+}
+
 console.log("\nTHE POLLER SIZES FROM THE CEREMONY, NOT FROM A CONSTANT");
 const poller = fs.readFileSync(new URL("./poller.mjs", import.meta.url), "utf8");
 ok("fixedSol tracks the configured cap", () =>

@@ -57,9 +57,15 @@ console.log("\n2. BOUNDED — an outage cannot become unbounded state");
 const many = Array.from({ length: 200 }, (_, i) => entry(1000 + i, `S${i}`, { firstAt: 1_000 + i }));
 const kept = j.saveEntryRetryQueue(many);
 ok("the queue is capped", () => assert.equal(kept.length, 64));
-ok("the OLDEST survive a trim", () => {
-  assert.equal(kept[0].firstAt, 1_000);
-  assert.equal(kept[63].firstAt, 1_063);
+ok("the FRESHEST survive a trim, because they are the ones still executable", () => {
+  /* This asserted the opposite and was wrong, pinning the inversion it existed to
+     prevent. The oldest entries are CLOSEST TO EXPIRY under MAX_CALL_AGE_MS — the
+     likeliest to be refused as stale — while the newest are the ones that can still be
+     won back. Keeping the oldest preserved exactly the calls about to be abandoned. */
+  const firstAts = kept.map((e) => Number(e.firstAt));
+  assert.equal(Math.max(...firstAts), 1_199, "the newest entry must survive");
+  assert.equal(Math.min(...firstAts), 1_136, "and the trim must cut from the OLD end");
+  assert.ok(!firstAts.includes(1_000), "the oldest entry is the first to be dropped");
 });
 ok("the cap persists, it is not merely a return value", () => assert.equal(j.entryRetryQueue().length, 64));
 
@@ -89,7 +95,17 @@ ok("no second entry path exists", () =>
 ok("only transport and oracle faults are retried", () =>
   assert.match(poller, /const transient = cls === "transport" \|\| cls === "oracle";/));
 ok("a refusal on the merits leaves the queue", () =>
-  assert.match(poller, /RETRY RESOLVED/));
+  assert.match(poller, /RETRY \$\{recovered \? "RECOVERED" : "RESOLVED \(refused on its merits\)"\}/));
+ok("a recovery is counted ONLY when a position actually opened", () => {
+  /* entriesRecovered incremented on any non-throwing onEntry return, so every refusal —
+     already holding, call too old, paused, hard-stopped — counted as a recovery and the
+     one metric that exists to prove the queue works could not fail. */
+  assert.match(poller, /const recovered = !heldBefore && !!S\.positions\[e\.event\?\.mint\];/);
+  assert.match(poller, /if \(recovered\) S\.entriesRecovered = \(S\.entriesRecovered \|\| 0\) \+ 1;/);
+  assert.match(poller, /else S\.entriesRetryRefused = \(S\.entriesRetryRefused \|\| 0\) \+ 1;/);
+});
+ok("...and the refused count reaches the heartbeat too", () =>
+  assert.equal((poller.match(/entriesRetryRefused: S\.entriesRetryRefused \|\| 0/g) || []).length, 2));
 ok("the age ceiling defers to MAX_CALL_AGE_MS instead of inventing a clock", () =>
   assert.match(poller, /now - Number\(e\.firstAt\) > MAX_CALL_AGE_MS/));
 ok("retries run before the feed drain so a busy market cannot starve them", () => {
