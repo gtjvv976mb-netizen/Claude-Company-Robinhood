@@ -13,3 +13,6 @@ reports/*.md
 
 # editor/session-local: carries an absolute home-directory path
 .claude/
+
+# paper-trade.mjs caches GeckoTerminal responses so a rerun costs no rate limit
+executor/.paper-cache/

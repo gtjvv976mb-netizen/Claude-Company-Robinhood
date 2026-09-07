@@ -2,6 +2,7 @@ import * as ds from "./dexscreener.js";
 import * as kyber from "./kyber.js";
 import * as evm from "./evm.js";
 import * as pons from "./pons-live.js";
+import * as blockscout from "./blockscout.js";
 import { ethUsd as ethUsdRead, coingecko } from "./eth-usd.js";
 import { cfg, TOKENS, TOKEN_DECIMALS, floorsFor } from "../config.js";
 import { bandForMarketCap, holdWindowFor } from "../bands.js";
@@ -233,9 +234,28 @@ export async function gather(address, hook = "") {
   ].filter(Boolean);
 
   const [holders, poolShare, sellSim, buySim, transferSim, mintSim, blacklist, lp, candles, identity] = await Promise.all([
+    /* THE LEDGER FIRST, THE CHAIN'S INDEX WHEN THE LEDGER HAS NO START.
+     *
+     * A replay from the launch block is the strongest evidence and stays primary. But
+     * on a 100ms chain the launch block is unreachable for anything older than the
+     * 120,000-block budget (~3.4 hours), and the fallback was to report UNVERIFIED and
+     * kill the coin. Measured 2026-09-07 on the live RH desk: 673 workups, 673 kills,
+     * zero calls, ever — `unverified_holders` fired on 24 of 24 sampled workups. The
+     * screen was not judging coins, it was reporting that it could not see any.
+     *
+     * blockscout.holdersFromExplorer reads the chain's indexed CURRENT balances, which
+     * is what the replay was trying to reconstruct. It estimates nothing — the 2026-09-05
+     * fail-open was an estimated launch block feeding a partial ledger, and no estimate
+     * appears here. When the explorer cannot answer it returns ok:false and the screen
+     * refuses exactly as before. */
     supply && launchBlock != null
       ? evm.holdersFromLedger(a, { fromBlock: launchBlock, toBlock: head, supply, decimals, exclude: excluded })
-      : Promise.resolve({ ok: false, error: supply ? "no launch block — ledger has no start (token older than the scan budget)" : "supply unreadable" }),
+          .then((r) => r.ok ? r : blockscout.holdersFromExplorer(a, { supply, decimals, exclude: excluded })
+            .then((x) => x.ok ? { ...x, ledgerError: r.error } : r).catch(() => r))
+      : supply
+        ? blockscout.holdersFromExplorer(a, { supply, decimals, exclude: excluded })
+            .catch((e) => ({ ok: false, error: `no launch block, and the explorer failed: ${e.message}` }))
+        : Promise.resolve({ ok: false, error: "supply unreadable" }),
     supply ? evm.poolShare(a, supply, excluded) : Promise.resolve({ ok: false, error: "supply unreadable" }),
     rt.ok ? evm.sellSim(a, rt.tokensOut, { route: { ok: true, routeSummary: rt._sellRoute, outAmount: rt.sell.outAmount }, build: kyber.build })
       : Promise.resolve({ ok: false, unverified: true, reason: `no sell route to simulate: ${rt.error}` }),
