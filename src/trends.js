@@ -157,7 +157,10 @@ export function raceWinner(coins) {
  * has to know this lane exists — they are ordinary candidates that happen to have been
  * found early, and they face exactly the same gauntlet.
  */
-export async function scanTrends({ maxThemes = 4, maxAgeHours = 72 } = {}) {
+/* scanTrends is coinsForTheme's ONLY production caller and it declared its own 72, then
+   passed it explicitly — and an explicit argument always beats a default, so raising the
+   default below did nothing at all. Both now read the same constant. */
+export async function scanTrends({ maxThemes = 4, maxAgeHours = THEME_MAX_AGE_HOURS } = {}) {
   if (!hasGrok()) return { ok: false, error: "no grok key", candidates: [] };
 
   const scan = await grokTrendScan({ limit: maxThemes + 2 }).catch(() => null);

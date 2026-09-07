@@ -91,6 +91,43 @@ await ok("the sampled depth is disclosed rather than implied to be exhaustive", 
   assert.ok(r.bundleScannedTop > 0, "the bundle scan depth must be stated");
 });
 
+console.log("\n2b. A NAME CANNOT HIDE SUPPLY");
+/* Excluding a holder removes it from top1Pct, which is the only number
+   holder_concentration (>50%) and the red team's holder_control read. The exclusion
+   briefly keyed on the explorer's NAME with no verification — and the deployer chooses
+   the name. Reproduced: 70% of supply in an unverified "TeamTreasuryVault" came back as
+   top1Pct 4%, and the one gate that catches a wallet owning the float saw a rounding
+   error. */
+await ok("an UNVERIFIED contract named like a vault cannot be excused", async () => {
+  stub({ "/holders": { items: [
+    holder("0x" + "a".repeat(40), (SUPPLY * 70n) / 100n),   // unverified: helper sets is_verified from `name`
+  ].map((h) => ({ ...h, address: { ...h.address, is_contract: true, is_verified: false, name: "TeamTreasuryVault" } })) },
+    ["/api/v2/tokens/" + TOKEN]: { total_supply: String(SUPPLY), decimals: "18", holders_count: "900" } });
+  const r = await holdersFromExplorer(TOKEN, {});
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.top1Pct, 70, "a name must not subtract 70% of supply from the concentration number");
+  assert.equal(r.inferredPools, 0, "nothing unverified may be excused");
+  assert.ok((r.nameOnlyContracts ?? []).some((c) => /TeamTreasuryVault/.test(c.name)),
+    "it must still be REPORTED, so the reader can see it was noticed and not excused");
+});
+await ok("free-standing 'vault'/'router'/'manager' are not venue words even when verified", async () => {
+  stub({ "/holders": { items: [{
+    address: { hash: "0x" + "e".repeat(40), is_contract: true, is_verified: true, name: "TreasuryManager" },
+    value: String((SUPPLY * 70n) / 100n),
+  }] }, ["/api/v2/tokens/" + TOKEN]: { total_supply: String(SUPPLY), decimals: "18", holders_count: "900" } });
+  const r = await holdersFromExplorer(TOKEN, {});
+  assert.equal(r.top1Pct, 70, "verification alone is not enough — the name must name a liquidity venue");
+});
+await ok("a caller-supplied pool address IS excused, because it has provenance", async () => {
+  const pool = "0x" + "f".repeat(40);
+  stub({ "/holders": { items: [{
+    address: { hash: pool, is_contract: true, is_verified: true, name: "SomePool" },
+    value: String((SUPPLY * 70n) / 100n),
+  }] }, ["/api/v2/tokens/" + TOKEN]: { total_supply: String(SUPPLY), decimals: "18", holders_count: "900" } });
+  const r = await holdersFromExplorer(TOKEN, { exclude: [{ address: pool, label: "pool:dexscreener" }] });
+  assert.ok(r.top1Pct < 50, `an address the caller proved is a pool must still be excluded, got ${r.top1Pct}`);
+});
+
 console.log("\n3. IT STILL CATCHES WHAT IT EXISTS TO CATCH");
 await ok("one wallet holding 60% of the float reads as 60%", async () => {
   stub({ "/holders": { items: [

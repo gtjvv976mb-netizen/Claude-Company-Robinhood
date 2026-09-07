@@ -75,11 +75,22 @@ ok("a missing phase is UNVERIFIED, not tradeable", () => {
 });
 
 console.log("\nONE DEFINITION — NO CALL SITE MAY KEEP ITS OWN COPY");
+/* STRIP COMMENTS BEFORE LOOKING FOR CODE. The first tightened version of this regex
+   matched the PROSE in the very comments that explain the rule — every file documenting
+   `!== "graduated"` failed its own guard. A source-text assertion that cannot tell code
+   from a comment is the exact failure mode this suite is meant to catch elsewhere. */
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 for (const f of ["src/agents/risk-rails.js", "src/penthouse.js", "src/mandate.js"]) {
   ok(`${f} uses the shared set`, () => {
-    const src = fs.readFileSync(new URL(f, import.meta.url), "utf8");
-    assert.ok(!/phase\s*!==\s*"graduated"/.test(src),
+    const src = codeOnly(fs.readFileSync(new URL(f, import.meta.url), "utf8"));
+    /* ANY comparison against the literal, however the left side is spelled. The old
+       regex required the token `phase` immediately before !==, so it could not see
+       `launchPhaseOf(c) !== "graduated"` — which is exactly the fifth caller it existed
+       to forbid, and it passed while that caller was live. */
+    assert.ok(!/!==\s*"graduated"/.test(src),
       "a private `!== \"graduated\"` copy silently keeps refusing what the others now allow");
+    assert.ok(!/===\s*"graduated"\s*\?/.test(src),
+      "a ternary on the literal is the same copy wearing a different shape");
     assert.match(src, /TRADEABLE_PHASES/);
   });
 }
@@ -100,9 +111,17 @@ ok("no dex id feeds the upgrade", () => {
 const bs = fs.readFileSync(new URL("src/data/blockscout.js", import.meta.url), "utf8");
 ok("verifiedAmmPool requires the contract to be VERIFIED, not merely named", () =>
   assert.match(bs, /is_contract && it\?\.address\?\.is_verified/));
-ok("Uniswap V4's singleton is matched by ADDRESS, not by its generic name", () =>
-  assert.match(bs, /addr === lower\(V4_POOL_MANAGER\)/),
-);
+ok("the V4 PoolManager singleton is NOT accepted as proof of a graduated pool", () => {
+  /* It briefly was, matched by address. But every V4 pool on the chain keeps its tokens
+     in that one contract, so its presence proves the token has SOME V4 position — not
+     that the position is a graduated pool rather than a live PONS curve. DEX_VENUES
+     would settle it, except its own comment calls that split "an inference from the ids,
+     not a documented contract". A safety gate cannot rest on that. */
+  assert.ok(!/addr === lower\(V4_POOL_MANAGER\)/.test(codeOnly(bs)),
+    "a singleton that holds every V4 pool cannot distinguish a graduate from a curve");
+});
+ok("...so proof requires a VERIFIED contract named as a specific AMM pool", () =>
+  assert.match(codeOnly(bs), /is_contract && it\?\.address\?\.is_verified/));
 ok("the curve veto does not fire on a LOCKER", () =>
   assert.match(bs, /!\/locker\/i\.test/),
 );

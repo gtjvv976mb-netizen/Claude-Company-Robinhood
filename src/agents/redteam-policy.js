@@ -83,9 +83,15 @@ function confirmedByBundle(code, evidence, path, actual, now = Date.now()) {
          if every one of those launches had graduated. Unverified must not read as damning
          any more than it reads as clean; the conjunct is dropped when the number cannot be
          read, so the attack stands only on evidence that exists. */
-      const grads = Number(evidence?.deployer?.graduated);
+      /* Number.isFinite(Number(null)) IS TRUE — Number(null) is 0. The previous attempt
+         at this guard therefore changed nothing at all: a null graduation count still
+         satisfied both conjuncts, exactly as before. Only `undefined` produced NaN. The
+         test that "fixed" it asserted the new SOURCE TEXT rather than the behaviour, so
+         it passed against a no-op. Absence has to be tested for directly. */
+      const raw = evidence?.deployer?.graduated;
+      const grads = raw == null ? null : Number(raw);
       const farm = Number(evidence?.deployer?.priorLaunches) >= FARM_LAUNCHES &&
-        Number.isFinite(grads) && grads === 0;
+        grads !== null && Number.isFinite(grads) && grads === 0;
       return farm || evidence?.xRead?.serial_rugger === true;
     }
     case "liquidity_collapse": {

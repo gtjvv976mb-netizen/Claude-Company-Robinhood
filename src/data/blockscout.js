@@ -118,9 +118,42 @@ export async function holdersFromExplorer(address, { supply = null, decimals = 1
      never listed, and a pool counted as a holder reads as one wallet owning half the
      float. Names like "UniswapV3Pool" are added to the exclusion set rather than being
      trusted for anything else. */
-  const inferred = items.slice(0, top)
-    .filter((it) => it?.address?.is_contract && /pool|pair|vault|router|manager|locker|curve/i.test(String(it?.address?.name ?? "")))
+  /* WHAT MAY BE SUBTRACTED FROM CONCENTRATION, AND WHY IT MUST NOT BE A NAME.
+   *
+   * Excluding a holder REMOVES IT FROM top1Pct, which is the single number
+   * holder_concentration (>50%) and the red team's holder_control both read. This
+   * filtered on `is_contract` plus a substring of the explorer's NAME —
+   * pool|pair|vault|router|manager|locker|curve — with no verification requirement. The
+   * name is chosen by the deployer. Reproduced against this module: one holder named
+   * "TeamTreasuryVault" holding 70% of supply came back as top1Pct 4%, and the one gate
+   * that exists to catch a wallet owning the float read it as a rounding error.
+   *
+   * The ledger path this replaced never had that weakness — it built `exclude` from
+   * addresses with PROVENANCE: DexScreener's pair addresses, evm.V4_POOL_MANAGER, and
+   * the curve/vault decoded out of the launch receipt (evidence.js). Provenance is what
+   * was traded away for a substring, so provenance is what comes back:
+   *
+   *   - `exclude` (passed in by the caller, address-keyed) is the authority and is
+   *     applied by shapeHolders exactly as before.
+   *   - a name match may only ADD to it when the explorer has VERIFIED the contract's
+   *     source, and only for words that name a liquidity venue. `vault`, `router` and
+   *     `manager` are dropped: they are free-standing words an attacker would pick, and
+   *     none of them names a pool.
+   *   - anything name-matched but unverified is reported in `nameOnlyContracts` and is
+   *     NOT subtracted, so a large holder can never be hidden by what it calls itself. */
+  const knownPools = new Set((exclude ?? []).map((e) => lower(e?.address)).filter(Boolean));
+  const looksLikeVenue = (n) => /uniswap|pancake|sushi|ramses|velodrome|aerodrome|pons/i.test(n) &&
+    /pool|pair|curve|locker/i.test(n);
+  const top100 = items.slice(0, top);
+  const inferred = top100
+    .filter((it) => it?.address?.is_contract && it?.address?.is_verified &&
+      !knownPools.has(lower(it?.address?.hash)) && looksLikeVenue(String(it?.address?.name ?? "")))
     .map((it) => ({ address: lower(it.address.hash), label: `pool:${String(it.address.name).toLowerCase()}` }));
+  /* Named like a venue but NOT verified — counted, never subtracted. */
+  const nameOnlyContracts = top100
+    .filter((it) => it?.address?.is_contract && !it?.address?.is_verified &&
+      /pool|pair|vault|router|manager|locker|curve|treasury/i.test(String(it?.address?.name ?? "")))
+    .map((it) => ({ address: lower(it.address.hash), name: String(it.address.name) }));
 
   const shaped = shapeHolders(balances, { supply, decimals, exclude: [...exclude, ...inferred] });
   if (!shaped.ok) return shaped;
@@ -139,6 +172,10 @@ export async function holdersFromExplorer(address, { supply = null, decimals = 1
        DexScreener reports a live PONS bonding curve as dexId "uniswap" (review,
        2026-09-05), so the label cannot distinguish a curve from a pool and this can. */
     poolContracts: inferred.map((e) => e.label),
+    /* Contracts that NAME themselves like a venue but whose source is unverified. They
+       are left in the concentration numbers on purpose; this is here so a reader can
+       see that a large holder was noticed and deliberately not excused. */
+    nameOnlyContracts,
     /* POSITIVE EVIDENCE OF A LIVE CURVE, which must veto the "amm" upgrade even when a
        pool is also present. A graduated PONS coin legitimately holds both a V4 pool and
        a launch LOCKER (SIZE holds "poolmanager" and "ponsv2launchlocker" — a locker is
@@ -148,18 +185,32 @@ export async function holdersFromExplorer(address, { supply = null, decimals = 1
     curveHolder: items.slice(0, top).some((it) =>
       it?.address?.is_contract && /curve|bonding/i.test(String(it?.address?.name ?? "")) &&
       !/locker/i.test(String(it?.address?.name ?? ""))),
-    /* AN ADDRESS BEATS A NAME. Uniswap V4 holds every pool's liquidity in ONE singleton
-       the explorer labels "PoolManager" — a name that matches no AMM word, so a
-       name-only test refused every V4-only token, and uniswap-v4-robinhood is one of the
-       two venues carrying this chain's volume. The canonical V4 PoolManager address is
-       known (evm.V4_POOL_MANAGER), so it is matched exactly rather than by string.
-       Measured on SIZE, which holds "poolmanager" and "ponsv2launchlocker": the locker
-       is the PONS float, and that coin is still correctly refused because a locker is
-       not a pool — the address test does not weaken that, it only stops V4 being
-       invisible. */
+    /* THE V4 PoolManager IS NOT PROOF, AND THAT COST COVERAGE — deliberately.
+     *
+     * This briefly matched evm.V4_POOL_MANAGER by address and returned true, on the
+     * reasoning that a name-only test made every V4-only token invisible and
+     * uniswap-v4-robinhood is one of the two venues carrying this chain's volume.
+     * An address does beat a name. But the V4 PoolManager is a SINGLETON — every V4
+     * pool on the chain keeps its tokens in that one contract (evm.js:49) — so its
+     * presence among a token's holders proves the token has SOME V4 position. It does
+     * not prove that position is a graduated pool rather than a live PONS curve.
+     *
+     * DEX_VENUES puts the live curve at "pons-v2" (v2) and the graduated hook pools at
+     * "pons-v2-dex" (v4), which would make the inference safe — except that the comment
+     * directly above that table says, in the fork's own words, "that split is an
+     * inference from the ids, not a documented contract, and the chain-native reads
+     * below are the authority when the two disagree." A safety gate cannot rest on an
+     * inference its own source flags as one, and the hole it would open is precisely
+     * the one the 2026-09-05 review closed: a coin still on its curve reading as
+     * tradeable.
+     *
+     * So proof requires a contract the explorer has VERIFIED and named as a specific AMM
+     * pool. V4-only tokens therefore do not earn the "amm" phase and are refused, which
+     * is the fail-closed direction. To restore that coverage properly, read the V4
+     * Initialize log for the token (pons-live.graduationFor already does exactly this,
+     * TOPIC_V4_INITIALIZE on the PoolManager) — that is the chain-native read the
+     * comment above names as the authority, and it distinguishes the two cases. */
     verifiedAmmPool: items.slice(0, top).some((it) => {
-      const addr = lower(it?.address?.hash);
-      if (addr === lower(V4_POOL_MANAGER)) return true;
       const name = String(it?.address?.name ?? "");
       return it?.address?.is_contract && it?.address?.is_verified &&
         /uniswap|pancake|sushi|ramses|velodrome|aerodrome/i.test(name) && /pool|pair/i.test(name);

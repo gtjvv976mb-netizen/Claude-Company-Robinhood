@@ -357,7 +357,15 @@ export function wouldSurviveScreen(c) {
    * there is no auction to buy ordering). Read last, so a dead-tape curve coin is still
    * reported as no_volume — the kill that would hold it whatever its phase. An absent
    * phase passes here and is judged on the paid bundle's launch.phase in mandate.js. */
-  if (launchPhaseOf(c) != null && launchPhaseOf(c) !== "graduated") return "on_curve";
+  /* THE FIFTH CALLER. risk-rails.js exports TRADEABLE_PHASES with the note that "four
+     copies of !== \"graduated\" is how a fifth caller silently keeps refusing what the
+     other four now allow" — and this was that fifth caller, unconverted. It kills at the
+     FREE screen, before gather() can ever run resolveAmmPhase, so on this chain it
+     refused every coin the "amm" phase exists to admit. The guard test missed it because
+     its regex looked for the token `phase !== "graduated"` and this reads
+     `launchPhaseOf(c) !== "graduated"`. */
+  const screenPhase = launchPhaseOf(c);
+  if (screenPhase != null && !TRADEABLE_PHASES.has(screenPhase)) return "on_curve";
   return null;
 }
 

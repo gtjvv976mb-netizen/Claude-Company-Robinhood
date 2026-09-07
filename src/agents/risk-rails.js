@@ -304,14 +304,20 @@ export function enforceRiskRails({ risk, ev, redteam, openRiskUsd = 0, config = 
    * Solana, where four measured Jupiter round trips at $75 came back 3.70-5.58%.
    *
    * rtCost is measured at cfg.targetSizeUsd ($75 = 0.0167 ETH). Interpolating the 18
-   * KyberSwap-quoted PONS round trips of 2026-09-07 to that clip gives a MEDIAN of 6.25%
-   * and a WORST of 8.09%. So under the old thresholds the median coin and the worst coin
-   * both scored 0.5: the rule could not discriminate between them, and what called itself
-   * a liquidity multiplier was a flat 50% haircut on everything. A check whose output does
-   * not vary is not measuring anything — the same disease as a screen that kills 100%.
+   * KyberSwap-quoted PONS round trips of 2026-09-07 to that clip gives 6.25% at the 67th
+   * PERCENTILE and 8.09% at the worst row. (This comment previously called 6.25% "the
+   * median". It is not: the registered values were the 4th of six rows, and the true
+   * median at that clip is nearer 5.1%. The boundaries below are unchanged — an
+   * upper-middle quantile is the right place to start haircutting — but the label was
+   * wrong and a wrong label is how a number gets reused for the wrong job.)
+   *
+   * Under the OLD thresholds the typical coin and the worst coin both scored 0.5: the rule
+   * could not discriminate between them, and what called itself a liquidity multiplier was
+   * a flat 50% haircut on everything. A check whose output does not vary is not measuring
+   * anything — the same disease as a screen that kills 100%.
    *
    * Re-cut so the haircut means "worse than typical" again on this chain: above the worst
-   * measured round trip, half; above the median, three quarters; at or below the median,
+   * measured round trip, half; above the 67th percentile, three quarters; at or below it,
    * none. The MECHANISM is unchanged and so is its direction — this only moves the
    * boundaries onto the distribution they are supposed to describe.
    *

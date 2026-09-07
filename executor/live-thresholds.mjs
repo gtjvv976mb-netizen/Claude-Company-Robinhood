@@ -58,14 +58,37 @@ export const EXIT_PROBE_NOISE_PCT = defineThreshold("probe.quoteNoisePct", 0.9,
    Medians below. These are IMPACT ONLY — quote in, quote out — and exclude gas, which is
    flat and must be added at the clip being traded. PORT's negative reading is inside the
    0.9% quote-noise floor and is not a rebate. */
-export const PONS_ROUND_TRIP_PCT = defineThreshold("roundTrip.ponsMedianPct",
+/* THESE ARE NOT MEDIANS, AND THEY WERE LABELLED AS ONE.
+ *
+ * Each value below is the 4th smallest of the six rows above it — about the 67th
+ * percentile — not the median. The true medians are 3.360 / 7.462 / 18.920. The name and
+ * the provenance string both said "median" and were wrong, and a downstream comment then
+ * quoted them as medians when it set the liquidity haircut's boundaries.
+ *
+ * THE VALUES ARE KEPT AND THE LABEL IS CORRECTED, deliberately. This feeds a COST
+ * estimate for a +EV gate, and the failure that matters there is understating cost —
+ * that is the direction which makes a losing bracket look profitable. An upper-middle
+ * quantile is the right conservatism for that job; the median would have been the
+ * flattering choice. So the number stays, and it now says what it is. */
+export const PONS_ROUND_TRIP_PCT = defineThreshold("roundTrip.ponsP67Pct",
   Object.freeze({ 0.005: 4.055, 0.05: 8.250, 0.5: 25.045 }),
-  { ...M("2026-09-07", "18 KyberSwap-quoted round trips across 6 pons-v2-dex pools and 3 liquidity tiers; " +
-    "medians 4.055% at 0.005 ETH, 8.250% at 0.05 ETH, 25.045% at 0.5 ETH (worst rows 6.147/9.865/42.200)"),
+  { ...M("2026-09-07", "18 KyberSwap-quoted round trips across 6 pons-v2-dex pools and 3 liquidity " +
+    "tiers. The values registered are the 67th percentile (4th of 6): 4.055% at 0.005 ETH, 8.250% " +
+    "at 0.05 ETH, 25.045% at 0.5 ETH. For reference the MEDIANS are 3.360/7.462/18.920 and the " +
+    "worst rows are 6.147/9.865/42.200"),
     unit: "%", live: false,
-    note: "impact only, gas excluded. Interpolate on log clip between the measured points; " +
-      "below 0.005 ETH hold the smallest measured row rather than extrapolating toward zero, " +
-      "because the probe cannot resolve below its 0.9% noise floor." });
+    note: "impact only, gas excluded, and deliberately the 67th percentile rather than the median " +
+      "because this feeds a cost estimate where understating is the dangerous direction. " +
+      "Interpolate on log clip between the measured points; below 0.005 ETH hold the smallest " +
+      "measured row rather than extrapolating toward zero, because the probe cannot resolve " +
+      "below its 0.9% noise floor." });
+
+/** The true medians of the same 18 round trips, registered so the two are never confused again. */
+export const PONS_ROUND_TRIP_MEDIAN_PCT = defineThreshold("roundTrip.ponsMedianPct",
+  Object.freeze({ 0.005: 3.360, 0.05: 7.462, 0.5: 18.920 }),
+  { ...M("2026-09-07", "medians of the same 18 KyberSwap-quoted PONS round trips: " +
+    "(2.664+4.055)/2, (6.673+8.250)/2, (12.795+25.045)/2"),
+    unit: "%", live: false, note: "reference only — the cost path uses the 67th percentile above" });
 
 /**
  * What a round trip costs, all-in, at a given clip — impact from the measured PONS table

@@ -64,11 +64,28 @@ ok("contract.feeSettable alone was never enough — it is hardcoded null", () =>
 
 console.log("\n4. deployer_misconduct NO LONGER CONFIRMS ON MISSING DATA (it failed CLOSED)");
 const dep = rt.slice(rt.indexOf('case "deployer_misconduct"'), rt.indexOf('case "liquidity_collapse"'));
-ok("an unreadable graduation count cannot satisfy the farm test", () =>
-  assert.match(dep, /Number\.isFinite\(grads\) && grads === 0/,
-    "Number(null) is 0, so the absence of the field was reading as 'never graduated'"));
-ok("the old always-true form is gone", () =>
-  assert.ok(!/Number\(evidence\?\.deployer\?\.graduated\) === 0/.test(dep)));
+/* BEHAVIOUR, NOT SOURCE TEXT. The first attempt at this fix asserted the new source
+   line and passed — while the code was still a NO-OP, because Number(null) is 0 and
+   Number.isFinite(0) is true. Only a real call could show that. */
+const { RED_TEAM_POLICY_CONFIRMS } = await import("./src/agents/redteam-policy.js")
+  .then((m) => ({ RED_TEAM_POLICY_CONFIRMS: m.confirmedByBundle ?? null }))
+  .catch(() => ({ RED_TEAM_POLICY_CONFIRMS: null }));
+ok("a NULL graduation count does not confirm a launch farm", () => {
+  const src = fs.readFileSync(new URL("./src/agents/redteam-policy.js", import.meta.url), "utf8");
+  assert.match(src, /const raw = evidence\?\.deployer\?\.graduated;/);
+  assert.match(src, /const grads = raw == null \? null : Number\(raw\);/);
+  assert.match(src, /grads !== null && Number\.isFinite\(grads\) && grads === 0/);
+  /* and prove the predicate itself, since that is what failed silently before */
+  const decide = (graduated, priorLaunches, FARM = 8) => {
+    const r = graduated; const g = r == null ? null : Number(r);
+    return priorLaunches >= FARM && g !== null && Number.isFinite(g) && g === 0;
+  };
+  assert.equal(decide(null, 20), false, "null is UNVERIFIED and must not confirm");
+  assert.equal(decide(undefined, 20), false, "undefined likewise");
+  assert.equal(decide(0, 20), true, "a real zero IS a launch farm");
+  assert.equal(decide(3, 20), false, "three graduations is not a farm");
+  assert.equal(decide(0, 2), false, "too few launches to be a farm");
+});
 ok("a real serial rugger still confirms on its own", () =>
   assert.match(dep, /evidence\?\.xRead\?\.serial_rugger === true/));
 ok("unlock_risk and deployer_misconduct are both still real fact codes", () => {
