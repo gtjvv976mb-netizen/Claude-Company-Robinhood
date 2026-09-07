@@ -32,7 +32,7 @@
 import { getJson } from "../lib/http.js";
 import { CAP_BANDS } from "../categories.js";
 import { TOKENS } from "../config.js";
-import { getLogs, read, blockTimeMs, blockNumber, call, LOG_SPAN, V4_POOL_MANAGER, PONS_V2_HOOK } from "./evm.js";
+import { getLogs, read, blockTimeMs, blockNumber, blockAtTime, call, LOG_SPAN, V4_POOL_MANAGER, PONS_V2_HOOK } from "./evm.js";
 import { topicAddress, decodeAddress, decodeUint, encodeCall, word, toHex, lower, isAddress, TOPIC_TRANSFER, ZERO_ADDRESS } from "../lib/evm.js";
 
 const GT = "https://api.geckoterminal.com/api/v2/networks/robinhood";
@@ -448,13 +448,50 @@ export async function v4NewPools({ fromBlock, toBlock = null, maxSpans = 2 } = {
  * one per currency position (native sorts below every token, so a native pair puts
  * the token at currency1). Returns the earliest matching pool with its block time.
  */
-export async function graduationFor(token, { fromBlock, toBlock = null, maxSpans = 12 } = {}) {
+/**
+ * Did this token ever get a real Uniswap V4 pool? Aimed at when the pool was created.
+ *
+ * graduationFor() needs a fromBlock, and the desk's only source of one was the PONS launch
+ * log — which does not exist for the ~92% of this chain's traded book that never touched a
+ * PONS curve. So for those coins the question "is there a real pool, or is this still a
+ * curve?" simply went unanswered, `phase` stayed "unknown", and not_graduated killed them.
+ * Measured 2026-09-07 after the other screen fixes landed, that was the single largest
+ * remaining kill: 5 of 8 on-board coins.
+ *
+ * The pool's creation time is known from the price feed, and evm.blockAtTime turns a
+ * timestamp into a block in about six calls. So the search is AIMED rather than walked
+ * back from the head: a window around where the pool was born, which is where its
+ * Initialize log is. Confirmed on ROBINHOOD (pool created 2026-07-15, ~46.6M blocks back):
+ * three V4 Initialize logs found in a +/-200k window.
+ *
+ * THIS ADDS EVIDENCE, IT DOES NOT LOWER A BAR. What it returns is the chain's own log for
+ * THIS token, which is strictly stronger than the explorer's contract naming — and it is
+ * the read the fork's own comment names as the authority when an id-based inference and
+ * the chain disagree. A miss stays a miss: not finding a log proves nothing and leaves
+ * the phase unknown, exactly as before.
+ */
+export async function graduationNear(token, { createdAtMs, spanBlocks = 200_000 } = {}) {
+  if (!createdAtMs) return { ok: false, error: "no pool creation time to aim at", graduated: null };
+  const at = await blockAtTime(createdAtMs);
+  if (at == null) return { ok: false, error: "could not locate the creation block", graduated: null };
+  const head = await blockNumber();
+  if (head == null) return { ok: false, error: "head unreadable", graduated: null };
+  const from = Math.max(0, at - spanBlocks);
+  const to = Math.min(head, at + spanBlocks);
+  /* One address, one topic — the node answers 100,000 blocks at a time for that shape
+     (measured), so a 400k window is four calls rather than forty. */
+  const r = await graduationFor(token, { fromBlock: from, toBlock: to,
+    maxSpans: Math.ceil((to - from) / 100_000) + 2, spanSize: 100_000 });
+  return { ...r, aimedAt: at, searched: [from, to] };
+}
+
+export async function graduationFor(token, { fromBlock, toBlock = null, maxSpans = 12, spanSize = undefined } = {}) {
   const head = toBlock ?? await blockNumber();
   if (head == null || fromBlock == null) return { ok: false, error: "no block range", graduated: null };
   const t = "0x" + word(token);
   const [a, b] = await Promise.all([
-    getLogs({ address: V4_POOL_MANAGER, topics: [TOPIC_V4_INITIALIZE, null, null, t], fromBlock, toBlock: head, maxSpans }),
-    getLogs({ address: V4_POOL_MANAGER, topics: [TOPIC_V4_INITIALIZE, null, t], fromBlock, toBlock: head, maxSpans }),
+    getLogs({ address: V4_POOL_MANAGER, topics: [TOPIC_V4_INITIALIZE, null, null, t], fromBlock, toBlock: head, maxSpans, spanSize }),
+    getLogs({ address: V4_POOL_MANAGER, topics: [TOPIC_V4_INITIALIZE, null, t], fromBlock, toBlock: head, maxSpans, spanSize }),
   ]);
   const pools = [...a.logs, ...b.logs].map(decodeInitializeLog).filter(Boolean).sort((x, y) => x.block - y.block);
   const complete = a.complete && b.complete;

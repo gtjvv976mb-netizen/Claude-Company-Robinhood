@@ -103,6 +103,44 @@ export async function call(to, data, { block = "latest", overrides = null, attem
   return read("eth_call", params, { attempts });
 }
 
+/**
+ * The block at a wall-clock time — estimate, then correct.
+ *
+ * WHY NOT A BINARY SEARCH: it works (25 eth_getBlockByNumber calls, verified) but that is
+ * an expensive way to answer a question the chain almost gives away. Blocks here are
+ * ~100.6ms and an L2 sequencer keeps that steady, so a linear estimate from the head is
+ * already close and two or three corrections land within a minute of the target. Measured
+ * on a 54-day-old token: 6 calls, final drift 1 second, 11 blocks from the binary
+ * search's answer — well inside the window any caller searches around it.
+ *
+ * Returns null rather than guessing when the head or a probe is unreadable: a wrong block
+ * here sends a log search to the wrong era, which reads as "no evidence" and is exactly
+ * the failure this exists to stop.
+ */
+export async function blockAtTime(targetMs, { maxCorrections = 4, toleranceSec = 60 } = {}) {
+  const target = Math.floor(Number(targetMs) / 1000);
+  if (!Number.isFinite(target) || target <= 0) return null;
+  const head = await blockNumber();
+  if (head == null) return null;
+  const headTs = await blockTimeMs(head);
+  if (headTs == null) return null;
+  const perBlockSec = BLOCK_MS_ESTIMATE / 1000;
+  let est = Math.max(1, Math.min(head, head - Math.round((headTs / 1000 - target) / perBlockSec)));
+  for (let i = 0; i < maxCorrections; i++) {
+    const t = await blockTimeMs(est);
+    if (t == null) return null;
+    const driftSec = t / 1000 - target;
+    if (Math.abs(driftSec) <= toleranceSec) break;
+    const next = Math.max(1, Math.min(head, est - Math.round(driftSec / perBlockSec)));
+    if (next === est) break;
+    est = next;
+  }
+  return est;
+}
+/* Measured 2026-09-04: 10,000 blocks spanned 1006s. Used only to AIM a search; every
+   caller confirms what it finds by reading an actual log. */
+const BLOCK_MS_ESTIMATE = 100.6;
+
 export async function blockNumber() {
   const r = await read("eth_blockNumber", []);
   return r.ok ? Number(r.data) : null;
@@ -134,11 +172,22 @@ export async function blockTimeMs(blockNo) {
  * false when the budget ran out BEFORE the range was covered, and a caller that needs
  * the whole ledger must treat that as no ledger at all.
  */
-export async function getLogs({ address, topics, fromBlock, toBlock, maxSpans = 12 }) {
+/* `spanSize` widens the stride for a query the node can answer in one go.
+ *
+ * LOG_SPAN is 10,000, which is the safe stride for an UNFILTERED sweep. A query pinned to
+ * one address AND a topic is a different shape: measured 2026-09-07 against
+ * rpc.mainnet.chain.robinhood.com, 100,000 blocks with an address+topic filter returned
+ * 651 logs in one call, while 1,000,000 timed out. Leaving such a query on the 10,000
+ * stride means forty calls and 150ms of spacing between each to cover a 400k window —
+ * which is how an aimed graduation search spent 29 seconds and then reported "scan budget
+ * exhausted" on a token whose logs were sitting in the range. Opt-in, because the wide
+ * stride is only safe for a filtered query. */
+export async function getLogs({ address, topics, fromBlock, toBlock, maxSpans = 12, spanSize = LOG_SPAN }) {
   const logs = [];
+  const stride = Math.max(1, Math.min(Number(spanSize) || LOG_SPAN, 100_000));
   let spans = 0, cursor = fromBlock, lastErr = null;
   while (cursor <= toBlock && spans < maxSpans) {
-    const hi = Math.min(cursor + LOG_SPAN - 1, toBlock);
+    const hi = Math.min(cursor + stride - 1, toBlock);
     const filter = { fromBlock: toHex(cursor), toBlock: toHex(hi), topics };
     if (address) filter.address = address;
     const r = await read("eth_getLogs", [filter], { attempts: 3 });

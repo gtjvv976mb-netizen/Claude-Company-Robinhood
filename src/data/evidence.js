@@ -223,6 +223,7 @@ export async function gather(address, hook = "") {
      dexId "uniswap" labels ["v4"], so a coin still on its curve would have read as
      graduated whenever its launch log sat outside the scan budget (review, 2026-09-05).
      Without the log the phase is unknown, and the screen refuses unknown. */
+  let graduationEvidence = null;
   let phase = launchLog ? (graduation?.graduated === true ? "graduated" : graduation?.graduated === false ? "curve" : "unknown")
     : onCurve ? "curve" : "unknown";
 
@@ -296,6 +297,30 @@ export async function gather(address, hook = "") {
    * A honeypot fails (2). If either is missing the phase stays "unknown" and the screen
    * refuses exactly as it does today — this can only ever turn an "unknown" into an
    * "amm", never a "curve" into anything. */
+  /* ── THE CHAIN'S OWN ANSWER, WHEN THERE IS NO LAUNCH LOG ──────────────────────
+   * `graduation` above is only read when a PONS launch log gave it a fromBlock, so for
+   * the ~92% of this chain's book that never touched a PONS curve the question went
+   * unasked and `phase` stayed "unknown" — which not_graduated refuses. Measured
+   * 2026-09-07 after the other screen fixes: that was the largest remaining kill, 5 of 8
+   * on-board coins.
+   *
+   * The pool's creation time is known from the price feed, and blockAtTime turns it into
+   * a block in about six calls, so the V4 Initialize search can be AIMED at where the
+   * pool was born instead of walked back from the head. A hit is the chain's own log for
+   * THIS token — the read pons-live.js names as the authority when an id-based inference
+   * and the chain disagree — and it is strictly stronger than the explorer's contract
+   * naming, so it is tried first. A miss proves nothing and changes nothing. */
+  if (phase === "unknown" && !launchLog && best?.pairCreatedAt) {
+    try {
+      const near = await pons.graduationNear(a, { createdAtMs: best.pairCreatedAt });
+      if (near?.ok && near.graduated === true && (near.pools?.length ?? 0) > 0) {
+        phase = "graduated";
+        graduationEvidence = { source: "v4-initialize-log", pools: near.pools.length,
+          aimedAt: near.aimedAt, searched: near.searched };
+      }
+    } catch { /* an unreachable node leaves the phase unknown, which is the safe answer */ }
+  }
+
   phase = resolveAmmPhase({
     phase, hasLaunchLog: !!launchLog,
     verifiedAmmPool: holders?.verifiedAmmPool === true,
@@ -442,7 +467,7 @@ export async function gather(address, hook = "") {
       ? { targetSizeUsd: cfg.targetSizeUsd, targetSizeWei: targetWei?.toString() ?? null, ...rt, _buyRoute: undefined, _sellRoute: undefined, gasUsdRoundTrip, error: null }
       : { targetSizeUsd: cfg.targetSizeUsd, error: rt.error, gasUsdRoundTrip: null },
     launch: {
-      venue, phase, onCurve,
+      venue, phase, onCurve, graduationEvidence,
       name: launchLog ? "pons-v2" : (venue !== "unknown" && venue !== "none" ? venue : null),
       launchpad: launchLog ? "pons" : (pons.launchpadOf(best?.dex) ?? null),
       curveProgressPct: null,
