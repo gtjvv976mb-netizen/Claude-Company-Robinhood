@@ -117,3 +117,34 @@ Percentages are of supply unless the name says otherwise; times are epoch millis
 | `callouts` | flow | recorded large buys on this token from the pool's own trade log. | GeckoTerminal trades?trade_volume_in_usd_greater_than=500 (src/whales.js) |
 | `xRead.*` | forensics, narrative (as a separate block), red team, PM, best pick | Grok's first-party read of X: dev_handle, dev_account_age, dev_followers, dev_looks_real, dev_prior_tokens, dev_posted_ca, dev_engaging_now, dev_red_flags, paid_promotion_signs, serial_rugger, rug_evidence, deleted_history, desk_record, story_is_true, truth_note, significance, trend_name, trend_stage, seasonal_hook, season_window, live_event, event_still_unfolding, emerging_trends, early_or_late, mentions_level, velocity, verdict, distinct_voices, lore_origin, paid_or_botted_signs, summary, citations, and from the 2026-09-05 retarget: audience ('robinhood_app' \| 'eu_stock_tokens' \| 'arbitrum_evm' \| 'solana_crosspost' \| 'mixed' \| 'unknown') and amplified_by_official (bool \| null). Absent means absent. | src/lib/grok.js grokXRead via enrichWithXRead(); desk_record from src/devrep.js |
 | `crosscheck.verdicts` | red team | the deterministic cross-checks and their KILLED/PASSED verdicts. | gather() |
+
+## Fields the charters cite that the table above had not caught up with
+
+Added 2026-09-07. Every row below was VERIFIED present in a live `gather()` bundle before
+being written down — the five seat charters were re-grounded for Robinhood Chain and cited
+21 fields the implementation produces and this document did not describe. None was invented;
+the contract was simply behind. `test-charter-fields.mjs` is what caught the gap.
+
+| field | seats | what it is | source |
+| --- | --- | --- | --- |
+| `contract.cloneVariant` | forensics | which known template the bytecode matched, when `cloneOf` is set. Null on the ~92% of this chain that is not a recognised clone. | src/data/evm.js contractFacts |
+| `launch.launchpad` | forensics, narrative | the pad a coin launched on, when it launched on one. Null off PONS, which is most of the book here. | PONS V2 factory log |
+| `launch.exemptReason` | forensics | WHY the snipe-tax exemption fields are null — e.g. "not a PONS V2 launch within the scan window". A null with a reason is unread, not clean. | gather() |
+| `launch.creatorFeeReason` | forensics | why the creator-fee fields are null: no public ABI for the PONS V2 creator-fee views or claim events. Unread, not zero. | gather() |
+| `holders.accounts` | forensics, red team | the top ten holders as {address, pctOfSupply, units}, pools and burns already excluded. | evm.js shapeHolders |
+| `holders.bundleScannedTop` | forensics | how many holders the bundle-cluster fingerprint actually scanned. A negative result means none on that page, not none. | src/data/blockscout.js |
+| `holders.complete` | forensics | whether the holder read finished. False means partial and must be named in missing_data. | gather() |
+| `deployer.ok` | forensics | whether anything about the deployer could be read at all. False on most coins here — the launch-log scan cannot reach a 22-day-old token on 100ms blocks. | pons-live launchLogs |
+| `deployer.kind` | forensics | 'eoa' | 'contract' | 'unknown'. Unknown is unread, and may not be credited as safe. | evm.isContract |
+| `exitProbe.targetSizeUsd` | liquidity, execution | the USD notional the round trip was measured at ($75), which is what every impact figure in `exitProbe` is relative to. | cfg.targetSizeUsd |
+| `derived.totalLiquidityUsd` | liquidity | USD liquidity summed across this token's pools, as the derived block sees it. | gather() |
+| `pair.volume.h24` | flow, technical | 24h USD volume of the deepest pool. Median on this chain is $322 — quiet is the resting state, not a symptom. | DexScreener volume.h24 |
+| `pair.volume.m5` | flow | 5-minute USD volume of the deepest pool. | DexScreener volume.m5 |
+| `pairs.count` | liquidity | how many pools this token has. One pool is one exit. | gather() |
+| `derived.flowSample` | flow | how many recent trades the wallet-level flow fields were computed over (300), NOT the full day. Check it against `derived.txns24h` before dividing. | gather() |
+| `derived.flowNote` | flow | the same fact in words: "computed on the indexer's most recent 300 trades, not the full 24h tape". | gather() |
+| `pair.version` | liquidity, technical | the deepest pool's AMM version ('v2' | 'v3' | 'v4'), which decides whether reported liquidity is depth and whether an LP burn is even a concept. | DexScreener labels |
+| `whales.trades` | flow | large buys read off the pool's own log, as {wallet, side, usd, ts}. | pons-live trades() |
+| `whales.sample` | flow | how many trades that whale read covered (300). Same caveat as `derived.flowSample`. | pons-live trades() |
+| `whales.ok` | flow | whether the whale read succeeded. False means the flow picture is partial. | pons-live trades() |
+| `pair.url` | narrative | the listing page for the deepest pool. | DexScreener url |

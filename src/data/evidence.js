@@ -460,8 +460,14 @@ export async function gather(address, hook = "") {
       : { ok: false, revertReason: sellSim.revertReason ?? null, effectiveTaxBps: null, routeGapBps: null, transferFeeBps: tax.transferFeeBps,
         unverified: !!sellSim.unverified, reason: sellSim.reason ?? sellSim.revertReason ?? null, status: sellSim.unverified ? "unverified" : "reverted" },
     transferSim,
+    /* THE FAILURE SHAPE CARRIES EVERY KEY THE SUCCESS SHAPE DOES. A seat that reads
+       holders.accounts on a failed read should get null — a value meaning "not read" —
+       rather than undefined, which is indistinguishable from a typo and from a field the
+       bundle never had. The charters cite these three, and leaving them off the failure
+       branch made them resolve on a live bundle and vanish on a recorded one. */
     holders: holders.ok ? holders : { ok: false, error: holders.error,
       top1Pct: null, top10Pct: null, clusteredHolders: null, bundleSuspect: null, midToHead: null, count: null,
+      accounts: [], bundleScannedTop: null, complete: false,
       poolShareOfSupplyPct: poolShare.ok ? poolShare.poolShareOfSupplyPct : null, excluded: poolShare.rows ?? [] },
     exitProbe: rt.ok
       ? { targetSizeUsd: cfg.targetSizeUsd, targetSizeWei: targetWei?.toString() ?? null, ...rt, _buyRoute: undefined, _sellRoute: undefined, gasUsdRoundTrip, error: null }
