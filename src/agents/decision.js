@@ -4,6 +4,7 @@ import { cfg } from "../config.js";
 import { recentLessons } from "./review.js";
 import { emit, runContext } from "../lib/bus.js";
 import { stopFloorForCoin, stopFloorDetail, EVM_GATES } from "./risk-rails.js";
+import { sanitizeEvidence, clean, UNTRUSTED_CAPS, UNTRUSTED_PREAMBLE } from "../data/untrusted.js";
 
 /* The floor lives in risk-rails.js (pure, config-only) so compliance can import it
    without dragging the model client in; re-exported here because the Risk seat's
@@ -13,7 +14,11 @@ export { stopFloorForCoin, stopFloorDetail };
 // Compact on purpose: 2-space pretty-printing inflated every downstream prompt
 // ~25% for nothing a model needs. The PM and Risk read ~20k tokens per run of
 // this bundle plus the book.
-const bundle = (ev) => "=== EVIDENCE BUNDLE ===\n" + JSON.stringify(ev);
+/* Framed and bounded for the same reason as the analyst seats (src/data/untrusted.js):
+   symbol and name are written by the deployer, and these are the seats that decide.
+   The caller passes raw evidence; sanitising here means no decision-seat prompt can
+   carry an unframed deployer string however it was reached. */
+const bundle = (ev) => UNTRUSTED_PREAMBLE + JSON.stringify(sanitizeEvidence(ev).ev);
 const book = (analysts) =>
   "=== ANALYST BOOK ===\n" +
   Object.entries(analysts)
@@ -49,9 +54,22 @@ most ${cfg.maxCandidates} picks. Returning fewer — or none — is a valid and 
 correct answer.`,
     prompt:
       `Here is today's raw feed. Rank what deserves a full workup.\n\n` +
-      JSON.stringify(candidates),
+      // Every row is deployer-authored: tickers and names are written by the people
+      // whose coins these are. Bounded and framed like every other untrusted block.
+      UNTRUSTED_PREAMBLE +
+      JSON.stringify((candidates ?? []).map((c) => sanitizeEvidence(c).ev)),
   });
 }
+
+/** Prompt builders are exported so a test can assert their shape without a model call —
+ *  the same reason analystBlocks and buildRequest are. Every one names the coin by
+ *  ADDRESS: the ticker is deployer-authored prose and has no place in the block a seat
+ *  reads as its orders (see src/data/untrusted.js). */
+export const redTeamPrompt = (ev, analysts) =>
+  `Destroy this trade idea for the token at ${ev.address ?? ev.mint}.\n\n${bundle(ev)}\n\n${book(analysts)}`;
+export const riskPrompt = (ev, analysts, redteam) =>
+  `Choose the stop and risk tier for the token at ${ev.address ?? ev.mint}.\n\n${bundle(ev)}\n\n` +
+  `${book(analysts)}\n\n=== RED TEAM ===\n${JSON.stringify(redteam)}`;
 
 /**
  * RED TEAM — the seat that exists to lose the trade. It sees the full bull case
@@ -173,7 +191,7 @@ you are being graded on.
 
 Verdict: "refuted" (this should not be traded), "wounded" (tradeable but smaller and with
 a tighter invalidation), or "survives" (your attacks did not land).`,
-    prompt: `Destroy this trade idea for ${ev.symbol} (${ev.address ?? ev.mint}).\n\n${bundle(ev)}\n\n${book(analysts)}`,
+    prompt: redTeamPrompt(ev, analysts),
   });
 }
 
@@ -228,7 +246,7 @@ ordering is first-come-first-served with no priority fee, and a stop the sequenc
 drops has no receipt — the bot re-sends, it does not assume.
 Set liquidity_adjusted when measured exit friction is material. Missing or contradictory
 data lowers the tier and confidence; never fill a gap with a plausible number.`,
-    prompt: `Choose the stop and risk tier for ${ev.symbol}.\n\n${bundle(ev)}\n\n${book(analysts)}\n\n=== RED TEAM ===\n${JSON.stringify(redteam)}`,
+    prompt: riskPrompt(ev, analysts, redteam),
   });
 }
 
@@ -302,11 +320,11 @@ Two publication rules, absolute:
   OVER: the tape well off its own high, volume falling away rather than accelerating, or
   a rise on almost no money. Judge the state of the move, not the fact of it.`;
 
-const pmPrompt = (ev, analysts, redteam, risk, weightedScore) => {
+export const pmPrompt = (ev, analysts, redteam, risk, weightedScore) => {
   const floorNo = runContext.getStore()?.floor ?? null;
   const lessonScope = floorNo == null || Number(floorNo) === 50 ? "house" : "tenant";
   const lessons = recentLessons(5, { evidenceScope: lessonScope, floorNo });
-  return `Decide on ${ev.symbol} (${ev.address ?? ev.mint}).\n\n` +
+  return `Decide on the token at ${ev.address ?? ev.mint}.\n\n` +
       `=== LESSONS FROM CLOSED CALLS (Colonel Debrief) ===\n` +
       `${lessons.map((l) => `[${l.grade}] ${l.symbol}: ${l.lesson}`).join("\n") || "(no closed calls yet)"}\n\n` +
       `${bundle(ev)}\n\n${book(analysts)}\n\n` +
@@ -411,7 +429,7 @@ Build the ticket from the routing evidence, not from imagination:
 
 The stop price must match the risk seat's stop exactly. You do not get to move it.`,
     prompt:
-      `Write the unsigned ticket for ${ev.symbol}.\n\n` +
+      `Write the unsigned ticket for the token at ${ev.address ?? ev.mint}.\n\n` +
       `Current price (evidence.pair.priceUsd): ${ev.pair?.priceUsd}\n` +
       `Exit probe: ${JSON.stringify(ev.exitProbe)}\n` +
       `Pools: ${JSON.stringify(ev.pairs?.pools ?? null)}\n\n` +
@@ -538,7 +556,8 @@ You must pick one. Refusing is not available to this seat: the safety questions 
 answered upstairs, and a desk that never chooses never learns whether it can.`,
     prompt:
       (filter ? `THE FLOOR'S FILTER: ${filter}. Prefer candidates matching it, but if none do, pick the best available and say so.\n\n` : "") +
-      `CANDIDATES (${brief.length}), all pre-vetted:\n\n${JSON.stringify(brief)}\n\n` +
+      `CANDIDATES (${brief.length}), all pre-vetted:\n\n` + UNTRUSTED_PREAMBLE +
+      `${JSON.stringify(brief.map((r) => ({ ...r, symbol: clean(r.symbol, UNTRUSTED_CAPS.symbol).value })))}\n\n` +
       `Choose the one most likely to make money. Compare them against each other.`,
   });
 }

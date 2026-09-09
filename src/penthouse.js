@@ -10,6 +10,7 @@ import db from "./lib/store.js";
 import { spend, OutOfCredit, spendSince, CYCLE_BUDGET_USD } from "./lib/llm.js";
 import { callouts, whaleScore } from "./whales.js";
 import { canonicalAddress, canonicalLaunchpad } from "./canonical.js";
+import { spoofReason } from "./data/untrusted.js";
 import { recordWhaleCallout } from "./identity.js";
 import { regime } from "./data/regime.js";
 import { cfg, floorsFor } from "./config.js";
@@ -463,13 +464,21 @@ export async function mergedUniverse() {
   /* Ignition first so its richer row — the one carrying the minute tape — wins the
      dedupe against the same coin arriving from the keyword sweep. */
   const merged = new Map();
+  const spoofed = [];
   for (const raw of [...igniting, ...swept]) {
     if (!raw?.mint) continue;
+    /* Drop feed spoofs before they cost anything. One live token carries a 9,575-char
+       symbol and a 34,090-char name — ~11k tokens per seat call, five seats a workup,
+       and an injection vector in the same field. Real tickers here are under 10 chars,
+       so this fires only on lengths no tradeable coin reaches. */
+    const spoof = spoofReason(raw);
+    if (spoof) { spoofed.push({ mint: raw.mint, reason: spoof }); continue; }
     // One spelling, or the dedupe is a fiction; one pad name, or the quota is.
     const c = { ...raw, mint: canonicalAddress(raw.mint), launchpad: canonicalLaunchpad(raw.launchpad) };
     if (!merged.has(c.mint)) merged.set(c.mint, c);
   }
-  return { universe: [...merged.values()], swept: swept.length, igniting: igniting.length };
+  if (spoofed.length) emit("universe:spoof_dropped", { count: spoofed.length, dropped: spoofed.slice(0, 5) });
+  return { universe: [...merged.values()], swept: swept.length, igniting: igniting.length, spoofed: spoofed.length };
 }
 
 export async function warmFunnel() {

@@ -47,10 +47,22 @@ ok("two queued calls read back", () => assert.equal(j.entryRetryQueue().length, 
 j = new ExecutionJournal(file, { wallet, create: false });
 const reopened = j.entryRetryQueue();
 ok("the queue survives reopening the journal", () => assert.equal(reopened.length, 2));
+/* FIND BY KEY, NEVER BY INDEX. saveEntryRetryQueue sorts NEWEST FIRST, and the two
+   entries above take their firstAt from independent Date.now() calls — so whether AAA
+   or BBB lands at index 0 depends on whether the millisecond ticked between two adjacent
+   statements. Asserting index 0 === "AAA" made this a ~0.5%-per-run coin flip against
+   the very function whose documented job is to re-order the list. Ordering is pinned
+   deliberately, with explicit timestamps, in the assertion below. */
+const aaa = reopened.find((r) => r.event.symbol === "AAA");
 ok("the event is carried intact, not just its id", () => {
-  assert.equal(reopened[0].event.symbol, "AAA");
-  assert.equal(reopened[0].event.type, "entry");
-  assert.ok(reopened[0].event.mint, "the mint must survive — a retry cannot be rebuilt without it");
+  assert.ok(aaa, "the AAA entry must be in the queue");
+  assert.equal(aaa.event.type, "entry");
+  assert.ok(aaa.event.mint, "the mint must survive — a retry cannot be rebuilt without it");
+});
+ok("the queue reads back newest first, whatever order it was saved in", () => {
+  const explicit = [entry(21, "OLD", { firstAt: 1_000 }), entry(22, "NEW", { firstAt: 2_000 })];
+  const order = j.saveEntryRetryQueue(explicit).map((r) => r.symbol);
+  assert.deepEqual(order, ["NEW", "OLD"], `got ${JSON.stringify(order)}`);
 });
 
 console.log("\n2. BOUNDED — an outage cannot become unbounded state");

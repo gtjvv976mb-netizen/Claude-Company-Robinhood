@@ -10,6 +10,7 @@ import { bandForMarketCap, holdWindowFor } from "../bands.js";
 import * as snapshots from "./snapshots.js";
 import { grokXRead, hasGrok } from "../lib/grok.js";
 import { emit } from "../lib/bus.js";
+import { clean, UNTRUSTED_CAPS } from "./untrusted.js";
 import { whaleFeed } from "../identity.js";
 import { regime } from "./regime.js";
 import { isAddress, lower, encodeCall, decodeBool, decodeUint, toWei, fromWei, addressFromWord, SLOT_BEACON, DEAD_ADDRESS, ZERO_ADDRESS } from "../lib/evm.js";
@@ -726,7 +727,11 @@ export async function enrichWithXRead(ev, hook = "") {
   const handle = handleFromUrl(tw);
   if (handle && ev.launchpad) ev.launchpad.creatorHandle = handle;
   const id = ev.address ?? ev.mint;
-  const xr = await grokXRead({ symbol: ev.pair?.baseSymbol ?? id.slice(0, 8), mint: id, address: id, hook, handle, lore: null })
+  /* The symbol is deployer-chosen and goes into Grok's prompt, so it is bounded on the
+     way out exactly as it is for the analyst seats. A 9,575-char ticker is both a cost
+     attack on the paid read and an injection into a second model. */
+  const safeSymbol = clean(ev.pair?.baseSymbol ?? id.slice(0, 8), UNTRUSTED_CAPS.symbol).value;
+  const xr = await grokXRead({ symbol: safeSymbol, mint: id, address: id, hook, handle, lore: null })
     .catch(() => null);
   if (xr?.ok) ev.xRead = { ...xr.read, citations: xr.citations };
   else if (xr) ev.xRead = { error: xr.error };
