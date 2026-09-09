@@ -5,9 +5,14 @@
  * securities. This is the check that makes that a property of the code instead of a
  * promise in a README, so the assertions below are about refusals, not about features.
  *
- * The live half runs against chain 4663 and is skipped without a network, because a
- * test that silently passes offline is worse than one that is honestly absent.
+ * NOTHING HERE TOUCHES THE NETWORK. The last section used to read chain 4663 live, which
+ * made this file both slow and non-deterministic — an RPC timeout makes classifyToken
+ * return "unreadable", the correct refusal, and the assertions read that as a regression.
+ * The real addresses and their verdicts are still asserted, from words recorded in
+ * test-fixtures/scope-guard-4663.json. `node scripts/check-scope-guard-live.mjs` is the
+ * deliberate re-check against the chain, and the only thing that needs a network.
  */
+import fs from "node:fs";
 import { NEVER_POSITIONS, assertNotAccessToken,
   classifyFromBeaconWord, classifyToken, beaconFromSlotWord, classifyPairAsset,
   classifyPairAssetOnChain, ALLOWED_PAIR_EQUITIES, classifyFromName, decodeAbiString,
@@ -161,60 +166,72 @@ console.log("\nTHE DESK'S OWN TOKEN IS NEVER A POSITION");
   ok("the list is short and named", NEVER_POSITIONS.size === 1 && /CLAUDECO/.test([...NEVER_POSITIONS.values()][0]));
 }
 
-console.log("\nAGAINST THE LIVE CHAIN");
+console.log("\nAGAINST RECORDED CHAIN ANSWERS");
 {
-  const RPC = "https://rpc.mainnet.chain.robinhood.com";
-  const readStorage = async (address, slot) => {
-    const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getStorageAt",
-        params: [address, slot, "latest"] }) });
-    const j = await r.json();
-    if (j.error) throw new Error(j.error.message);
-    return j.result;
-  };
-  const readName = async (address) => {
-    const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" },
-      signal: AbortSignal.timeout(12_000),
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call",
-        params: [{ to: address, data: SELECTOR_NAME }, "latest"] }) });
-    const j = await r.json();
-    if (j.error) throw new Error(j.error.message);
-    return j.result;
-  };
-  // Measured 2026-09-04: five equities behind one beacon, four tradeable tokens behind none.
-  // 2026-09-05: SPCX — a PRIVATE company, tokenized anyway — and a 44-byte EIP-1167 clone.
-  const EQUITIES = { SPY: "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
-    NVDA: "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
-    AAPL: "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
-    TSLA: "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
-    SPCX: "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea" };
-  const TRADEABLE = { CASHCAT: "0x020bfC650A365f8BB26819deAAbF3E21291018b4",
-    PONS: "0x39dBED3a2bd333467115dE45665cC57F813C4571",
-    WETH: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
-    AI_CLONE: "0x2e8c31162b855a2ffa90f6f8634643ad6f111e18" };
-  let reachable = true;
-  try { await readStorage(TRADEABLE.WETH, ERC1967_BEACON_SLOT); }
-  catch { reachable = false; }
+  /* THE SAME TABLE THAT USED TO RUN LIVE, ON WORDS RECORDED FROM CHAIN 4663.
+   *
+   * This section made twenty JSON-RPC round trips per run until 2026-09-09, which made
+   * `npm test` slow and — worse — non-deterministic: a timed-out read makes classifyToken
+   * return kind "unreadable", which is the guard working exactly as designed, and the
+   * AAPL assertion below read that correct refusal as a code regression. A test whose
+   * red means "the network was busy" trains people to ignore red.
+   *
+   * So the readers are stubbed from test-fixtures/scope-guard-4663.json, recorded from
+   * rpc.mainnet.chain.robinhood.com the same way test-pons-live.mjs records GeckoTerminal.
+   * What is asserted is unchanged: these nine real addresses, and the verdict the guard
+   * must reach about each. `node scripts/check-scope-guard-live.mjs` re-runs it against
+   * the chain deliberately, and `--record` refreshes the fixture. */
+  const fx = JSON.parse(fs.readFileSync(new URL("../test-fixtures/scope-guard-4663.json", import.meta.url), "utf8"));
+  const EXPECT = ["SPY", "NVDA", "AAPL", "TSLA", "SPCX", "CASHCAT", "PONS", "WETH", "AI_CLONE"];
 
-  if (!reachable) {
-    console.log("  ..   chain unreachable, live assertions skipped (not silently passed)");
-  } else {
-    for (const [sym, addr] of Object.entries(EQUITIES)) {
-      const r = await classifyToken(addr, readStorage, readName);
-      ok(`${sym} is refused as a Stock Token`, r.tradeable === false && r.kind === "stock_token",
-        r.beacon ?? r.kind);
-    }
-    for (const [sym, addr] of Object.entries(TRADEABLE)) {
-      const r = await classifyToken(addr, readStorage, readName);
-      ok(`${sym} is tradeable`, r.tradeable === true, `${r.kind} name=${JSON.stringify(r.name)}`);
-    }
-    /* The second signal, live: the equity's own name carries the marker; the clone's does not. */
-    const spcxName = decodeAbiString(await readName(EQUITIES.SPCX));
-    ok("SPCX names itself a Robinhood Token", classifyFromName(spcxName).equityByName === true, spcxName);
-    const aiName = decodeAbiString(await readName(TRADEABLE.AI_CLONE));
-    ok("the 44-byte clone does not", classifyFromName(aiName).equityByName === false, aiName);
+  /* THE FIXTURE IS THE RULER HERE, SO CHECK THE RULER FIRST. A missing entry must not
+     become a quiet pass: the stubs below throw on an address they have no answer for,
+     and this asserts the table is whole before any of them is read. */
+  ok("the fixture holds every recorded token", EXPECT.every((s) => fx.tokens?.[s]),
+    `${Object.keys(fx.tokens ?? {}).length} recorded ${fx.recordedAt ?? "?"}`);
+  ok("...each with a 32-byte beacon word and a name() return",
+    EXPECT.every((s) => /^0x[0-9a-f]{64}$/i.test(fx.tokens[s].beaconSlotWord) &&
+      /^0x[0-9a-f]{2,}$/i.test(fx.tokens[s].nameReturn)));
+  ok("...recorded against the slot the guard actually reads", fx.beaconSlot === ERC1967_BEACON_SLOT);
+  ok("...and carrying the verdict each one is supposed to reach",
+    EXPECT.every((s) => ["stock_token", "plain"].includes(fx.tokens[s].kind)));
+
+  const byAddress = new Map(Object.values(fx.tokens).map((t) => [t.address.toLowerCase(), t]));
+  const entry = (address) => {
+    const t = byAddress.get(String(address).toLowerCase());
+    /* NOT `return EMPTY`. A stub that answers "no beacon" for an address it does not know
+       is the shape of the bug this whole guard exists to prevent. */
+    if (!t) throw new Error(`no recorded answer for ${address}`);
+    return t;
+  };
+  const readStorage = async (address, slot) => {
+    if (slot !== ERC1967_BEACON_SLOT) throw new Error(`no recorded answer for slot ${slot}`);
+    return entry(address).beaconSlotWord;
+  };
+  const readName = async (address) => entry(address).nameReturn;
+
+  for (const sym of EXPECT) {
+    const t = fx.tokens[sym];
+    const r = await classifyToken(t.address, readStorage, readName);
+    if (t.group === "equity")
+      ok(`${sym} is refused as a Stock Token`, r.tradeable === false && r.kind === t.kind,
+        `${r.kind} ${r.beacon ?? ""}`.trim());
+    else
+      ok(`${sym} is tradeable`, r.tradeable === true && r.kind === t.kind,
+        `${r.kind} name=${JSON.stringify(r.name)}`);
   }
+
+  /* The second signal, on the recorded names: the equity's own name carries the marker;
+     the 44-byte clone's does not. */
+  const spcxName = decodeAbiString(fx.tokens.SPCX.nameReturn);
+  ok("SPCX names itself a Robinhood Token", classifyFromName(spcxName).equityByName === true, spcxName);
+  const aiName = decodeAbiString(fx.tokens.AI_CLONE.nameReturn);
+  ok("the 44-byte clone does not", classifyFromName(aiName).equityByName === false, aiName);
+
+  /* An unreadable slot on a REAL equity still refuses — the case the flaky live run kept
+     producing, asserted here on purpose instead of arriving by accident. */
+  const flaky = await classifyToken(fx.tokens.AAPL.address, async () => { throw new Error("RPC 429"); });
+  ok("a timed-out read of AAPL refuses rather than passing", flaky.tradeable === false && flaky.kind === "unreadable");
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

@@ -8,7 +8,8 @@
  * docs/EVIDENCE-CONTRACT.md — using gather() output RECORDED from the live chain on
  * 2026-09-05 (test-fixtures/gather-*-4663.json), so the shape test needs no network.
  *
- * The live section at the end runs only when the RPC answers, and says SKIP otherwise.
+ * NOTHING HERE TOUCHES THE NETWORK. The live gather() run lives in
+ * scripts/check-evm-evidence-live.mjs and is run deliberately.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -261,48 +262,14 @@ console.log("\nSCREEN(): EVERY NEW KILL FIRES ON ITS FLAG, AND ONLY ON ITS FLAG"
   ok("the screen does not throw on a bundle missing lp and launch (test-mcap's shape)", (() => { const ev = clean(); delete ev.lp; delete ev.launch; try { screen(ev); return true; } catch { return false; } })());
 }
 
-console.log("\nLIVE (skipped honestly when the RPC does not answer)");
-{
-  let live = false;
-  try {
-    const r = await fetch(cfg.rhRpc, { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }), signal: AbortSignal.timeout(6000) });
-    live = (await r.json())?.result === "0x1237";
-  } catch {}
-  if (!live) console.log("  SKIP no RPC — live gather() not run");
-  else {
-    const { gather } = await import("./src/data/evidence.js");
-    const t0 = Date.now();
-    const ev = await gather("0x020bfc650a365f8bb26819deaabf3e21291018b4", "probe");
-    ok("gather(CASHCAT) completes", ev.ok === true, `${Date.now() - t0}ms; ${ev.error ?? ""}`);
-    if (ev.ok) {
-      console.log("  bundle keys: " + Object.keys(ev).join(", "));
-      console.log(`  sellSim: ok=${ev.sellSim.ok} routeGap=${ev.sellSim.effectiveTaxBps}bps transferFee=${ev.sellSim.transferFeeBps}bps slot=${ev.sellSim.slot} revert=${ev.sellSim.revertReason}`);
-      if (ev.sellSim.transferFeeBps == null && /429|timeout|fetch failed|ECONN/i.test(String(ev.contract?.tax?.reason ?? ev.sellSim?.revertReason ?? "")))
-        console.log("  ..   the transfer ruler was rate-limited (HTTP 429) — live assertion skipped, not passed");
-      else
-        ok("the transfer ruler reads 0 bps on CASHCAT live", ev.sellSim.transferFeeBps === 0, `${ev.sellSim.transferFeeBps}bps`);
-      const E = await import("./src/data/evm.js");
-      const self = await E.transferSim("0x020bfc650a365f8bb26819deaabf3e21291018b4", 10n ** 18n, { recipient: E.PROBE_EOA });
-      if (/429|timeout|fetch failed|ECONN/i.test(String(self.revertReason ?? "")))
-        console.log("  ..   the self-transfer control was rate-limited (HTTP 429) — live assertion skipped, not passed");
-      else
-        ok("negative control: a self-transfer's delta is 0, so the ruler is measuring a delta and not echoing the amount", self.ok === false && self.received === "0", JSON.stringify({ sent: self.sent, received: self.received, reason: self.revertReason }));
-      // The probe holds 1e18 by override and is asked to move 2e18: the token must revert, and the probe with it.
-      const CASHCAT = "0x020bfc650a365f8bb26819deaabf3e21291018b4";
-      const short = await E.read("eth_call", [{ to: E.PROBE_EOA, gas: "0xf4240",
-        data: "0x" + "0".repeat(24) + CASHCAT.slice(2) + "0".repeat(24) + E.PROBE_RECIPIENT.slice(2) + (2n * 10n ** 18n).toString(16).padStart(64, "0") }, "latest",
-        { [CASHCAT]: { stateDiff: { [E.mappingKey(E.PROBE_EOA, 0)]: "0x" + (10n ** 18n).toString(16).padStart(64, "0") } }, [E.PROBE_EOA]: { code: TRANSFER_PROBE_CODE } }], { attempts: 1 });
-      ok("negative control: transferring more than the overridden balance REVERTS the probe", short.ok === false, String(short.error).slice(0, 80));
-      console.log(`  exit: ${ev.exitProbe.roundTripLossPct}% pool, $${ev.exitProbe.gasUsdRoundTrip} gas at ${ev.gasPriceWei} wei, ETH $${ev.ethUsd.value} (${ev.ethUsd.source})`);
-      ok("CASHCAT's sell simulates without revert", ev.sellSim.ok === true);
-      ok("CASHCAT is not an equity", ev.contract.isEquity === false);
-    }
-    const g = await gather("0x2e0847e8910a9732eb3fb1bb4b70a580adad4fe3", "probe");
-    const k = g.ok ? screen(g).fails.map((f) => f.code) : [];
-    ok("gather(GOOGL) completes and screen() KILLS it as an equity", g.ok && k.includes("equity"), k.join(", ") || g.error);
-  }
-}
+/* THE LIVE SECTION MOVED OUT on 2026-09-09. It was the most expensive thing in the suite
+ * — 20.8 seconds and fifty requests to six hosts, four of them third parties whose rate
+ * limits say nothing about whether this code is correct. Every ruler and every kill above
+ * is asserted against the recorded gather() bundles and needs no network; whether gather()
+ * still completes against today's sources is a live question, asked deliberately:
+ *
+ *     node scripts/check-evm-evidence-live.mjs
+ */
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

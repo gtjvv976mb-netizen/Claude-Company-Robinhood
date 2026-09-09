@@ -111,7 +111,8 @@ Local equivalents:
 ```bash
 npm run build                                          # local preview; executor copy buttons disabled
 EXECUTOR_COMMIT="$(git rev-parse HEAD)" npm run build  # pinned release build from a clean commit
-npm test                                               # the isolated suite Render runs before starting
+npm test                                               # the isolated suite Render runs before starting (offline)
+npm run check:live                                     # re-check the guard, the launch feed and gather() against chain 4663
 ```
 
 A local preview warns loudly if an executor file is missing from the installer graph; a
@@ -134,7 +135,8 @@ npm run desk -- --office
 | `npm run watch -- 30` | Same, every 30 minutes, with the floor open |
 | `npm run ledger` | Every proposal the desk has made |
 | `npm run improvement:bundle` | Print a local, content-addressed aggregate review bundle |
-| `npm test` | The isolated regression suite that gates Render deploys |
+| `npm test` | The isolated regression suite that gates Render deploys — offline, no network |
+| `npm run check:live` | The live half, run deliberately: chain 4663 vs the scope guard, the PONS feed, a real `gather()` |
 | `node src/index.js office` | Serve the site, the tower and the floors |
 | `npm run build` | Bundle standalone pages into `dist/` with three.js inlined |
 

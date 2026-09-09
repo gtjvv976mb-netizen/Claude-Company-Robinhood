@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -18,6 +18,10 @@ const executorTests = fs.readdirSync(path.join(root, "executor"))
   .map((name) => path.join("executor", name));
 const tests = [...rootTests, ...executorTests];
 
+/* NO TEST MAY REACH THE NETWORK. Preloaded into every one of them; see the file for why.
+   Live checks are the scripts/check-*-live.mjs family, run deliberately. */
+const offlineGuard = pathToFileURL(path.join(root, "scripts", "offline-guard.mjs")).href;
+
 let failed = 0;
 const started = Date.now();
 
@@ -25,7 +29,8 @@ for (const test of tests) {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "claude-co-test-"));
   const dbFile = path.join(sandbox, "journal.sqlite");
   process.stdout.write(`\n\u2501\u2501 ${test} \u2501\u2501\n`);
-  const args = test === path.join("executor", "test-install.mjs") ? [test, "."] : [test];
+  const args = ["--import", offlineGuard,
+    ...(test === path.join("executor", "test-install.mjs") ? [test, "."] : [test])];
   const run = spawnSync(process.execPath, args, {
     cwd: root,
     // Keep stderr available for a GitHub check annotation while preserving the

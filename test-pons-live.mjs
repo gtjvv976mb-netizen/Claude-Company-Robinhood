@@ -10,7 +10,8 @@
  * sender and 33,876,471,306… (3.39%) to a second address — so the exempt share must
  * read 12.70% and nothing else.
  *
- * The live section at the end runs only when the RPC answers, and says SKIP otherwise.
+ * NOTHING HERE TOUCHES THE NETWORK. The live read of the launch feed lives in
+ * scripts/check-pons-live.mjs and is run deliberately.
  */
 import fs from "node:fs";
 import {
@@ -19,7 +20,6 @@ import {
   PONS_V2_FACTORY, TOPIC_PONS_LAUNCH, TOPIC_V4_INITIALIZE,
 } from "./src/data/pons-live.js";
 import { topicAddress, ZERO_ADDRESS } from "./src/lib/evm.js";
-import { cfg } from "./src/config.js";
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { c ? (pass++, console.log(`  ok   ${n}${d ? "  — " + d : ""}`))
@@ -143,43 +143,14 @@ console.log("\nUNISWAP V4 INITIALIZE: THE ZERO-THIRD-PARTY DISCOVERY PATH");
   ok("a log with the wrong topic is not an Initialize", decodeInitializeLog({ ...log, topics: [TOPIC_PONS_LAUNCH, ...log.topics.slice(1)] }) === null);
 }
 
-console.log("\nLIVE (skipped honestly when the RPC does not answer)");
-{
-  let live = false;
-  try {
-    const r = await fetch(cfg.rhRpc, { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }), signal: AbortSignal.timeout(6000) });
-    live = (await r.json())?.result === "0x1237";
-  } catch {}
-  if (!live) console.log("  SKIP no RPC — live launch feed not read");
-  else {
-    const { launchLogs, curveState, v4NewPools, blockNumberNow } = await import("./src/data/pons-live.js").then(async (P) => ({ ...P, blockNumberNow: (await import("./src/data/evm.js")).blockNumber }));
-    const head = await blockNumberNow();
-    const t0 = Date.now();
-    const ll = await launchLogs({ fromBlock: head - 9_999, toBlock: head, maxSpans: 1 });
-    console.log(`  launches in the last 10k blocks: ${ll.launches.length} (${Date.now() - t0}ms, complete=${ll.complete})`);
-    ok("the live launch feed answers and decodes", ll.ok && ll.complete && ll.launches.every((l) => /^0x[0-9a-f]{40}$/.test(l.token) && /^0x[0-9a-f]{40}$/.test(l.curve)));
-    if (ll.launches.length) {
-      /* Whichever launch is newest is a SAMPLE, not a contract: on 2026-09-05 the newest
-         curve answered every view with a revert (a template this reader does not know, or
-         a proxy not yet initialised in its own block) while the one before it answered
-         fine. Sample the newest few; one answering curve proves the reader, none is an
-         honest skip with the views printed, never a failure of code that did not change. */
-      const sample = ll.launches.slice(-5).reverse();
-      let answered = null;
-      for (const l of sample) {
-        const cs = await curveState(l.curve);
-        console.log(`  curve ${cs.curve}: quoteToken=${cs.quoteToken} token=${cs.token} views=${Object.entries(cs.views).map(([k, v]) => `${k}:${v.value ?? "revert"}`).join(" ")}`);
-        if (cs.ok && cs.token === l.token) { answered = cs; break; }
-      }
-      if (answered) ok("a recent curve answers quoteToken() and token() with its launched token", true, answered.curve);
-      else console.log(`  SKIP none of the newest ${sample.length} curves answered its views — live sample inconclusive, not a failure`);
-    }
-    const v4 = await v4NewPools({ fromBlock: head - 999, toBlock: head, maxSpans: 1 });
-    console.log(`  V4 pools initialised in the last 1k blocks: ${v4.pools.length}`);
-    ok("the PoolManager feed answers", v4.ok && Array.isArray(v4.pools));
-  }
-}
+/* THE LIVE SECTION MOVED OUT on 2026-09-09. It read the launch feed from
+ * rpc.mainnet.chain.robinhood.com on every `npm test`, which made this file slow and made
+ * a busy RPC look like a code regression. Every shaper above is asserted against the
+ * recorded fixture and needs no network; whether the feed still ANSWERS is a live
+ * question, asked deliberately:
+ *
+ *     node scripts/check-pons-live.mjs
+ */
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

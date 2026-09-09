@@ -18,10 +18,14 @@ marked honestly as things a person still has to hold.
 | `gate-doubles-as-cost` | `executor/lessons-lint.mjs · constantAsGateAndCost` |
 | `unmeasured-threshold` | `executor/thresholds.mjs · assertLiveReady` |
 | `stock-token-scope` | `executor/scope-guard.mjs · classifyToken` |
+| `tests-must-be-offline` | `scripts/offline-guard.mjs · net.Socket.prototype.connect` |
 
 Each lint rule is tested against the code that actually failed on Solana **and** against the
 actual fix, so it catches the real shape rather than an invented one. `assertLiveReady()` refuses
 to arm the executor while any live-path threshold still carries a Solana measurement.
+The offline guard is preloaded into every test by `scripts/test-all.mjs` and fails any test file
+that opens a socket to something that is not loopback; it was itself checked against a test that
+reaches the live RPC and against one that serves itself over 127.0.0.1.
 
 ## The rest, by cost
 
@@ -406,3 +410,5 @@ to arm the executor while any live-path threshold still carries a Solana measure
   src/order.js pairLegOf, src/copy.js ethView (2026-09-05). A legacy-unit row has NO value until re-entered, and says so (`legacy_units`); a mirror column exists for old readers, never for sizing.
 - **A ledger replayed from an estimated start is a clean, wrong answer. Reconcile the rebuilt balances to totalSupply or refuse; and never assert a phase ("graduated") from a DEX label when the chain can be asked — DexScreener lists a live PONS V2 curve as uniswap v4.**  
   src/data/evm.js holdersFromLedger, src/data/evidence.js phase (2026-09-05). Fail-closed costs a few tokens older than the scan budget; fail-open costs the top-10 concentration the seats weight hardest.
+- **A reachability probe at the top of a live test does not survive to the twentieth request inside it. Record the live answer into a fixture and stub the reader; run the live half deliberately, where "the chain disagrees" (exit 1) is a different exit code from "the chain did not answer" (exit 2).**  
+  2026-09-09. Three test files had grown live sections — each written carefully, each probing the RPC first and skipping honestly when it did not answer — and each still went red on a busy day, because reachability is checked once and the block then makes twenty more calls. executor/test-scope-guard.mjs wanted `kind === "stock_token"` for AAPL; a timed-out read returns `"unreadable"`, which is the guard working exactly as designed, and it read as a code regression. Measured: the suite reached six hosts (four of them third parties whose rate limits say nothing about this repo) and 150 iterations could not finish in ten minutes. Recorded into test-fixtures/scope-guard-4663.json and stubbed, the same three files went 30.5s → 0.11s and 450 consecutive runs failed 0 times; the whole suite went 60.5s → 26.1s with zero outbound connections. The cost was never the minute — it is that a suite which goes red when someone else is busy teaches people to re-run red instead of reading it.
