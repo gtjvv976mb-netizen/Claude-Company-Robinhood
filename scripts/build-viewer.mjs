@@ -153,6 +153,10 @@ const EXECUTOR_FILES = [
   /* the offline recovery tool — a key on one disk is a stranded-funds bug
      waiting for its first dead host. See executor/burner-backup.mjs. */
   "burner-backup.mjs",
+  /* the funded rehearsal: the only way an operator can measure the three canary
+     thresholds, since no read-only probe can watch what the sequencer does with a
+     transaction. See executor/live-roundtrip-4663.mjs. */
+  "live-roundtrip-4663.mjs",
   "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs", "scope-guard.mjs",
   "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs", "erc20-hazards.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",

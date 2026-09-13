@@ -57,6 +57,7 @@ const ALLOWED_ENV = new Set([
      deliberately absent: it defers to MAX_CALL_AGE_MIN rather than owning a door. */
   "ENTRY_RETRY_BASE_MS", "ENTRY_RETRY_MAX_ATTEMPTS",
   "FEE_RESERVE_ETH", "F_DEFAULT", "F_NAME_MAX", "HARD_STOP_FILE",
+  "ENTRY_MODE", "ENTRY_MODE_ACK",
   "INIT_ONLY", "KEY_FILE", "LIVE_CAPS_ACK",
   "LIVE_STATE_INIT_ACK", "LIVE_TRADING_ACK", "LOCK_FILE", "MAX_AGE_HOURS",
   "MAX_CALL_AGE_MIN", "MAX_ENTRY_DEVIATION_PCT", "MAX_ENTRY_MARK_AGE_MIN",
@@ -330,19 +331,23 @@ function liveOpenPositions(values, fail = abort) {
   return Number(raw);
 }
 
-/* The same numbers as poller.mjs LIVE_LIMITS / OPERATOR_MAX: the ETH translation of
-   the owner's SOL caps at $2,450/ETH, MARKED AS AWAITING OWNER CONFIRMATION there. */
+/* The same numbers as poller.mjs LIVE_LIMITS / OPERATOR_MAX. The default clip is the
+   measured cheapest point on this chain's cost curve (live-thresholds.mjs
+   size.cheapestClipEth = 0.0112 ETH); the day is ten of them and the brake three. The
+   old 0.0004 could not clear the executor's own entry guard at any stop width, so it
+   was a cap that could only ever refuse. test-launchd.mjs and test-install.mjs hold
+   every copy of these numbers equal to the poller's. */
 const CANARY_MONEY_CAPS = Object.freeze({
-  MAX_ETH_PER_TRADE: 0.0004,
-  DAILY_ETH_CAP: 0.0008,
-  DAILY_LOSS_LIMIT_ETH: 0.0008,
+  MAX_ETH_PER_TRADE: 0.0112,
+  DAILY_ETH_CAP: 0.112,
+  DAILY_LOSS_LIMIT_ETH: 0.0336,
 });
 // DAILY_LOSS_LIMIT_ETH is a rolling realized-loss entry brake threshold. It limits
 // later entry authority; it cannot guarantee a fill/slippage loss ceiling.
 const OPERATOR_MONEY_MAX = Object.freeze({
-  MAX_ETH_PER_TRADE: 0.004,
-  DAILY_ETH_CAP: 0.04,
-  DAILY_LOSS_LIMIT_ETH: 0.012,
+  MAX_ETH_PER_TRADE: 0.1,
+  DAILY_ETH_CAP: 1,
+  DAILY_LOSS_LIMIT_ETH: 0.3,
 });
 const MONEY_CAP_NAMES = Object.freeze(Object.keys(CANARY_MONEY_CAPS));
 /* v3: ETH, and the CHECKSUMMED address. Revokes every SOL-era (v2) acknowledgement, so

@@ -52,7 +52,8 @@ ok("blockscout.js is in the manifest", () => assert.match(manifest, /"src\/data\
 ok("...because it now decides holder concentration and the launch phase", () => {
   const ev = fs.readFileSync(new URL("./src/data/evidence.js", import.meta.url), "utf8");
   assert.match(ev, /blockscout\.holdersFromExplorer/);
-  assert.match(ev, /verifiedAmmPool: holders\?\.verifiedAmmPool === true/);
+  assert.match(ev, /verifiedAmmPool: chainPoolProof === true \|\| holders\?\.verifiedAmmPool === true/);
+  assert.match(manifest, /"src\/data\/geckoterminal\.js",/, "the indexer that now supplies holders belongs in the fingerprint too");
 });
 ok("eth-usd.js is in the manifest", () => assert.match(manifest, /"src\/data\/eth-usd\.js",/));
 

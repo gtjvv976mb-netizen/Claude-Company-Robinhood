@@ -85,7 +85,7 @@ const rug = {
   hold: { holdMaxMs: 30 * 60_000 },
   contract: { isProxy: true, proxyAdmin: { address: "0xadmin", kind: "eoa", delaySec: 0 }, verifiedSource: false, cloneOf: null, flags: [] },
   lp: { kind: "v4_position", pullableSharePct: 100, unlockAt: null, positionNftOwner: "0xowner" },
-  pairs: { pools: [{ pairToken: "0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea", pairTokenClass: "equity_unlisted" }] },
+  pairs: { pools: [{ pairToken: "0x39dbed3a2bd333467115de45665cc57f813c4571", pairTokenClass: "other" }] },
   sellSim: { ok: false, revertReason: "TRANSFER_FAILED" },
   launch: { phase: "graduated", graduatedAt: now - 3600e3, exemptShareOfSupplyPct: 41.2, creatorTaxBps: 2000, maxCreatorTaxBps: 2000 },
   derived: { voidedTxPct: 12 },
@@ -106,7 +106,7 @@ const evmAttack = (fact_code, evidence_path, observed_value, threshold_or_compar
 const cases = [
   ["upgrade_key_live", "contract.proxyAdmin.kind", "eoa", "an EOA holds the upgrade key; a timelock shorter than hold.holdMaxMs would also count"],
   ["lp_unlocked", "lp.pullableSharePct", "100", "> 20% pullable, or unlock inside the hold"],
-  ["pair_token_gate", "pairs.pools.0.pairTokenClass", "equity_unlisted", "not native/weth/stable/allowed_equity"],
+  ["pair_token_gate", "pairs.pools.0.pairTokenClass", "other", "not native/weth/stable/an equity or synthetic the chain vouches for"],
   ["unverified_code", "contract.verifiedSource", "false", "bespoke, unverified, not a PONS clone, sell not simulated"],
   ["sequencer_exclusion", "sellSim.ok", "false", "sell does not simulate / txs voided"],
   ["insider_float", "launch.exemptShareOfSupplyPct", "41.2", "> the insider ceiling"],

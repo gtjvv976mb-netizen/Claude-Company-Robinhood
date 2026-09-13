@@ -13,7 +13,7 @@
  * are what stop that gate being quietly widened later.
  */
 import { defineThreshold, thresholds, threshold, unmeasuredLiveThresholds,
-  assertLiveReady, PROVENANCE } from "./thresholds.mjs";
+  assertLiveReady, canaryThresholds, PROVENANCE } from "./thresholds.mjs";
 import "./live-thresholds.mjs";
 
 let pass = 0, fail = 0;
@@ -40,19 +40,72 @@ console.log("\nA NUMBER MUST SAY WHERE IT CAME FROM");
   ok("an unknown name is an error, not undefined", threw(() => threshold("t.nothere")));
 }
 
-console.log("\nTHE GATE IS SHUT, AND SAYS WHY");
+/* THE GATE REFLECTS THE REGISTRY — WHICHEVER WAY THE REGISTRY POINTS.
+ *
+ * This section used to assert that the gate was SHUT: "pending.length > 0" and
+ * "refuses to arm". That was true, and it was a test of the current state rather than of
+ * the mechanism — the shape this repo's own lessons file calls out ("Tests assert
+ * invariants, never current defaults. A test that encodes today's tunable value turns
+ * every honest retune into a false regression"). When the ten void numbers were measured
+ * on 2026-09-07/13 the suite went red for the one reason it should never go red: the
+ * work it exists to demand was done.
+ *
+ * The invariant is that the gate answers to the registry. So: with everything on the live
+ * path measured it opens, and the moment ANY live threshold is not measured it shuts
+ * again and names that one. The second half is proved by registering a void live
+ * threshold here, which is also what a future unmeasured number will look like. */
+console.log("\nTHE GATE ANSWERS TO THE REGISTRY, IN BOTH DIRECTIONS");
 {
   const pending = unmeasuredLiveThresholds();
-  ok("the desk knows it is not ready to trade", pending.length > 0, `${pending.length} still void`);
-  ok("...and refuses to arm", threw(() => assertLiveReady()));
+  ok("every live-path number is measured on this chain, so the gate opens",
+    pending.length === 0 && assertLiveReady() === true,
+    pending.length ? `${pending.length} still void: ${pending.map((t) => t.name).join(", ")}` : "0 void");
+
+  /* One at a time is how a check gets disabled: someone fixes the first offender,
+     re-runs, sees another, and reaches for the flag instead. So the refusal must list
+     EVERY offender, and here there are two. */
+  defineThreshold("t.voidLive", null,
+    { provenance: PROVENANCE.INHERITED, live: true,
+      note: "a stand-in for the next unmeasured number: registered by test-thresholds.mjs so the " +
+        "refusal path is proved on a real registry entry rather than on a mock of one" });
+  defineThreshold("t.assumedLive", 7,
+    { provenance: PROVENANCE.ASSUMED, live: true, note: "a guess nobody has checked" });
+  const nowPending = unmeasuredLiveThresholds();
+  ok("an INHERITED live number shuts it again", nowPending.some((t) => t.name === "t.voidLive"));
+  ok("...and so does an ASSUMED one, even though it carries a value",
+    nowPending.some((t) => t.name === "t.assumedLive"));
+  ok("...and it refuses to arm", threw(() => assertLiveReady()));
 
   let msg = "";
   try { assertLiveReady(); } catch (e) { msg = e.message; }
-  /* One at a time is how a check gets disabled: someone fixes the first offender,
-     re-runs, sees another, and reaches for the flag instead. */
-  for (const t of pending) ok(`${t.name} is named in the refusal`, msg.includes(t.name));
+  for (const t of nowPending) ok(`${t.name} is named in the refusal`, msg.includes(t.name));
   ok("the refusal explains the two-orders-of-magnitude gap, not just the rule",
     /0\.015-0\.018%/.test(msg) && /4\.5-5\.6%/.test(msg));
+  ok("a threshold that is not on the live path never shuts the gate",
+    !nowPending.some((t) => t.live !== true));
+}
+
+/* THE THREE NUMBERS ONLY A REAL SEND CAN PRODUCE.
+ *
+ * inclusionLatencyMs, dropRatePct and nonceReplacementHonoured were registered `live:
+ * true` and VOID, which is a gate that can never open: measuring them requires sending a
+ * transaction, and sending requires an armed executor. They are now `canary` — null,
+ * never claimed as measured, and off the live path — and the executor measures them from
+ * its own sends (evm-executor.mjs send_stats) once it is running, exactly as the Solana
+ * desk measured its equivalents with one deliberate live round trip. */
+console.log("\nA GATE THAT NEEDS A SEND TO OPEN CANNOT GATE SENDS");
+{
+  const canary = canaryThresholds();
+  ok("the three send-dependent numbers are registered as canary", canary.length === 3,
+    canary.map((t) => t.name).join(", "));
+  for (const name of ["exec.inclusionLatencyMs", "exec.dropRatePct", "exec.nonceReplacementHonoured"]) {
+    const t = threshold(name);
+    ok(`${name} is canary, null, and NOT on the live path`,
+      t.provenance === PROVENANCE.CANARY && t.value === null && t.live === false);
+    ok(`...and says how it gets measured`, /measured|send/i.test(t.note ?? ""));
+  }
+  ok("no canary threshold is ever counted as measured",
+    !thresholds().some((t) => t.provenance === PROVENANCE.CANARY && t.provenance === PROVENANCE.MEASURED));
 }
 
 console.log("\nWHAT IS MEASURED IS MEASURED ON THIS CHAIN");

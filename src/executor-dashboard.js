@@ -20,21 +20,22 @@ import { isEvmAddress, normalise } from "./lib/address.js";
 
 export const EXECUTOR_HEARTBEAT_STALE_MS = 150_000;
 export const EXECUTOR_READINESS_STALE_MS = 5 * 60_000;
-/* The executor's LIVE_LIMITS and OPERATOR_MAX (executor/poller.mjs): the ETH translation
-   of the owner's SOL canary at $2,450/ETH, MARKED THERE AS AWAITING OWNER CONFIRMATION.
+/* The executor's LIVE_LIMITS and OPERATOR_MAX (executor/poller.mjs). The default clip is
+   the measured cheapest point on this chain's cost curve (executor/live-thresholds.mjs
+   size.cheapestClipEth); the day is ten of them and the brake three.
    test-executor-dashboard.mjs pins both sets to the poller source so they cannot drift
    apart silently. */
 export const EXECUTOR_CANARY_DEFAULTS = Object.freeze({
-  maxEthPerTrade: 0.0004,
-  rolling24hDeployEth: 0.0008,
-  rolling24hRealizedLossBrakeEth: 0.0008,
+  maxEthPerTrade: 0.0112,
+  rolling24hDeployEth: 0.112,
+  rolling24hRealizedLossBrakeEth: 0.0336,
   maxOpenPositions: 4,
 });
 export const EXECUTOR_GAS_HEADROOM_ETH_PLACEHOLDER = 0.001;
 export const EXECUTOR_OPERATOR_MAXIMA = Object.freeze({
-  maxEthPerTrade: 0.004,
-  rolling24hDeployEth: 0.04,
-  rolling24hRealizedLossBrakeEth: 0.012,
+  maxEthPerTrade: 0.1,
+  rolling24hDeployEth: 1,
+  rolling24hRealizedLossBrakeEth: 0.3,
   maxOpenPositions: 4,
 });
 /** The 4663 rehearsal pair (executor/evm-executor.mjs EXECUTION_READINESS_ROUTE). */

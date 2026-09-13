@@ -404,30 +404,97 @@ export function erc7201Slot(namespace) {
 }
 export const OZ_ERC20_SLOT = erc7201Slot("openzeppelin.storage.ERC20");
 
+/* SOLADY'S ERC20 IS NOT A SOLIDITY MAPPING, AND 90 OF 800 LISTED TOKENS ARE IT.
+ *
+ * Measured 2026-09-13 on KIRKINATORX 0x040d…, LONGCAT 0x1537… and FRONTIER 0xb50e…:
+ * every one a 44-byte "0age" minimal proxy onto 0x63d733be…b6b4, and every one failed
+ * "balanceOf did not read back from slots 0..12 or the ERC-7201 ERC20 namespace" — so
+ * the sell could not be simulated and the coin died as unverified_sellsim. Their
+ * balances are not in any sequential slot (0..80 scanned against a real holder) because
+ * the implementation is Solady's ERC20, which hand-rolls its storage layout:
+ *
+ *   balance slot   = keccak256(owner ‖ 8 zero bytes ‖ 0x87a211a2)                    (32 bytes)
+ *   allowance slot = keccak256(owner ‖ 8 zero bytes ‖ 0x7f5e9f20 ‖ spender)          (52 bytes)
+ *
+ * Both read back the sentinel through the override trick on all three tokens on the day
+ * they were derived, and the balance key matched the live balanceOf() of a real holder.
+ * The slot is written as a KEY FUNCTION rather than a base slot number because the
+ * mapping is not keccak(pad(key).pad(slot)); every caller below asks `keyFor(holder)`
+ * and never assumes the Solidity shape. */
+export const SOLADY_BALANCE_SEED = "87a211a2";
+export const SOLADY_ALLOWANCE_SEED = "7f5e9f20";
+const addr20 = (a) => { if (!isAddress(a)) throw new Error(`not an address: ${a}`); return a.slice(2).toLowerCase(); };
+export const soladyBalanceKey = (owner) =>
+  keccak256(Buffer.from(addr20(owner) + "0000000000000000" + SOLADY_BALANCE_SEED, "hex"));
+export const soladyAllowanceKey = (owner, spender) =>
+  keccak256(Buffer.from(addr20(owner) + "0000000000000000" + SOLADY_ALLOWANCE_SEED + addr20(spender), "hex"));
+
+/* Beyond the OpenZeppelin namespace, the ERC-7201 names launchers on this chain have
+   used or are likely to. Cheap to try; each is one eth_call. */
+const ERC7201_NAMESPACES = ["openzeppelin.storage.ERC20", "openzeppelin.storage.ERC20Upgradeable",
+  "pons.storage.Token", "pons.storage.ERC20", "hood.storage.ERC20", "storage.ERC20"];
+/** Sequential slots to try. 0 is CASHCAT and every 3,248-byte PONS V2 token (measured);
+    the upper bound covers an inheritance chain of a dozen mixins with __gap arrays. */
+const SEQUENTIAL_SLOTS = 64;
+
+/* A TRANSPORT FAILURE IS NOT "NOT THIS SLOT". The scan used to treat every non-matching
+   answer alike, so thirteen 429s in a row read as "balanceOf did not read back from
+   slots 0..12" and the coin died as unverified_sellsim for a busy minute on the public
+   RPC — the same shape as the mint/blacklist probes that failed open (2026-09-05), here
+   failing CLOSED on the wrong fact. A revert or a different number is the contract's
+   answer; anything else is no answer, and no answer is reported as such and NOT cached. */
+export const isTransportError = (err) =>
+  !/revert|execution reverted|invalid opcode|out of gas|VM Exception|invalid jump/i.test(String(err ?? "")) &&
+  /429|Too many|rate limit|timeout|timed out|abort|fetch failed|ECONN|socket|HTTP 5\d\d|network|missing from batch|batch failed|no RPC/i.test(String(err ?? ""));
+
 /**
  * Find where balanceOf lives by WRITING A NUMBER INTO A CANDIDATE SLOT FOR ONE CALL and
- * asking the contract to read it back. Slots 0..12 sequentially, then the OpenZeppelin
- * ERC-7201 namespace (Stock Tokens use it; CASHCAT and PONS launches sit at slot 0 —
- * measured 2026-09-05). A contract that reads back the sentinel from none of them is
- * reported as unknown, and every simulation built on it says UNVERIFIED.
- *
- * `offset` selects a neighbouring mapping in the same layout (allowances are typically
- * balance slot + 1 in both OZ layouts); it is verified the same way, never assumed.
+ * asking the contract to read it back: sequential slots first, then the ERC-7201
+ * namespaces, then Solady's hand-rolled layout. The answer is a `keyFor(holder)` function
+ * plus the kind and slot for the record; a contract that reads back the sentinel from
+ * none of them is reported as unknown and every simulation built on it says UNVERIFIED.
+ * A scan that could not get an answer from the node is reported as `transport` and is
+ * not cached, so the next workup asks again.
  */
 export async function findBalanceSlot(token, { probe = PROBE_EOA, sentinel = 123n } = {}) {
   const key = lower(token);
   if (slotCache.has(key)) return slotCache.get(key);
   const data = encodeCall("balanceOf(address)", [probe]);
   const want = "0x" + sentinel.toString(16).padStart(64, "0");
-  const tryAt = async (slot, kind) => {
-    const r = await call(token, data, { overrides: { [token]: { stateDiff: { [mappingKey(probe, slot)]: want } } } });
-    if (r.ok && decodeUint(r.data) === sentinel) return { ok: true, slot, kind };
+  let transport = null;
+  const tryKey = async (storageKey, meta) => {
+    const r = await call(token, data, { overrides: { [token]: { stateDiff: { [storageKey]: want } } } });
+    if (r.ok && decodeUint(r.data) === sentinel) return { ok: true, ...meta };
+    if (!r.ok && isTransportError(r.error)) transport = r.error;
     return null;
   };
+  /* IN ORDER OF HOW OFTEN EACH LAYOUT IS MET ON THIS CHAIN, because every miss is one
+     RPC round trip: slot 0 (every 3,248-byte PONS V2 token, CASHCAT), Solady (the 90
+     clone launches), the OpenZeppelin namespace (every Stock Token), the low sequential
+     slots, then the rarer namespaces and the long tail of mixin chains. A KIRKINATORX
+     workup spent 167s on the first ordering of this scan; the same token now answers on
+     the second try. */
+  const seq = (n) => ({ slot: n, kind: "sequential", keyFor: (h) => mappingKey(h, n), key: mappingKey(probe, n) });
+  const ns7201 = (ns) => { const base = erc7201Slot(ns); return { slot: base, kind: "erc7201", namespace: ns, keyFor: (h) => mappingKey(h, base), key: mappingKey(probe, base) }; };
+  const candidates = [
+    seq(0),
+    { slot: "solady", kind: "solady", keyFor: (h) => soladyBalanceKey(h), key: soladyBalanceKey(probe) },
+    ns7201(ERC7201_NAMESPACES[0]),
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(seq),
+    ...ERC7201_NAMESPACES.slice(1).map(ns7201),
+    ...Array.from({ length: SEQUENTIAL_SLOTS - 12 }, (_, i) => seq(i + 13)),
+  ];
   let found = null;
-  for (let s = 0; s <= 12 && !found; s++) { found = await tryAt(s, "sequential"); if (!found) await sleep(80); }
-  if (!found) found = await tryAt(OZ_ERC20_SLOT, "erc7201");
-  const out = found ?? { ok: false, error: "balanceOf did not read back from slots 0..12 or the ERC-7201 ERC20 namespace" };
+  for (const c of candidates) {
+    const { key: storageKey, ...meta } = c;
+    found = await tryKey(storageKey, meta);
+    if (found) break;
+    await sleep(40);
+  }
+  if (found) { slotCache.set(key, found); return found; }
+  if (transport)
+    return { ok: false, transport: true, error: `the balance slot scan got no answer from the node (${transport}) — unreadable, not absent` };
+  const out = { ok: false, error: `balanceOf did not read back from slots 0..${SEQUENTIAL_SLOTS}, the ERC-7201 namespaces or Solady's layout` };
   slotCache.set(key, out);
   return out;
 }
@@ -438,15 +505,20 @@ export async function findAllowanceSlot(token, spender, { probe = PROBE_EOA, sen
   if (!bal.ok) return bal;
   const want = "0x" + sentinel.toString(16).padStart(64, "0");
   const data = encodeCall("allowance(address,address)", [probe, spender]);
-  const candidates = typeof bal.slot === "number"
-    ? [bal.slot + 1, bal.slot + 2, bal.slot - 1].filter((s) => s >= 0)
-    : [toHex(BigInt(bal.slot) + 1n), toHex(BigInt(bal.slot) + 2n)];
-  for (const s of candidates) {
-    const inner = mappingKey(spender, mappingKey(probe, s));
-    const r = await call(token, data, { overrides: { [token]: { stateDiff: { [inner]: want } } } });
-    if (r.ok && decodeUint(r.data) === sentinel) return { ok: true, slot: s, kind: bal.kind, key: inner };
-    await sleep(80);
+  const candidates = bal.kind === "solady"
+    ? [{ slot: "solady", key: soladyAllowanceKey(probe, spender), keyFor: (o, sp) => soladyAllowanceKey(o, sp) }]
+    : (typeof bal.slot === "number"
+      ? [bal.slot + 1, bal.slot + 2, bal.slot - 1].filter((s) => s >= 0)
+      : [toHex(BigInt(bal.slot) + 1n), toHex(BigInt(bal.slot) + 2n)])
+      .map((s) => ({ slot: s, key: mappingKey(spender, mappingKey(probe, s)), keyFor: (o, sp) => mappingKey(sp, mappingKey(o, s)) }));
+  let transport = null;
+  for (const c of candidates) {
+    const r = await call(token, data, { overrides: { [token]: { stateDiff: { [c.key]: want } } } });
+    if (r.ok && decodeUint(r.data) === sentinel) return { ok: true, slot: c.slot, kind: bal.kind, key: c.key, keyFor: c.keyFor };
+    if (!r.ok && isTransportError(r.error)) transport = r.error;
+    await sleep(60);
   }
+  if (transport) return { ok: false, transport: true, error: `the allowance slot scan got no answer from the node (${transport})` };
   return { ok: false, error: "allowance did not read back from the slots beside the balance mapping" };
 }
 
@@ -459,18 +531,19 @@ export async function findAllowanceSlot(token, spender, { probe = PROBE_EOA, sen
  */
 export async function transferSim(token, amount, { from = PROBE_EOA, recipient = PROBE_RECIPIENT } = {}) {
   const slot = await findBalanceSlot(token, { probe: from });
-  if (!slot.ok) return { ok: false, unverified: true, reason: slot.error };
+  if (!slot.ok) return { ok: false, unverified: true, transport: slot.transport === true, reason: slot.error };
   const amt = BigInt(amount);
   if (amt <= 0n) return { ok: false, unverified: true, reason: "nothing to transfer" };
   /* The probe address becomes the helper contract for this one call: its balance in the
      token is overridden, TRANSFER_PROBE_CODE is placed at it, and the call returns the
      recipient's balance delta. Nothing here is a receipt or a transaction. */
   const overrides = {
-    [token]: { stateDiff: { [mappingKey(from, slot.slot)]: "0x" + amt.toString(16).padStart(64, "0") } },
+    [token]: { stateDiff: { [slot.keyFor(from)]: "0x" + amt.toString(16).padStart(64, "0") } },
     [from]: { balance: toHex(10n ** 18n), code: TRANSFER_PROBE_CODE },
   };
   const data = "0x" + word(token) + word(recipient) + word(toHex(amt));
-  const r = await read("eth_call", [{ to: from, data, gas: toHex(1_000_000) }, "latest", overrides], { attempts: 2 });
+  const r = await read("eth_call", [{ to: from, data, gas: toHex(1_000_000) }, "latest", overrides], { attempts: 3 });
+  if (!r.ok && isTransportError(r.error)) return { ok: false, unverified: true, transport: true, reason: `transfer probe unreadable: ${r.error}`, sent: amt.toString() };
   if (!r.ok) return { ok: false, reverted: true, revertReason: r.error, sent: amt.toString() };
   const received = decodeUint(r.data);
   if (received == null) return { ok: false, unverified: true, reason: "probe returned no delta", sent: amt.toString() };
@@ -497,19 +570,20 @@ export async function transferSim(token, amount, { from = PROBE_EOA, recipient =
 export async function sellSim(token, amount, { route, build, from = PROBE_EOA, slippageBps = 1000 } = {}) {
   if (!route?.ok || !route.routeSummary) return { ok: false, unverified: true, reason: `no sell route: ${route?.error ?? "none"}` };
   const built = await build(route.routeSummary, { sender: from, recipient: from, slippageBps });
-  if (!built.ok) return { ok: false, unverified: true, reason: `route build: ${built.error}` };
+  if (!built.ok) return { ok: false, unverified: true, transport: true, reason: `route build: ${built.error}` };
   const router = lower(built.routerAddress);
   const bal = await findBalanceSlot(token, { probe: from });
-  if (!bal.ok) return { ok: false, unverified: true, reason: bal.error };
+  if (!bal.ok) return { ok: false, unverified: true, transport: bal.transport === true, reason: bal.error };
   const allow = await findAllowanceSlot(token, router, { probe: from });
-  if (!allow.ok) return { ok: false, unverified: true, reason: allow.error };
+  if (!allow.ok) return { ok: false, unverified: true, transport: allow.transport === true, reason: allow.error };
   const amt = BigInt(amount);
   const wordOf = (n) => "0x" + BigInt(n).toString(16).padStart(64, "0");
   const overrides = {
-    [token]: { stateDiff: { [mappingKey(from, bal.slot)]: wordOf(amt), [allow.key]: wordOf(amt) } },
+    [token]: { stateDiff: { [bal.keyFor(from)]: wordOf(amt), [allow.key]: wordOf(amt) } },
     [from]: { balance: toHex(10n ** 18n) },
   };
-  const r = await read("eth_call", [{ from, to: router, data: built.data, gas: toHex(3_000_000) }, "latest", overrides], { attempts: 2 });
+  const r = await read("eth_call", [{ from, to: router, data: built.data, gas: toHex(3_000_000) }, "latest", overrides], { attempts: 3 });
+  if (!r.ok && isTransportError(r.error)) return { ok: false, unverified: true, transport: true, reason: `sell simulation unreadable: ${r.error}`, router };
   if (!r.ok) return { ok: false, reverted: true, revertReason: r.error, router, balanceSlot: bal.slot, allowanceSlot: allow.slot };
   const out = decodeUint(r.data);
   if (out == null) return { ok: false, unverified: true, reason: "router returned nothing measurable", router };

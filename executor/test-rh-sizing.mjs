@@ -19,7 +19,8 @@
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { expectedRoundTripPct, ROUND_TRIP_GAS, PONS_ROUND_TRIP_PCT } from "./live-thresholds.mjs";
+import { expectedRoundTripPct, ROUND_TRIP_GAS, PONS_ROUND_TRIP_PCT,
+  CHEAPEST_CLIP_ETH, MIN_CLIP_ETH } from "./live-thresholds.mjs";
 import { DEFAULTS, planEntry, freshState } from "./strategy.mjs";
 
 let pass = 0, fail = 0;
@@ -129,7 +130,22 @@ ok("fixedSol is no longer pinned to the paper constant", () =>
 ok("costPct is derived from the measured curve at the configured clip", () =>
   assert.match(poller, /costPct: expectedRoundTripPct\(configuredTradeCap\.value\) \/ 100,/));
 ok("the derivation reads the registry rather than a literal", () =>
-  assert.match(poller, /import \{ expectedRoundTripPct \} from "\.\/live-thresholds\.mjs"/));
+  assert.match(poller, /import \{ expectedRoundTripPct[^}]*\} from "\.\/live-thresholds\.mjs"/));
+/* THE DEFAULT SIZE IS THE MEASURED CHEAPEST CLIP, NOT A TRANSLATED SOL NUMBER. The
+   canary was 0.0004 ETH, at which the cost curve above reads >50% and the executor's own
+   entry guard refuses every stop width the desk publishes — a cap that could only ever
+   refuse. Both the poller and every copy of the caps now start from the registry's
+   size.cheapestClipEth, so the default and the curve cannot drift apart. */
+ok("the live default clip IS the registry's measured cheapest clip", () => {
+  assert.match(poller, /maxEthPerTrade: CHEAPEST_CLIP_ETH,/);
+  assert.ok(expectedRoundTripPct(CHEAPEST_CLIP_ETH) < expectedRoundTripPct(0.0004) / 5,
+    "the default must sit near the minimum of the curve, not at its blown-up end");
+});
+ok("the minimum clip is the registry's, not a SOL-era literal", () => {
+  assert.match(poller, /minSolPerTrade: MIN_CLIP_ETH,/);
+  assert.ok(!/minSolPerTrade: 0\.0001/.test(poller),
+    "0.0001 ETH is a clip at which two gas legs cost more than the position");
+});
 ok("raising the cap therefore raises BOTH the size and the cost estimate", () => {
   // the two CFG lines must both read configuredTradeCap, or the ceremony half-applies
   const cfg = poller.slice(poller.indexOf("const CFG = {"), poller.indexOf("scaleOutPct: 0,"));

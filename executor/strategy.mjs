@@ -33,7 +33,23 @@ import { POLICY_DEFAULTS, POLICY_VERSION, pricePolicy } from "./trade-policy.mjs
 
 export { POLICY_VERSION };
 
+/* HOW THE BOT DECIDES WHETHER TO BUY A PUBLISHED CALL.
+ *
+ *   risk             every rail below decides; a bracket whose R_net is not positive at
+ *                    the measured cost is refused ("costs eat the target").
+ *   take-every-call  ported from the Solana desk (60d6920, 2026-09-13): every published
+ *                    call is bought at the operator's fixed size and the EDGE rails —
+ *                    R_net, the per-name risk cap, book heat — become advisory, logged as
+ *                    WARN and never a refusal. The MONEY rails are unchanged in every
+ *                    mode: a call with no stop, the rolling realized-loss brake, the open
+ *                    position cap, the rolling deploy cap, the spendable balance and the
+ *                    minimum viable size still refuse, and the executor's own round-trip
+ *                    and impact ceilings are never advisory. Armed by ENTRY_MODE plus a
+ *                    typed sentence naming the wallet and the size (poller.mjs). */
+export const ENTRY_MODES = Object.freeze(["risk", "take-every-call"]);
+
 export const DEFAULTS = {
+  entryMode: "risk",
   maxSolPerTrade: 0.05,      // hard ceiling; Kelly may size well under it
   dailySolCap: 0.5,          // total SOL deployed per rolling day
   dailyLossLimitSol: 0.15,   // realized losses that stop new entries for the day
@@ -132,8 +148,12 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
     ? c.costPctFor(expectedClip)
     : c.costPct;
   const rNet = targetFrac != null ? (targetFrac - cost) / (stopFrac + cost) : null;
-  if (rNet != null && !(rNet > 0))
-    return { action: "skip", reason: `costs eat the target: R_net ${rNet.toFixed(2)}` };
+  const takeEveryCall = c.entryMode === "take-every-call";
+  const advisories = [];
+  if (rNet != null && !(rNet > 0)) {
+    if (!takeEveryCall) return { action: "skip", reason: `costs eat the target: R_net ${rNet.toFixed(2)}` };
+    advisories.push(`costs eat the target: R_net ${rNet.toFixed(2)} — bought anyway (take-every-call)`);
+  }
 
   // ── the break-even hit rate this bracket demands ──
   const wMin = rNet != null ? 1 / (1 + rNet) : null;
@@ -147,8 +167,11 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
     f = c.fDefault;
     why = `small sample (n=${n}) — flat ${(f * 100).toFixed(2)}% risk`;
   } else if (W <= wMin) {
-    return { action: "skip",
+    if (!takeEveryCall) return { action: "skip",
       reason: `hit rate ${(W * 100).toFixed(0)}% is under the ${(wMin * 100).toFixed(0)}% this bracket needs` };
+    advisories.push(`hit rate ${(W * 100).toFixed(0)}% is under the ${(wMin * 100).toFixed(0)}% this bracket needs — bought anyway (take-every-call)`);
+    f = c.fDefault;
+    why = `take-every-call: flat ${(f * 100).toFixed(2)}% risk`;
   } else {
     const fStar = W - (1 - W) / rNet;
     f = Math.max(0, Math.min(c.kappa * fStar, c.fNameMax));
@@ -174,9 +197,17 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
    * mostly fees. A call with no conviction stated is not scaled at all — the desk's
    * silence is not evidence, and the rails below still bound it. */
   const conviction = Number(call.conviction);
-  const convictionScale = Number.isFinite(conviction) && conviction > 0
-    ? Math.max(c.convictionFloor, Math.min(1, conviction / 100))
-    : 1;
+  /* NOT IN TAKE-EVERY-CALL. The operator's acknowledgement there is literally "I take
+     every published call at N ETH", and a desk-authored number that quietly makes it
+     0.35N contradicts the sentence they typed. It is also the shape the Solana desk
+     removed outright — "a remote party who can set the size to a fraction can silence
+     this bot as surely as one who can set it to ten times" — so in the mode where the
+     operator has fixed the size, the desk's confidence ranks calls and does not size
+     them. In risk mode it sizes as before, floored below. */
+  const convictionScale = takeEveryCall ? 1
+    : Number.isFinite(conviction) && conviction > 0
+      ? Math.max(c.convictionFloor, Math.min(1, conviction / 100))
+      : 1;
 
   /* THE CEILING, then the rails. `fixedSol` is what the OPERATOR permits on one trade,
    * not an instruction to bet exactly that: the risk rails may size under it and never
@@ -185,9 +216,25 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
   if (c.fixedSol > 0) { want = c.fixedSol; why = `operator ceiling ${c.fixedSol} SOL`; }
   want = Math.min(want, c.maxSolPerTrade);
   if (call.size_sol != null) want = Math.min(want, Number(call.size_sol));
+  /* CONVICTION MAY NOT SHRINK A CLIP INTO ITS OWN GAS.
+   *
+   * On Solana, scaling a position down by the desk's conviction cost proportionally less
+   * to trade. Here gas is a FLAT toll, so the cost curve is a U and shrinking moves the
+   * clip toward the expensive end: the desk's MEDIAN conviction is 31 of 100, which
+   * scales to the 0.35 floor, and 0.35 of the 0.0112 ETH default clip is 0.0039 —
+   * under the measured minimum, so every median-conviction call refused with "the sized
+   * position rounds to nothing". A scaler that silently deletes the median call is not
+   * expressing less confidence, it is not trading.
+   *
+   * So conviction still sizes down, and it stops at the smallest clip that is not mostly
+   * gas. Below that there is no smaller position worth taking — there is only the
+   * refusal below, which is the honest answer when even the minimum does not fit. */
   if (convictionScale < 1) {
-    want *= convictionScale;
-    why += `; conviction ${conviction}/100 sizes to ${(convictionScale * 100).toFixed(0)}%`;
+    const scaled = want * convictionScale;
+    const floor = Math.min(want, Number(c.minSolPerTrade) > 0 ? Number(c.minSolPerTrade) : 0);
+    want = Math.max(scaled, floor);
+    why += `; conviction ${conviction}/100 sizes to ${((want / (c.fixedSol > 0 ? c.fixedSol : want)) * 100).toFixed(0)}%` +
+      (scaled < floor ? ` (held at the ${floor} minimum clip: below it the round trip is mostly gas)` : "");
   }
 
   /* SIZE DOWN TO EACH RAIL RATHER THAN REFUSING THE CALL.
@@ -203,11 +250,23 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
   const bind = (limitSol, label) => {
     if (Number.isFinite(limitSol) && limitSol < want) { want = limitSol; boundBy = label; }
   };
+  /* The EDGE rails. In take-every-call they are advisory: the operator chose the size
+     and the desk chose the call, so the per-name and book-heat caps report the breach
+     rather than shrink the trade. The MONEY rails after them bind in every mode. */
+  const fNameMax = takeEveryCall ? 1 : c.fNameMax;
+  const bookHeatMax = takeEveryCall ? 1 : c.bookHeatMax;
+  if (takeEveryCall) {
+    const perName = (c.fNameMax * equity - 2 * feeReserve) / effectiveStopFrac;
+    if (Number.isFinite(perName) && perName < want)
+      advisories.push(`per-name risk cap ${(c.fNameMax * 100).toFixed(2)}% would have sized this to ${Math.max(0, perName).toFixed(4)}`);
+    if (heat + (want * effectiveStopFrac + 2 * feeReserve) / Number(equity) > c.bookHeatMax)
+      advisories.push(`book heat would exceed ${(c.bookHeatMax * 100).toFixed(0)}%`);
+  }
   // Per-name stop risk: want * stopFrac + both fees <= fNameMax * equity.
-  bind((c.fNameMax * equity - 2 * feeReserve) / effectiveStopFrac, `per-name risk cap ${(c.fNameMax * 100).toFixed(2)}%`);
+  bind((fNameMax * equity - 2 * feeReserve) / effectiveStopFrac, `per-name risk cap ${(fNameMax * 100).toFixed(2)}%`);
   // Aggregate book heat, on the room this call actually has left.
-  bind(((c.bookHeatMax - heat) * equity - 2 * feeReserve) / effectiveStopFrac,
-    `book heat (${(heat * 100).toFixed(1)}% of ${(c.bookHeatMax * 100).toFixed(0)}% used)`);
+  bind(((bookHeatMax - heat) * equity - 2 * feeReserve) / effectiveStopFrac,
+    `book heat (${(heat * 100).toFixed(1)}% of ${(bookHeatMax * 100).toFixed(0)}% used)`);
   bind(c.dailySolCap - state.deployedTodaySol - feeReserve,
     `rolling 24h deploy cap (${state.deployedTodaySol.toFixed(3)}/${c.dailySolCap} SOL)`);
   if (state.spendableSol != null) bind(state.spendableSol - feeReserve, "spendable balance after the fee reserve");
@@ -221,21 +280,26 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
     return { action: "skip",
       reason: boundBy
         ? `${boundBy} leaves ${Math.max(0, want).toFixed(4)} SOL, under the ${minSize} SOL minimum`
-        : "the sized position rounds to nothing" };
+        /* NAME THE FLOOR AND THE NUMBER THAT MISSED IT. "Rounds to nothing" was true of a
+           size that really was ~0, and misleading for one that is simply under the
+           measured minimum clip — the reader goes looking for a zero that is not there. */
+        : `the sized position is ${Math.max(0, want).toFixed(6)}, under the ${minSize} minimum clip — ` +
+          "below that the round trip is mostly the flat gas toll" };
 
   const actualF = (want * effectiveStopFrac + 2 * feeReserve) / Number(equity);
   if (!Number.isFinite(actualF) || actualF < 0)
     return { action: "skip", reason: "actual risk fraction is invalid" };
   /* The rails above already bound this, so a breach here would mean the arithmetic
      disagrees with itself. Refuse rather than trust it. */
-  if (actualF > c.fNameMax + 1e-9)
-    return { action: "skip", reason: `actual stop risk ${(actualF * 100).toFixed(2)}% exceeds per-name cap ${(c.fNameMax * 100).toFixed(2)}%` };
-  if (heat + actualF > c.bookHeatMax + 1e-9)
-    return { action: "skip", reason: `book heat ${(heat * 100).toFixed(1)}% + ${(actualF * 100).toFixed(1)}% exceeds ${(c.bookHeatMax * 100).toFixed(0)}%` };
+  if (actualF > fNameMax + 1e-9)
+    return { action: "skip", reason: `actual stop risk ${(actualF * 100).toFixed(2)}% exceeds per-name cap ${(fNameMax * 100).toFixed(2)}%` };
+  if (heat + actualF > bookHeatMax + 1e-9)
+    return { action: "skip", reason: `book heat ${(heat * 100).toFixed(1)}% + ${(actualF * 100).toFixed(1)}% exceeds ${(bookHeatMax * 100).toFixed(0)}%` };
 
   return { action: "buy", sol: want, f: actualF, estimatedF: f, rNet, wMin,
-    convictionScale, boundBy,
-    reason: `${why}${boundBy ? `; sized down by ${boundBy}` : ""}; actual stop risk ${(actualF * 100).toFixed(2)}%` };
+    convictionScale, boundBy, advisories, entryMode: takeEveryCall ? "take-every-call" : "risk",
+    reason: `${why}${boundBy ? `; sized down by ${boundBy}` : ""}; actual stop risk ${(actualF * 100).toFixed(2)}%` +
+      (advisories.length ? `; advisory: ${advisories.join("; ")}` : "") };
 }
 
 /** Fresh position record, created after a fill. */

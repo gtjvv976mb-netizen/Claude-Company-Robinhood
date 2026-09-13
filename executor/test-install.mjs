@@ -14,6 +14,10 @@ const need = ["poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "e
   "erc20-hazards.mjs", "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
   "heartbeat-health.mjs", "sleep-assertion.mjs", "monitor.mjs", "strategy.mjs", "trade-policy.mjs",
+  /* A TOOL, not the trading runtime: never imported by poller.mjs, so it stays out of
+     RUNTIME_FILES and out of the byte fingerprint, but it must be published, because it
+     is the only way an operator can measure the three canary thresholds. */
+  "live-roundtrip-4663.mjs",
   "package.json", "package-lock.json", "install.sh", "macos-launchagent.sh", "macos-release.sh", "launchd-runner.mjs"];
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "wallste-install-test-"));
 const sources = new Map();
@@ -77,19 +81,19 @@ check("private RPC credentials can stay in owner-only files instead of argv",
   installer.includes("--rpc-file") && installer.includes("--secondary-rpc-file") &&
   /read_private_file "primary RPC"/.test(installer) &&
   /read_private_file "secondary RPC"/.test(installer));
-check("live canary defaults cover trade, deployment and realized loss, in ETH",
-  /LIVE_CANARY_MAX_ETH="0\.0004"/.test(installer) &&
-  /LIVE_CANARY_DAILY_CAP="0\.0008"/.test(installer) &&
-  /LIVE_CANARY_DAILY_LOSS_CAP="0\.0008"/.test(installer) &&
+check("live defaults cover trade, deployment and realized loss, in ETH, at the measured cheapest clip",
+  /LIVE_CANARY_MAX_ETH="0\.0112"/.test(installer) &&
+  /LIVE_CANARY_DAILY_CAP="0\.112"/.test(installer) &&
+  /LIVE_CANARY_DAILY_LOSS_CAP="0\.0336"/.test(installer) &&
   /write_env_line DAILY_LOSS_LIMIT_ETH "\$DAILY_LOSS_CAP"/.test(installer));
 check("an optional live raise requires all three explicit numeric cap flags",
   /--daily-loss-cap\) need_value/.test(installer) &&
   /MAX_ETH_SET" -ne 1.*DAILY_CAP_SET" -ne 1.*DAILY_LOSS_CAP_SET" -ne 1/.test(installer) &&
   /raising any live cap requires --max-eth, --daily-cap, and --daily-loss-cap together/.test(installer));
 check("installer matches the poller's immutable operator maxima and daily/trade relation, compared in wei not awk floats",
-  /LIVE_OPERATOR_MAX_ETH="0\.004"/.test(installer) &&
-  /LIVE_OPERATOR_MAX_DAILY_CAP="0\.04"/.test(installer) &&
-  /LIVE_OPERATOR_MAX_DAILY_LOSS_CAP="0\.012"/.test(installer) &&
+  /LIVE_OPERATOR_MAX_ETH="0\.1"/.test(installer) &&
+  /LIVE_OPERATOR_MAX_DAILY_CAP="1"/.test(installer) &&
+  /LIVE_OPERATOR_MAX_DAILY_LOSS_CAP="0\.3"/.test(installer) &&
   /d >= m \? "coherent" : "incoherent"/.test(installer) && /BigInt\(m\[1\]\) \* 10n \*\* 18n/.test(installer));
 
 const capsStart = installer.indexOf("# BEGIN LIVE_CAPS_VALIDATOR");
@@ -114,15 +118,15 @@ if (capsStart >= 0 && capsEnd > capsStart) {
   });
 
   const defaults = runCaps();
-  check("no live cap flags select the unchanged canary and no raised-cap ceremony",
-    defaults.status === 0 && defaults.stdout.trim() === "0.0004|0.0008|0.0008|0");
+  check("no live cap flags select the unchanged default and no raised-cap ceremony",
+    defaults.status === 0 && defaults.stdout.trim() === "0.0112|0.112|0.0336|0");
 
   const raised = runCaps({
-    MAX_ETH: "0.004", DAILY_CAP: "0.04", DAILY_LOSS_CAP: "0.012",
+    MAX_ETH: "0.1", DAILY_CAP: "1", DAILY_LOSS_CAP: "0.3",
     MAX_ETH_SET: "1", DAILY_CAP_SET: "1", DAILY_LOSS_CAP_SET: "1",
   });
   check("all three explicit reviewed values select the raised-cap ceremony",
-    raised.status === 0 && raised.stdout.trim() === "0.004|0.04|0.012|1");
+    raised.status === 0 && raised.stdout.trim() === "0.1|1|0.3|1");
 
   const exactMinimum = runCaps({
     MAX_ETH: "0.000001", DAILY_CAP: "0.000001", DAILY_LOSS_CAP: "0.000001",
@@ -144,10 +148,10 @@ if (capsStart >= 0 && capsEnd > capsStart) {
       /must each be at least 0\.000001/.test(result.stderr)));
 
   const roundedBoundaryLiterals = [
-    { MAX_ETH: "0.0000009999999999999999999", DAILY_CAP: "0.0008", DAILY_LOSS_CAP: "0.0008" },
-    { MAX_ETH: "0.0040000000000000000000001", DAILY_CAP: "0.04", DAILY_LOSS_CAP: "0.012" },
-    { MAX_ETH: "0.004", DAILY_CAP: "0.0400000000000000000000001", DAILY_LOSS_CAP: "0.012" },
-    { MAX_ETH: "0.004", DAILY_CAP: "0.04", DAILY_LOSS_CAP: "0.0120000000000000000000001" },
+    { MAX_ETH: "0.0000009999999999999999999", DAILY_CAP: "0.112", DAILY_LOSS_CAP: "0.0336" },
+    { MAX_ETH: "0.1000000000000000000000001", DAILY_CAP: "1", DAILY_LOSS_CAP: "0.3" },
+    { MAX_ETH: "0.1", DAILY_CAP: "1.0000000000000000000000001", DAILY_LOSS_CAP: "0.3" },
+    { MAX_ETH: "0.1", DAILY_CAP: "1", DAILY_LOSS_CAP: "0.3000000000000000000000001" },
   ].map((values) => runCaps({
     ...values, MAX_ETH_SET: "1", DAILY_CAP_SET: "1", DAILY_LOSS_CAP_SET: "1",
   }));
@@ -157,28 +161,28 @@ if (capsStart >= 0 && capsEnd > capsStart) {
 
   // The awk trap, now at 18 digits: one wei over the operator maximum must refuse.
   const oneWeiOver = runCaps({
-    MAX_ETH: "0.004000000000000001", DAILY_CAP: "0.04", DAILY_LOSS_CAP: "0.012",
+    MAX_ETH: "0.100000000000000001", DAILY_CAP: "1", DAILY_LOSS_CAP: "0.3",
     MAX_ETH_SET: "1", DAILY_CAP_SET: "1", DAILY_LOSS_CAP_SET: "1",
   });
   check("one wei above the operator maximum is refused (a float comparison would have accepted it)",
     oneWeiOver.status !== 0 && /live caps cannot exceed/.test(oneWeiOver.stderr));
 
   const nonCanonicalLiterals = [".0004", "00.0004", "1."].map((MAX_ETH) => runCaps({
-    MAX_ETH, DAILY_CAP: "0.0008", DAILY_LOSS_CAP: "0.0008",
+    MAX_ETH, DAILY_CAP: "0.112", DAILY_LOSS_CAP: "0.0336",
     MAX_ETH_SET: "1", DAILY_CAP_SET: "1", DAILY_LOSS_CAP_SET: "1",
   }));
   check("installer cap grammar exactly matches the runtime's canonical decimal grammar",
     nonCanonicalLiterals.every((result) => result.status !== 0 &&
       /must be plain decimals/.test(result.stderr)));
 
-  const partial = runCaps({ MAX_ETH: "0.004", MAX_ETH_SET: "1" });
+  const partial = runCaps({ MAX_ETH: "0.1", MAX_ETH_SET: "1" });
   check("a partial live raise fails closed",
     partial.status !== 0 && /requires --max-eth, --daily-cap, and --daily-loss-cap together/.test(partial.stderr));
 
   const excessive = [
-    { MAX_ETH: "0.0040001", DAILY_CAP: "0.04", DAILY_LOSS_CAP: "0.012" },
-    { MAX_ETH: "0.004", DAILY_CAP: "0.0400001", DAILY_LOSS_CAP: "0.012" },
-    { MAX_ETH: "0.004", DAILY_CAP: "0.04", DAILY_LOSS_CAP: "0.0120001" },
+    { MAX_ETH: "0.1000001", DAILY_CAP: "1", DAILY_LOSS_CAP: "0.3" },
+    { MAX_ETH: "0.1", DAILY_CAP: "1.0000001", DAILY_LOSS_CAP: "0.3" },
+    { MAX_ETH: "0.1", DAILY_CAP: "1", DAILY_LOSS_CAP: "0.3000001" },
   ].map((values) => runCaps({
     ...values, MAX_ETH_SET: "1", DAILY_CAP_SET: "1", DAILY_LOSS_CAP_SET: "1",
   }));
@@ -194,7 +198,7 @@ if (capsStart >= 0 && capsEnd > capsStart) {
 
   const lower = runCaps({ MAX_ETH: "0.0003", MAX_ETH_SET: "1" });
   check("a partial lowering remains safe and does not require a raise acknowledgement",
-    lower.status === 0 && lower.stdout.trim() === "0.0003|0.0008|0.0008|0");
+    lower.status === 0 && lower.stdout.trim() === "0.0003|0.112|0.0336|0");
 }
 check("no aggregator key exists to leak: KyberSwap's routes/build need none and the bytes are proven by eth_call",
   !installer.includes("jupiter") && !installer.includes("JUPITER") && !installer.includes("KYBER_API_KEY"));

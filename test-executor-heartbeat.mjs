@@ -99,10 +99,10 @@ assert.equal(solanaNamed.executionReadiness.amountWei, "0");
 assert.equal(solanaNamed.executionReadiness.ready, false);
 assert.equal(solanaNamed.state, "degraded");
 console.log(`  solana-named heartbeat → caps=${solanaNamed.caps} route=${solanaNamed.executionReadiness.route} state=${solanaNamed.state}`);
-// A rehearsal above the operator ceiling (0.004 ETH) is not a size this building admits.
+// A rehearsal above the operator ceiling (0.1 ETH) is not a size this building admits.
 const oversized = sanitizeExecutorHealth({ state: "healthy",
   executionReadiness: { ready: true, lastSuccessAt: now - 1000, observedAt: now - 1200,
-    route: "eth-usdg", providers: 2, amountWei: "4000000000000001" } });
+    route: "eth-usdg", providers: 2, amountWei: "100000000000000001" } });
 assert.equal(oversized.executionReadiness.amountWei, "0");
 assert.equal(oversized.state, "degraded");
 

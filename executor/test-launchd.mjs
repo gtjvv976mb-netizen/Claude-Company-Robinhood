@@ -290,9 +290,9 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
     `LIVE_TRADING_ACK=${capWallet}`,
     "RH_RPC=https://primary.invalid/key",
     "RH_RPC_SECONDARY=https://secondary.invalid/key",
-    "MAX_ETH_PER_TRADE=0.004",
-    "DAILY_ETH_CAP=0.04",
-    "DAILY_LOSS_LIMIT_ETH=0.012",
+    "MAX_ETH_PER_TRADE=0.1",
+    "DAILY_ETH_CAP=1",
+    "DAILY_LOSS_LIMIT_ETH=0.3",
     "KEY_FILE=burner.key",
     "STATE_DB=.cc-executor.sqlite",
     "LOCK_FILE=.cc-executor.lock",
@@ -371,9 +371,9 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
     upgraded.stderr.trim());
   check("missing v3 acknowledgement lowers exposure caps to the ETH canary, and no rent rail is invented",
     upgradedText.includes(`CC_SECRET=${quoteEnvironmentValue(payload)}`) &&
-    upgradedText.includes('MAX_ETH_PER_TRADE="0.0004"\n') &&
-    upgradedText.includes('DAILY_ETH_CAP="0.0008"\n') &&
-    upgradedText.includes('DAILY_LOSS_LIMIT_ETH="0.0008"\n') &&
+    upgradedText.includes('MAX_ETH_PER_TRADE="0.0112"\n') &&
+    upgradedText.includes('DAILY_ETH_CAP="0.112"\n') &&
+    upgradedText.includes('DAILY_LOSS_LIMIT_ETH="0.0336"\n') &&
     !upgradedText.includes("MAX_RENT_LAMPORTS") &&
     !upgradedText.includes("LIVE_CAPS_ACK=") &&
     !`${upgraded.stdout}${upgraded.stderr}`.includes(payload));
@@ -392,7 +392,7 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
     !fs.existsSync(environmentBackup), restored.stderr.trim());
 
   const validRaisedLines = capEnvironment({
-    trade: "0.004", daily: "0.04", loss: "0.012", ack: capAckV3("0.004", "0.04", "0.012"),
+    trade: "0.1", daily: "1", loss: "0.3", ack: capAckV3("0.1", "1", "0.3"),
   });
   writeEnvironment(validRaisedLines);
   const validRaisedText = fs.readFileSync(envFile, "utf8");
@@ -407,10 +407,10 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
       "MAX_ETH_PER_TRADE,DAILY_ETH_CAP,DAILY_LOSS_LIMIT_ETH") &&
     !validRaisedPreview.stdout.includes("canary normalization remains active") &&
     validRaisedUpgrade.status === 0 &&
-    validRaisedUpgradedText.includes("MAX_ETH_PER_TRADE=0.004\n") &&
-    validRaisedUpgradedText.includes("DAILY_ETH_CAP=0.04\n") &&
-    validRaisedUpgradedText.includes("DAILY_LOSS_LIMIT_ETH=0.012\n") &&
-    validRaisedUpgradedText.includes(`LIVE_CAPS_ACK=${quoteEnvironmentValue(capAckV3("0.004", "0.04", "0.012"))}\n`),
+    validRaisedUpgradedText.includes("MAX_ETH_PER_TRADE=0.1\n") &&
+    validRaisedUpgradedText.includes("DAILY_ETH_CAP=1\n") &&
+    validRaisedUpgradedText.includes("DAILY_LOSS_LIMIT_ETH=0.3\n") &&
+    validRaisedUpgradedText.includes(`LIVE_CAPS_ACK=${quoteEnvironmentValue(capAckV3("0.1", "1", "0.3"))}\n`),
     `${validRaisedPreview.stderr}${validRaisedUpgrade.stderr}`.trim());
   check("raised-cap adoption changes no pause, hard-stop, wallet, journal, or acknowledgement bytes",
     fs.readFileSync(pauseFile, "utf8") === "keep-entry-pause\n" &&
@@ -426,51 +426,60 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
   const invalidRaisedCases = [
     {
       slug: "legacy-ack", label: "revoked SOL-era (v2) acknowledgement",
-      trade: "0.004", daily: "0.04", loss: "0.012",
+      trade: "0.1", daily: "1", loss: "0.3",
       ack: legacyCapAck("0.05", "0.5", "0.15"),
     },
     {
       slug: "mismatched-ack", label: "mismatched v3 acknowledgement",
-      trade: "0.004", daily: "0.04", loss: "0.012",
-      ack: capAckV3("0.004", "0.04", "0.011"),
+      trade: "0.1", daily: "1", loss: "0.3",
+      ack: capAckV3("0.1", "1", "0.29"),
     },
     {
       slug: "wrong-wallet-ack", label: "wrong-wallet v3 acknowledgement",
-      trade: "0.004", daily: "0.04", loss: "0.012",
-      ack: "I acknowledge WALL-ST-E caps v3 for 0x0000000000000000000000000000000000000001: 0.004 ETH per trade, " +
-        "0.04 ETH per day, 0.012 ETH rolling realized-loss entry brake",
+      trade: "0.1", daily: "1", loss: "0.3",
+      ack: "I acknowledge WALL-ST-E caps v3 for 0x0000000000000000000000000000000000000001: 0.1 ETH per trade, " +
+        "1 ETH per day, 0.3 ETH rolling realized-loss entry brake",
     },
     {
       slug: "lowercase-wallet-ack", label: "lower-cased wallet v3 acknowledgement",
-      trade: "0.004", daily: "0.04", loss: "0.012",
-      ack: capAckV3("0.004", "0.04", "0.012").replace(capWallet, capWallet.toLowerCase()),
+      trade: "0.1", daily: "1", loss: "0.3",
+      ack: capAckV3("0.1", "1", "0.3").replace(capWallet, capWallet.toLowerCase()),
     },
     {
       slug: "partial-caps", label: "partial raised-cap tuple",
-      trade: "0.004", daily: "0.04", loss: "0.012",
-      ack: capAckV3("0.004", "0.04", "0.012"), omit: ["DAILY_LOSS_LIMIT_ETH"],
+      trade: "0.1", daily: "1", loss: "0.3",
+      ack: capAckV3("0.1", "1", "0.3"), omit: ["DAILY_LOSS_LIMIT_ETH"],
     },
     {
       slug: "over-max", label: "out-of-range raised-cap tuple",
-      trade: "0.004000001", daily: "0.04", loss: "0.012",
-      ack: capAckV3("0.004000001", "0.04", "0.012"),
+      trade: "0.100000001", daily: "1", loss: "0.3",
+      ack: capAckV3("0.100000001", "1", "0.3"),
     },
     {
       slug: "daily-over-max", label: "out-of-range daily deployment cap",
-      trade: "0.004", daily: "0.040000001", loss: "0.012",
-      ack: capAckV3("0.004", "0.040000001", "0.012"),
+      trade: "0.1", daily: "1.000000001", loss: "0.3",
+      ack: capAckV3("0.1", "1.000000001", "0.3"),
     },
     {
       slug: "loss-over-max", label: "out-of-range realized-loss brake",
-      trade: "0.004", daily: "0.04", loss: "0.012000001",
-      ack: capAckV3("0.004", "0.04", "0.012000001"),
+      trade: "0.1", daily: "1", loss: "0.300000001",
+      ack: capAckV3("0.1", "1", "0.300000001"),
     },
     {
+      /* AN INCOHERENT TUPLE IS NOT A RAISE, and normalization lowers each cap to the
+         default only where it SITS ABOVE it. The requested daily (0.09) is below the
+         per-trade cap it is supposed to fund and is also below the default day, so it is
+         kept as the lower of the two — normalization may only ever reduce exposure.
+         The property under test is unchanged: the acknowledgement is not honoured as a
+         raise, and what lands is the default per-trade clip. */
       slug: "daily-below-trade", label: "daily cap below per-trade cap",
-      trade: "0.004", daily: "0.003", loss: "0.012",
-      ack: capAckV3("0.004", "0.003", "0.012"),
+      trade: "0.1", daily: "0.09", loss: "0.3",
+      ack: capAckV3("0.1", "0.09", "0.3"),
+      expect: { trade: "0.0112", daily: "0.09", loss: "0.0336" },
     },
   ];
+  const capLine = (text, name, value) =>
+    text.includes(`${name}="${value}"\n`) || text.includes(`${name}=${value}\n`);
   for (const invalid of invalidRaisedCases) {
     writeEnvironment(capEnvironment(invalid));
     const before = fs.readFileSync(envFile, "utf8");
@@ -483,9 +492,12 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
       preview.stdout.includes("canary normalization remains active") &&
       !preview.stdout.includes("will preserve wallet-acknowledged operator caps") &&
       update.status === 0 &&
-      after.includes('MAX_ETH_PER_TRADE="0.0004"\n') &&
-      after.includes('DAILY_ETH_CAP="0.0008"\n') &&
-      after.includes('DAILY_LOSS_LIMIT_ETH="0.0008"\n') &&
+      /* A cap the runner REPLACED is rewritten quoted; one it left alone keeps the
+         spelling the operator wrote. Both are accepted here — what is being asserted is
+         the VALUE that survived, not the quoting of the line it survived on. */
+      capLine(after, "MAX_ETH_PER_TRADE", invalid.expect?.trade ?? "0.0112") &&
+      capLine(after, "DAILY_ETH_CAP", invalid.expect?.daily ?? "0.112") &&
+      capLine(after, "DAILY_LOSS_LIMIT_ETH", invalid.expect?.loss ?? "0.0336") &&
       after.includes(`LIVE_CAPS_ACK=${quoteEnvironmentValue(invalid.ack)}\n`),
       `${preview.stderr}${update.stderr}`.trim());
     const rollback = update.status === 0 ? invoke(["restore-upgrade-env", "--env", envFile,
@@ -534,7 +546,7 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
   };
   for (const capName of Object.keys(capArgument)) {
     for (const value of ["0", "0.0000009", "0.00000099999999999999999999"]) {
-      const capValues = { trade: "0.0004", daily: "0.0008", loss: "0.0008" };
+      const capValues = { trade: "0.0112", daily: "0.112", loss: "0.0336" };
       capValues[capArgument[capName]] = value;
       writeEnvironment(capEnvironment(capValues));
       const before = fs.readFileSync(envFile, "utf8");
@@ -555,9 +567,9 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
   }
 
   for (const [capName, capValues] of [
-    ["MAX_ETH_PER_TRADE", { trade: "0.0040000000000000000000001", daily: "0.04", loss: "0.012" }],
-    ["DAILY_ETH_CAP", { trade: "0.004", daily: "0.0400000000000000000000001", loss: "0.012" }],
-    ["DAILY_LOSS_LIMIT_ETH", { trade: "0.004", daily: "0.04", loss: "0.0120000000000000000000001" }],
+    ["MAX_ETH_PER_TRADE", { trade: "0.1000000000000000000000001", daily: "1", loss: "0.3" }],
+    ["DAILY_ETH_CAP", { trade: "0.1", daily: "1.0000000000000000000000001", loss: "0.3" }],
+    ["DAILY_LOSS_LIMIT_ETH", { trade: "0.1", daily: "1", loss: "0.3000000000000000000000001" }],
   ]) {
     writeEnvironment(capEnvironment(capValues));
     const before = fs.readFileSync(envFile, "utf8");
@@ -573,7 +585,7 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
   }
 
   for (const value of ["", "0", "1.5", "4.0", "4.0000000000000001", "5"]) {
-    writeEnvironment([...capEnvironment({ trade: "0.0004", daily: "0.0008", loss: "0.0008" }),
+    writeEnvironment([...capEnvironment({ trade: "0.0112", daily: "0.112", loss: "0.0336" }),
       `MAX_OPEN_POSITIONS=${value}`]);
     const before = fs.readFileSync(envFile, "utf8");
     const preview = invoke(["validate-upgrade-env", ...upgradeArgs]);
@@ -612,16 +624,16 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
     escapedRelative.status !== 0 && escapedRelative.stderr.includes("KEY_FILE relative path escapes"));
 
   const canonicalLiveEnvironment = capEnvironment({
-    trade: "0.0004", daily: "0.0008", loss: "0.0008",
+    trade: "0.0112", daily: "0.112", loss: "0.0336",
   }).map((line) => line.startsWith("LOCK_FILE=")
     ? "LOCK_FILE=.cc-executor.sqlite.lock"
     : line);
   const armArgs = {
     "--env": envFile,
     "--workdir": runtimeDir,
-    "--max-eth": "0.004",
-    "--daily-eth-cap": "0.04",
-    "--daily-loss-cap": "0.012",
+    "--max-eth": "0.1",
+    "--daily-eth-cap": "1",
+    "--daily-loss-cap": "0.3",
   };
   const armCliArgs = ["arm-caps", ...Object.entries(armArgs).flat()];
   writeEnvironment(canonicalLiveEnvironment);
@@ -647,7 +659,7 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
   for (const [label, overrides, expected] of [
     ["over-precise subminimum", { "--max-eth": "0.00000099999999999999999999" },
       "MAX_ETH_PER_TRADE must be a plain decimal with at most 18 fractional digits"],
-    ["over-precise maximum", { "--max-eth": "0.0040000000000000000000001" },
+    ["over-precise maximum", { "--max-eth": "0.1000000000000000000000001" },
       "MAX_ETH_PER_TRADE must be a plain decimal with at most 18 fractional digits"],
     ["exactly incoherent", { "--max-eth": "0.001000000000000001", "--daily-eth-cap": "0.001000000000000000",
       "--daily-loss-cap": "0.001" }, "DAILY_ETH_CAP must be at least MAX_ETH_PER_TRADE"],
@@ -681,7 +693,7 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
 
   writeEnvironment(canonicalLiveEnvironment);
   const beforeWrongValue = fs.readFileSync(envFile, "utf8");
-  const wrongValueArm = await attemptArm(async (expected) => expected.replace("0.004 ETH", "0.003 ETH"));
+  const wrongValueArm = await attemptArm(async (expected) => expected.replace("0.1 ETH", "0.09 ETH"));
   check("cap arming rejects an acknowledgement with a changed cap literal",
     !wrongValueArm.ok && wrongValueArm.error.message.includes("did not match exactly") &&
     fs.readFileSync(envFile, "utf8") === beforeWrongValue);
@@ -706,11 +718,11 @@ export function sleepAssertionFaultPath(lockFile) { return lockFile + ".sleep-as
 
   const exactArm = await attemptArm(async (expected) => expected);
   const armedText = fs.readFileSync(envFile, "utf8");
-  const expectedArmAck = capAckV3("0.004", "0.04", "0.012");
+  const expectedArmAck = capAckV3("0.1", "1", "0.3");
   check("exact TTY v3 acknowledgement atomically arms all three literal cap values",
-    exactArm.ok && armedText.includes('MAX_ETH_PER_TRADE="0.004"\n') &&
-    armedText.includes('DAILY_ETH_CAP="0.04"\n') &&
-    armedText.includes('DAILY_LOSS_LIMIT_ETH="0.012"\n') &&
+    exactArm.ok && armedText.includes('MAX_ETH_PER_TRADE="0.1"\n') &&
+    armedText.includes('DAILY_ETH_CAP="1"\n') &&
+    armedText.includes('DAILY_LOSS_LIMIT_ETH="0.3"\n') &&
     armedText.includes(`LIVE_CAPS_ACK=${quoteEnvironmentValue(expectedArmAck)}\n`));
   check("cap arming preserves secrets and safety controls while retaining an owner-only recovery copy",
     exactArm.ok && fs.readFileSync(exactArm.value.backup, "utf8") === beforeWrongValue &&

@@ -51,7 +51,13 @@ const INSIDER_FLOAT_CEILING_PCT = 20;
 export const EVM_GATES = Object.freeze({
   minGraduationAgeSec: Math.max(GRADUATION_AGE_FLOOR_SEC, envNum("DESK_MIN_GRADUATION_AGE_SEC", GRADUATION_AGE_FLOOR_SEC)),
   maxInsiderFloatPct: Math.min(INSIDER_FLOAT_CEILING_PCT, envNum("DESK_MAX_INSIDER_FLOAT_PCT", INSIDER_FLOAT_CEILING_PCT)),
-  allowedPairTokenClasses: Object.freeze(["native", "weth", "stable", "allowed_equity"]),
+  /* WIDENED 2026-09-13 (see the note above classifyPairTokens in src/data/evidence.js):
+     the bot never holds the pair asset — the aggregator routes ETH → pair → meme inside
+     one transaction and the exit is measured in ETH — so any structurally real asset
+     may quote the pool: a Stock Token on the chain's own beacon, or a leveraged
+     synthetic on the second beacon measured that day. `other` (an arbitrary ERC-20)
+     and an unreadable class stay refused. */
+  allowedPairTokenClasses: Object.freeze(["native", "weth", "stable", "allowed_equity", "equity_unlisted", "synthetic_equity"]),
   /* live_authority is about ROLES a key still holds — mint, pause, blacklist, upgrade,
      freeze. equity_token, unknown_beacon, paused_now and transfer_blocked are killed by
      the screen under their own codes (evidence.js) and are deliberately NOT repeated

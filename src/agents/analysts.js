@@ -322,13 +322,15 @@ back — and is still your most important input. Then:
   compounds; do not report them as two tidy separate notes.
 - WHAT IS THE OTHER SIDE OF THE POOL? pairs.pools[].pairToken is the asset you sell INTO,
   and on PONS V2 it can be anything: WETH, native ETH, USDG, or a Robinhood Stock Token.
-  A meme quoted in NVDA can only be sold to someone holding NVDA, and the bot may only
-  pass through an equity on its allowlist (GOOGL, AMZN, NVDA) — an unlisted equity or an
-  obscure ERC-20 as pairToken means the desk cannot exit at all, whatever the depth.
-  pairs.pools[].pairTokenClass says which: native, weth, stable, allowed_equity, or
-  something else, and something else is a KILL. Add the pairToken's own exit cost to
-  yours: the round trip is two legs each way when the quote asset is not what the bot
-  holds, and an equity leg moves with the stock after hours.
+  The bot never holds the pair asset: the aggregator routes ETH → pair → meme inside one
+  transaction and the exit is measured in ETH by the round-trip probe. So a Stock Token
+  on the chain's own beacon or a leveraged synthetic (NVDAx3L and the like) is an
+  acceptable quote asset; an arbitrary ERC-20 or an unreadable class is not.
+  pairs.pools[].pairTokenClass says which: native, weth, stable, allowed_equity,
+  equity_unlisted, synthetic_equity, or other — and "other" is a KILL. Add the
+  pairToken's own exit cost to yours: the round trip is two legs each way when the quote
+  asset is not ETH, and an equity leg moves with the stock after hours (a leveraged one
+  moves several times as far).
 - HOW OLD IS THE POOL, AND WHAT DOES OLD MEAN HERE. Read pair.ageHours. Coins on this
   chain are OLD: age p10 6h, p50 543h — twenty-two days — and p90 1595h, and not one of
   eighteen sub-$1m coins sampled was under an hour old. There is no fresh-graduate pop to

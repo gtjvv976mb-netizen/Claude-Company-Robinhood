@@ -242,7 +242,7 @@ console.log("\nCOMPLIANCE — the chain's deterministic gates are a veto, from t
   for (const [name, over, code] of [
     ["a token still on the curve", { launch: { ...graduate.launch, phase: "curve", graduatedAt: null } }, "not_graduated"],
     ["a pool graduated 30 seconds ago", { launch: { ...graduate.launch, graduatedAt: now - 30e3 } }, "graduated_too_recently"],
-    ["a pool quoted in an unlisted equity", { pairs: { pools: [{ pairToken: "0x4a0e", pairTokenClass: "equity_unlisted" }] } }, "pair_token_gate"],
+    ["a pool quoted in an arbitrary ERC-20", { pairs: { pools: [{ pairToken: "0xdead", pairTokenClass: "other" }] } }, "pair_token_gate"],
     ["an exempt list holding 60% of supply", { launch: { ...graduate.launch, exemptShareOfSupplyPct: 60 } }, "insider_float"],
     ["bespoke unverified code whose sell reverts", { contract: { cloneOf: null, verifiedSource: false, flags: [] }, sellSim: { ok: false, revertReason: "y" } }, "unverified_code"],
     ["a live blacklist role", { contract: { ...graduate.contract, flags: [{ flag: "blacklist" }] } }, "live_authority"],

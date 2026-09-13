@@ -50,10 +50,12 @@ would have deployed onto the Solana desk's service by name.
   launches in a month, 1.55% graduate, half of those inside four minutes (Bitquery,
   Sep 2026). The edge, if any, is choosing among graduates.
 - **Costs are flat, not proportional.** A KyberSwap round trip measured ~661k gas for
-  both legs on 2026-09-04 — about $0.54 at any size. That inverts Solana's sizing
-  logic, so every inherited number is registered `inherited` in
-  `executor/live-thresholds.mjs` and `assertLiveReady()` refuses to arm the executor
-  until each is re-measured here.
+  both legs on 2026-09-04 — about $0.54 at any size. That inverts Solana's sizing logic:
+  cost as a share of the position is a U in the clip size, and the *cheap* end is the
+  large end. Every number the executor trades on carries provenance in
+  `executor/live-thresholds.mjs`, and `assertLiveReady()` refuses to arm on an
+  `inherited` or `assumed` one. As of 2026-09-13 all 14 live-path thresholds are
+  **measured on 4663** and the gate passes.
 - **An equity may be a pair asset, never a position.** 203 Robinhood Stock Tokens are
   283-byte beacon proxies on one beacon, pausable, with a blocklist.
   `executor/scope-guard.mjs` refuses them as targets and allows GOOGL/AMZN/NVDA only as
@@ -61,9 +63,12 @@ would have deployed onto the Solana desk's service by name.
 - **A transaction can vanish.** The sequencer may drop a tx with no receipt; ArbOS 61
   compliance filtering can void one (status `0x0`, no logs, gas burned). Gas is read per
   ticket, never cached — `eth_gasPrice` moved 0.02 → 0.7 gwei in two weeks.
-- **No explorer on the hot path.** Blockscout is human-facing (403 to a curl UA).
-  Evidence comes from the RPC, GeckoTerminal (`robinhood`), DexScreener (`robinhood`) and
-  Kyber; the shape every seat expects is `docs/EVIDENCE-CONTRACT.md`.
+- **No explorer on the hot path.** Blockscout is human-facing (403 to a curl UA), and
+  a screen that depended on it killed 100% of workups on `unverified_holders` — the desk
+  published nothing at all across 19,335 lifetime workups. Evidence comes from the RPC,
+  GeckoTerminal (`robinhood`), DexScreener (`robinhood`) and Kyber, with the holder read
+  chained ledger → indexer → explorer; the shape every seat expects is
+  `docs/EVIDENCE-CONTRACT.md`.
 
 ## The seats
 
@@ -156,8 +161,12 @@ dollars: a USD peg read off a thin market is trivially manipulated.
 
 - **Nothing here has an edge until you have graded it.** Read the first weeks of the
   journal as a backtest you are watching forward.
-- **Every inherited threshold is void.** The executor will not arm while any live-path
-  number is `inherited` or `assumed`; that refusal is the mechanism, not a bug.
+- **A threshold is only as good as its provenance.** The executor will not arm while any
+  live-path number is `inherited` or `assumed`; that refusal is the mechanism, not a bug.
+  Three numbers about what the sequencer does with *this wallet's* sends (inclusion
+  latency, drop rate, same-nonce replacement) cannot be read without sending, so they are
+  `canary`: off the live path, `null` until answered, and filled in by the bot's own
+  sends rather than by a gate that would need an armed executor to open.
 - **Holder data is a log replay**, not an endpoint: ERC-20 `Transfer` logs from the pool's
   creation block on an RPC that 429s on batches. Coverage is reported, not estimated.
 - **The live executor is an experimental local canary, not evidence of an edge.**

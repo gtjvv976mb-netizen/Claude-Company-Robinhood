@@ -181,7 +181,7 @@ const googl = JSON.parse(fs.readFileSync(new URL("./test-fixtures/gather-googl-4
   ok("the transfer ruler reads 0 bps on a no-fee token, whatever the route gap said", cashcat.sellSim.transferFeeBps === 0 && cashcat.contract.transferFeeBps === 0 && cashcat.contract.taxsellFeeBps === 0 && cashcat.contract.tax.simulated === true,
     `transfer ${cashcat.sellSim.transferFeeBps}bps vs route gap ${cashcat.sellSim.routeGapBps}bps`);
   ok("the route gap is reported separately, never folded into the fee", cashcat.contract.tax.sellRouteGapBps === cashcat.sellSim.routeGapBps && "buyRouteGapBps" in cashcat.contract.tax);
-  ok("pools carry pairToken and the contract's class vocabulary", cashcat.pairs.pools.every((p) => p.pairToken === p.quoteAddress && ["native", "weth", "stable", "allowed_equity", "equity_unlisted", "other", null].includes(p.pairTokenClass)), cashcat.pairs.pools.map((p) => p.pairTokenClass).join(","));
+  ok("pools carry pairToken and the contract's class vocabulary", cashcat.pairs.pools.every((p) => p.pairToken === p.quoteAddress && ["native", "weth", "stable", "allowed_equity", "equity_unlisted", "synthetic_equity", "other", null].includes(p.pairTokenClass)), cashcat.pairs.pools.map((p) => p.pairTokenClass).join(","));
   ok("the deepest CASHCAT pool is WETH-quoted and allowed", cashcat.pairs.pools[0].pairTokenClass === "weth" && cashcat.pairs.pools[0].pairAllowed === true);
   ok("GOOGL's deepest pool is USDG-quoted (stable)", googl.pairs.pools[0].pairTokenClass === "stable");
   ok("the planned creator-fee rows are null WITH a reason, not zero", cashcat.launch.creatorTaxBps === null && typeof cashcat.launch.creatorFeeReason === "string");
@@ -216,7 +216,12 @@ console.log("\nSCREEN(): EVERY NEW KILL FIRES ON ITS FLAG, AND ONLY ON ITS FLAG"
   const kills = (ev) => screen(ev).fails.map((f) => f.code);
   const base = kills(clean());
   ok("the cleaned recorded bundle passes the screen", base.length === 0, base.join(", ") || "clean");
-  ok("the recorded CASHCAT bundle is refused for size and unverified holders", (() => { const k = kills(cashcat); return k.includes("too_big") && k.includes("unverified_holders"); })(), kills(cashcat).join(", "));
+  /* The recorded bundle's holders are unread (its ledger is older than the scan budget)
+     but its sell SIMULATED and its round trip cleared the ceiling — so, since 2026-09-13,
+     the unread distribution is a seat input rather than a kill (see screen()). The size
+     kill stands. */
+  ok("the recorded CASHCAT bundle is refused for size, and its unread holders are NOT a kill because its exit is proven", (() => { const k = kills(cashcat); return k.includes("too_big") && !k.includes("unverified_holders"); })(), kills(cashcat).join(", "));
+  ok("...but unread holders DO refuse when the exit is unproven too", (() => { const ev = JSON.parse(JSON.stringify(cashcat)); ev.sellSim = { ok: false, unverified: true, reason: "x" }; return kills(ev).includes("unverified_holders"); })());
   ok("the recorded GOOGL bundle is KILLED as an equity", kills(googl).includes("equity"), kills(googl).join(", "));
 
   /* Each case names the EXACT set of kills. The screen's own codes and the rails'
@@ -242,12 +247,15 @@ console.log("\nSCREEN(): EVERY NEW KILL FIRES ON ITS FLAG, AND ONLY ON ITS FLAG"
   one("a 12% route gap on the sell", (ev) => { ev.sellSim.effectiveTaxBps = 1200; }, ["sell_tax"]);
   one("an unreadable contract", (ev) => { ev.contract = { error: "429" }; }, ["unverified_contract"]);
   one("no contract block at all", (ev) => { delete ev.contract; }, ["unverified_contract"]);
-  one("an unverified ledger", (ev) => { ev.holders = { ok: false, error: "budget" }; }, ["unverified_holders"]);
+  one("an unverified ledger with a proven exit is a seat input, not a kill", (ev) => { ev.holders = { ok: false, error: "budget" }; }, []);
+  one("an unverified ledger AND an unproven exit", (ev) => { ev.holders = { ok: false, error: "budget" }; ev.sellSim = { ok: false, unverified: true, reason: "no slot" }; }, ["unverified_holders", "unverified_sellsim", "unverified_code"]);
   one("no round trip", (ev) => { ev.exitProbe = { targetSizeUsd: 75, error: "no route" }; }, ["unverified_exit"]);
   one("no ETH/USD", (ev) => { ev.ethUsd = { value: null, error: "disputed" }; }, ["unverified_eth_usd"]);
   one("a pullable v2 LP", (ev) => { ev.lp = { kind: "v2_lp_tokens", pullableSharePct: 61 }; }, ["lp_pullable"]);
   one("a v3 position is not judged by the v2 rule", (ev) => { ev.lp = { kind: "v3_position", pullableSharePct: 100 }; }, []);
-  one("a pool quoted in an unlisted equity", (ev) => { ev.pairs.pools[0].pairAllowed = false; ev.pairs.pools[0].pairTokenClass = "equity_unlisted"; ev.pair.pairAddress = ev.pairs.pools[0].address; }, ["pair_token_unallowed", "pair_token_gate"]);
+  one("a pool quoted in a Stock Token off the old three-name list is allowed (the bot never holds the pair asset)", (ev) => { ev.pairs.pools[0].pairAllowed = true; ev.pairs.pools[0].pairTokenClass = "equity_unlisted"; ev.pair.pairAddress = ev.pairs.pools[0].address; }, []);
+  one("a pool quoted in a leveraged synthetic is allowed", (ev) => { ev.pairs.pools[0].pairAllowed = true; ev.pairs.pools[0].pairTokenClass = "synthetic_equity"; ev.pair.pairAddress = ev.pairs.pools[0].address; }, []);
+  one("a pool quoted in an arbitrary ERC-20", (ev) => { ev.pairs.pools[0].pairAllowed = false; ev.pairs.pools[0].pairTokenClass = "other"; ev.pair.pairAddress = ev.pairs.pools[0].address; }, ["pair_token_unallowed", "pair_token_gate"]);
   one("a pool whose quote class could not be read", (ev) => { ev.pairs.pools[0].pairAllowed = false; ev.pairs.pools[0].pairTokenClass = null; ev.pair.pairAddress = ev.pairs.pools[0].address; }, ["pair_token_unallowed", "unverified_pair_token"]);
   one("no pools at all", (ev) => { ev.pairs.pools = []; }, ["unverified_pair_token"]);
   one("a coin still on its curve", (ev) => { ev.launch.onCurve = true; ev.launch.phase = "curve"; }, ["on_curve", "not_graduated"]);

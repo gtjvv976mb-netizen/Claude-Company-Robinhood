@@ -79,17 +79,28 @@ non-zero → non-zero allowances gets `approve(0)` at N, `approve(amount)` at N+
 swap at N+2. Every approval goes through the same machine, is exact (never unbounded),
 and the swap is not even built until the allowance has been READ back from the chain.
 
-Whether the sequencer honours same-nonce replacement at all is **unmeasured**
-(`exec.nonceReplacementHonoured`, VOID). The cancel path assumes nothing about it.
+Whether the sequencer honours same-nonce replacement at all is measured **by the bot
+itself**: `exec.nonceReplacementHonoured` is a `canary` threshold, `null` until a cancel
+lands at a dropped nonce, and every send records its own outcome (`sendStats()`). It is
+deliberately off the live path — a gate that can only open after a send cannot guard
+sends. The cancel path assumes nothing about it either way.
 
 ## The registry gate: the executor will not arm on Solana numbers
 
 `thresholds.mjs` / `live-thresholds.mjs` register every number the executor trades on
 with its provenance. In live mode `assertLiveReady()` runs BEFORE any provider is
 contacted and refuses to boot while any live-path threshold is `inherited` or
-`assumed`. Slippage, price impact and the network-fee ceiling are read from the
-registry only — there is no `SLIPPAGE_BPS` env, the launchd allowlist refuses it, and
-`test-live-gates.mjs` proves an env value changes nothing. The expected network fee is
+`assumed`. **As of 2026-09-13 it passes**: all 14 live-path thresholds are `measured` on
+4663. The three send-dependent numbers are `canary` and off the live path (above), so
+they can never wedge the gate they would otherwise need an armed executor to open.
+
+Slippage, price impact and the network-fee ceiling are read from the registry only —
+there is no `SLIPPAGE_BPS` env, the launchd allowlist refuses it, and
+`test-live-gates.mjs` proves an env value changes nothing. `src/config.js` IMPORTS
+`exec.slippageBps` and `screen.minStopDistancePct` from the same registry rather than
+keeping its own copies: two copies of one number is how the Solana desk came to refuse
+four consecutive live calls, the desk sizing to one tolerance while the executor signed
+at another. The expected network fee is
 the COST MODEL — half the measured 660,996-gas round trip × the gas price both providers
 report right now — and is never the gate; gas moved 0.41 → 0.80 gwei between two probe
 runs fifteen minutes apart on 2026-09-05, so a constant would be wrong within the hour.
@@ -97,22 +108,27 @@ runs fifteen minutes apart on 2026-09-05, so a constant would be wrong within th
 `node probe-measure-4663.mjs --seconds 300` is the read-only measurement campaign: it
 prints pasteable `M(date, method)` lines and writes nothing. Three thresholds
 (inclusion latency, drop rate, nonce replacement) need a funded burner and a real send
-and are outside it.
+and are outside it: `node live-roundtrip-4663.mjs` is the supervised rehearsal that
+answers them (separate journal, `LIVE_ROUNDTRIP_ACK` equal to the checksummed burner
+address), and ordinary trading answers them too.
 
 ## Caps, in ETH
 
-| | Canary (default) | Operator ceiling (typed ceremony) |
+| | Default | Hard maximum (code change to move) |
 |---|---|---|
-| per trade | 0.0004 ETH | 0.004 ETH |
-| rolling 24 h deploy | 0.0008 ETH | 0.04 ETH |
-| rolling realized-loss entry brake | 0.0008 ETH | 0.012 ETH |
+| per trade | 0.0112 ETH (`size.cheapestClipEth`) | 0.1 ETH |
+| rolling 24 h deploy | 0.112 ETH (10 clips) | 1 ETH |
+| rolling realized-loss entry brake | 0.0336 ETH (3 clips) | 0.3 ETH |
 | open positions | 4 | 4 (frozen) |
 
-These are the ETH translation of the owner's SOL caps at $2,450/ETH and are **marked as
-awaiting owner confirmation** in `poller.mjs`. Gas is flat here: one swap leg is
-~0.00014 ETH at 0.42 gwei, which is 70 % of the canary and 7 % of the operator ceiling,
-so the canary is refused by the executable-cost guard at every stop width and only the
-ceiling clears it (`test-fee-gate-split.mjs`). Raising a cap needs all three set and
+The defaults are **derived from the registry**, not typed: gas here is flat (660,996
+units a round trip), so cost as a share of the position is a U in the clip size and the
+default is that curve's argmin — 7.35 % all-in against 9.2 % at 0.004 ETH and 55 % at
+0.0004 ETH. The old 0.0004 / 0.0008 / 0.0008 canary was the owner's SOL caps translated
+at $2,450/ETH, and on this chain it could not clear the executor's own executable-cost
+guard at any stop width the desk publishes (4 of 4 refused, `test-fee-gate-split.mjs`).
+A default that cannot clear its own entry guard is not caution; it is a bot that can
+never buy. Env may only ever LOWER a cap; raising needs all three set and
 `LIVE_CAPS_ACK` equal to the v3 sentence naming the checksummed wallet and the numbers;
 every SOL-era acknowledgement is revoked. Caps are parsed as wei with BigInt: a literal
 one wei over a ceiling is refused, and more than 18 fractional digits is refused rather
@@ -140,7 +156,16 @@ Environment (all read by `poller.mjs`; the launchd runner refuses any other name
 `MAX_ENTRY_PREFLIGHT_AGE_MS`, `MAX_EXIT_PRICE_IMPACT_PCT`, `MAX_EXIT_TRIGGER_AGE_MS`,
 `MAX_TX_ATTEMPTS`, `MAX_EXIT_TX_ATTEMPTS`, `TRAIL_PCT`, `F_DEFAULT`, `F_NAME_MAX`,
 `BOOK_HEAT_MAX`, `MAX_AGE_HOURS`, `EXECUTOR_SOURCE_COMMIT`, `STATE_FILE`,
-`WALLSTE_ALLOW_BATTERY_ENTRIES`.
+`WALLSTE_ALLOW_BATTERY_ENTRIES`, `ENTRY_MODE` (`risk` | `take-every-call`),
+`ENTRY_MODE_ACK`.
+
+`ENTRY_MODE=take-every-call` buys every published call at the configured size and turns
+the EDGE rails (R_net, per-name risk cap, book heat) into advisories on the fill. The
+MONEY rails — no stop, the realized-loss brake, the open-position and deploy caps, the
+spendable balance, the minimum clip — and every rule on the transaction itself still
+refuse. It is armed like a cap raise: `ENTRY_MODE_ACK` must equal
+`I take every published call on <checksummed wallet> at <size> ETH`, character for
+character. See `ARMING.md` §2b.
 
 ## Verifying a fill
 
@@ -177,5 +202,8 @@ the migration fixture), `test-live-gates.mjs`, `test-operator-caps.mjs`,
 `test-launchd.mjs`, `test-install.mjs .` (from the repo root), `test-monitor.mjs`,
 `test-scope-guard.mjs`, `test-evm-swap.mjs`, `test-approvals.mjs`,
 `test-thresholds.mjs`, `test-lessons-lint.mjs`, `test-fee-gate-split.mjs`,
-`test-mainnet-wait.mjs`, `test-review-hardening.mjs`. The root `npm test` runs all of
-them.
+`test-mainnet-wait.mjs`, `test-review-hardening.mjs`, `test-take-every-call.mjs` (the
+edge/money rail split and both arming ceremonies) and `test-send-stats.mjs` (the canary
+arithmetic and the entries-only drop pause). The root `npm test` discovers every
+`test-*.mjs` here and at the repo root, so a new regression joins CI without anyone
+updating a list.

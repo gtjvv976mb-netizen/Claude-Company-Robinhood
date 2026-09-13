@@ -25,6 +25,10 @@ export const PROVENANCE = Object.freeze({
   MEASURED: "measured",     // measured on THIS chain, with a date and a method
   INHERITED: "inherited",   // carried from the Solana desk; void until re-measured
   ASSUMED: "assumed",       // a starting guess nobody has checked
+  /* A number only a real send can produce, recorded by the executor's own transactions
+     (journal meta send_stats) and by live-roundtrip-4663.mjs. Null until the first send;
+     never on the live path, because a gate that needs a send to open cannot gate sends. */
+  CANARY: "canary",
 });
 
 const REGISTRY = new Map();
@@ -75,4 +79,9 @@ export function assertLiveReady() {
     `Measure it here, then set provenance to "measured" with the date and method. ` +
     `Numbers carried from the Solana desk are void: its round trips were 4.5-5.6% where ` +
     `this chain measured 0.015-0.018% deep and 8.92% thin.`);
+}
+
+/** The send-dependent numbers the executor measures about itself, for the heartbeat. */
+export function canaryThresholds() {
+  return thresholds().filter((t) => t.provenance === PROVENANCE.CANARY);
 }

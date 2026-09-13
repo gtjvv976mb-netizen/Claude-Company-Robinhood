@@ -68,7 +68,11 @@ assert.match(html, /cannot start, stop, steer, sign for, or fund it/);
 assert.match(html, /Active local cap policy · self-reported/);
 assert.match(html, /rolling realized-loss entry brake/);
 assert.match(html, /The realized-loss value is an entry brake, not a guaranteed loss ceiling/);
-assert.match(html, /--daily-loss-cap 0\.01/);
+/* The flag must be OFFERED; its value is asserted below against install.sh's own
+   literals rather than against a copy here. This line used to pin "0.01", which matched
+   the old raised profile's 0.012 by prefix — a literal that quietly stopped meaning
+   anything the moment either number moved. */
+assert.match(html, /--daily-loss-cap \d/);
 /* ── THE COMMANDS THIS PANEL HANDS AN OWNER MUST RUN ON THIS CHAIN ────────────
  * This file used to assert /--max-sol 0.05 --daily-cap 0.5 --daily-loss-cap 0.15/ —
  * the SOLANA tower's string — so the test was actively holding the bug in place.
@@ -113,7 +117,10 @@ assert.match(html, /--daily-loss-cap 0\.01/);
   assert.ok(!/jupiter/i.test(code.slice(code.indexOf("const dryRunCommand"), code.indexOf("const setupCard"))),
     "this chain routes through KyberSwap and takes no API key");
 }
-assert.match(html, /fresh v2 wallet-and-values acknowledgement/);
+/* v3, in ETH and naming the checksummed address: the SOL-era v2 wording is revoked
+   everywhere (executor/poller.mjs capsAckSentence), and the page must not still be
+   telling an owner to type a sentence the installer refuses. */
+assert.match(html, /fresh v3 wallet-and-values acknowledgement/);
 assert.match(html, /const dashEth = \(value\) =>[\s\S]*?toFixed\(9\)/,
   "sub-milli-ETH caps and readiness probes retain enough precision to never render as zero");
 assert.doesNotMatch(html, /Active trade cap[\s\S]{0,160}toFixed\(3\)|amountWei[\s\S]{0,180}toFixed\(3\)/,
