@@ -164,8 +164,9 @@ and each has a fact_code the desk's bar will accept:
     than the hold (upgrade_key_live) — the token you audited is not the one you will sell
   · the pool can be pulled: a position NFT its owner can withdraw, or a lock that
     expires inside the hold (lp_unlocked)
-  · the quote asset is one the bot cannot hold — an unlisted equity or an obscure
-    ERC-20 as pairToken (pair_token_gate)
+  · the quote asset is an arbitrary ERC-20 the aggregator has no real market for, or
+    its class could not be read (pair_token_gate) — a Stock Token or a leveraged
+    synthetic as pairToken is allowed; the bot routes through it, it never holds it
   · the bytecode is bespoke, unverified, not a recognised PONS clone, and the sell has
     not been shown to simulate (unverified_code)
   · sells do not land — the simulated sell reverts, or the chain is voiding this token's
@@ -396,8 +397,8 @@ Build the ticket from the routing evidence, not from imagination:
 - Name the route from evidence.exitProbe: the KyberSwap aggregator route
   (aggregator-api.kyberswap.com/robinhood) or the single Uniswap V3/V4 pool, and the
   pairToken leg if the pool is not WETH/native-quoted — pairs.pools[].pairToken is what
-  the bot must hold first, and if it is an allowed equity (GOOGL, AMZN, NVDA) the leg
-  moves with the stock after hours. The bot reads the price floor from the built
+  the route passes through (the bot never holds it), and if it is an equity or a
+  leveraged synthetic the leg moves with the stock after hours. The bot reads the price floor from the built
   calldata, never from the quote's amountOut, and reads gas per ticket, never cached.
 - Do not write a priority fee or a gas bump into the ticket. Priority fees are refunded
   on this chain; there is no auction, and a "fee bump" buys nothing.

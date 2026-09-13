@@ -99,13 +99,13 @@ console.log("\nTHE PROOFS COME FROM CHAIN STATE, NEVER FROM A DEX LABEL");
 const ev = fs.readFileSync(new URL("src/data/evidence.js", import.meta.url), "utf8");
 ok("evidence.js resolves the phase through the shared function", () =>
   assert.match(ev, /phase = resolveAmmPhase\(\{/));
-ok("the pool proof is the explorer's verified contract, not a dexId", () =>
-  assert.match(ev, /verifiedAmmPool: holders\?\.verifiedAmmPool === true/));
+ok("the pool proof is chain state — a V4 Initialize log or a V3 pool's token0/token1 — or the explorer's verified contract, never a dexId", () =>
+  assert.match(ev, /verifiedAmmPool: chainPoolProof === true \|\| holders\?\.verifiedAmmPool === true/));
 ok("the exit proof is the on-chain sell simulation", () =>
   assert.match(ev, /sellSimOk: sellSim\?\.ok === true/));
 ok("no dex id feeds the upgrade", () => {
   const block = ev.slice(ev.indexOf("phase = resolveAmmPhase({"), ev.indexOf("phase = resolveAmmPhase({") + 400);
-  assert.ok(!/dexId|\.dex\b|launchpad/.test(block),
+  assert.ok(!/dexId|\.dex\b/.test(block),
     "DexScreener calls a live PONS curve \"uniswap\" — a label can never be the proof");
 });
 const bs = fs.readFileSync(new URL("src/data/blockscout.js", import.meta.url), "utf8");

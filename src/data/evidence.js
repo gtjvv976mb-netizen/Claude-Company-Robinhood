@@ -3,6 +3,7 @@ import * as kyber from "./kyber.js";
 import * as evm from "./evm.js";
 import * as pons from "./pons-live.js";
 import * as blockscout from "./blockscout.js";
+import * as gecko from "./geckoterminal.js";
 import { resolveAmmPhase } from "../agents/risk-rails.js";
 import { ethUsd as ethUsdRead, coingecko } from "./eth-usd.js";
 import { cfg, TOKENS, TOKEN_DECIMALS, floorsFor } from "../config.js";
@@ -13,7 +14,7 @@ import { emit } from "../lib/bus.js";
 import { clean, UNTRUSTED_CAPS } from "./untrusted.js";
 import { whaleFeed } from "../identity.js";
 import { regime } from "./regime.js";
-import { isAddress, lower, encodeCall, decodeBool, decodeUint, toWei, fromWei, addressFromWord, SLOT_BEACON, DEAD_ADDRESS, ZERO_ADDRESS } from "../lib/evm.js";
+import { isAddress, lower, encodeCall, decodeBool, decodeUint, decodeString, decodeAddress, toWei, fromWei, addressFromWord, SLOT_BEACON, DEAD_ADDRESS, ZERO_ADDRESS } from "../lib/evm.js";
 import { ALLOWED_PAIR_EQUITIES, KNOWN_STOCK_TOKEN_BEACON } from "../../executor/scope-guard.mjs";
 import { evmGateFailures } from "../agents/risk-rails.js";
 
@@ -32,9 +33,25 @@ import { evmGateFailures } from "../agents/risk-rails.js";
  */
 /* pairTokenClass vocabulary is the contract's (docs/EVIDENCE-CONTRACT.md) and
    risk-rails.js EVM_GATES.allowedPairTokenClasses reads it verbatim: native | weth |
-   stable | allowed_equity | equity_unlisted | other. PONS itself is `other`: the
-   executor's scope guard holds ETH/WETH/USDG and the three allowed equities, nothing
-   else, so a PONS-quoted pool is one the bot cannot exit through. */
+   stable | allowed_equity | equity_unlisted | synthetic_equity | other.
+
+   WHAT THE PAIR ASSET IS FOR, and why the allowlist widened (2026-09-13). The bot never
+   holds the pair asset: an entry spends native ETH and the aggregator routes
+   ETH → USDG → NVDA → MEME inside one transaction (measured on AC 0xfad4…: orvex →
+   uniswap-v4 → pons-v2-dex, three hops, one tx), and the exit is the same path back.
+   Whether the position can be LEFT is measured directly — the $75 round-trip probe and
+   the on-chain sell simulation — and neither depends on which asset the pool is quoted
+   in. Measured on the live desk: 1,241 + 769 + 532 kills carried pair_token_gate for
+   pools quoted in SPCX and PLTR (Stock Tokens on the one Robinhood beacon, not among
+   the three hand-listed) and in NVDAx3L / ANTHROPICx1L (leveraged synthetics on a
+   second beacon). PONS V2 launches pair against these BY DESIGN; refusing them refused
+   the venue. So a pair asset is allowed when it is structurally a real asset: native,
+   WETH, USDG, any Stock Token the chain's own beacon vouches for, or a synthetic on
+   the leveraged-equity beacon. An arbitrary ERC-20 (`other`) and an unreadable class
+   stay refused. The executor is unchanged: it screens the TARGET, never the route. */
+/** The beacon behind "NVDA 3x Long", "ANTHROPIC 1x Long" and the other leveraged
+ *  synthetics measured 2026-09-13 (0xf51fb54…, 0x1937cad…, owner 0x426d100c…). */
+export const SYNTHETIC_EQUITY_BEACON = "0x50e11faae3c85f1ff7e38933c707ae5e0116de5f";
 const PAIR_ASSETS = new Map([
   [lower(TOKENS.WETH), { class: "weth", symbol: "WETH", allowed: true }],
   [lower(TOKENS.NATIVE), { class: "native", symbol: "ETH", allowed: true }],
@@ -64,15 +81,23 @@ async function classifyPairTokens(quoteAddrs) {
     else unknown.push(q);
   }
   if (unknown.length) {
-    const rs = await evm.readMany(unknown.map((q) => ({ method: "eth_getStorageAt", params: [q, SLOT_BEACON, "latest"] })));
-    rs.forEach((r, i) => {
+    const rs = await evm.readMany(unknown.flatMap((q) => [
+      { method: "eth_getStorageAt", params: [q, SLOT_BEACON, "latest"] },
+      { method: "eth_call", params: [{ to: q, data: encodeCall("symbol()") }, "latest"] },
+    ]));
+    unknown.forEach((q, i) => {
+      const r = rs[2 * i], sym = rs[2 * i + 1];
       const beacon = r.ok ? addressFromWord(r.data) : undefined;
+      const symbol = sym?.ok ? (decodeString(sym.data) ?? null) : null;
       /* An unreadable slot is `null`, not a class: the rails report a null class as
          UNVERIFIED and the screen refuses it, which is the fail-closed answer. */
-      out.set(unknown[i], beacon === undefined ? { class: null, symbol: null, allowed: false, reason: `beacon slot unreadable: ${r.error}` }
-        : beacon === KNOWN_STOCK_TOKEN_BEACON ? { class: "equity_unlisted", symbol: null, allowed: false, reason: "a Stock Token not on the pair-asset allowlist" }
-        : beacon ? { class: "other", symbol: null, allowed: false, reason: `delegates to unrecognised beacon ${beacon}` }
-        : { class: "other", symbol: null, allowed: false, reason: "an arbitrary ERC-20 quote the desk does not hold" });
+      out.set(q, beacon === undefined ? { class: null, symbol, allowed: false, reason: `beacon slot unreadable: ${r.error}` }
+        : beacon === KNOWN_STOCK_TOKEN_BEACON ? { class: "equity_unlisted", symbol, allowed: true,
+            reason: "a Robinhood Stock Token (chain beacon 0xe10b…1b00) used as the medium of exchange only — the position is the memecoin, the exit is measured in ETH" }
+        : beacon === SYNTHETIC_EQUITY_BEACON ? { class: "synthetic_equity", symbol, allowed: true,
+            reason: "a leveraged equity synthetic (beacon 0x50e1…de5f) used as the medium of exchange only — the meme's ETH price moves with the leveraged underlying" }
+        : beacon ? { class: "other", symbol, allowed: false, reason: `delegates to unrecognised beacon ${beacon}` }
+        : { class: "other", symbol, allowed: false, reason: "an arbitrary ERC-20 quote the desk does not hold" });
     });
   }
   return out;
@@ -208,13 +233,14 @@ export async function gather(address, hook = "") {
   const launchBlock = launchLog?.block ?? null;
   const curve = launchLog?.curve ?? null;
 
-  const [curveState, launchTx, graduation, deployerIsContract, priorLaunches, pairClasses] = await Promise.all([
+  const [curveState, launchTx, graduation, deployerIsContract, priorLaunches, pairClasses, indexed] = await Promise.all([
     curve ? pons.curveState(curve) : Promise.resolve(null),
     launchLog ? pons.launchTxFacts(launchLog.tx, { token: a, curve, supply }) : Promise.resolve(null),
     launchLog ? pons.graduationFor(a, { fromBlock: launchLog.block, toBlock: head }) : Promise.resolve(null),
     launchLog ? evm.isContract(launchLog.creator) : Promise.resolve(null),
     launchLog ? pons.launchLogs({ fromBlock: Math.max(0, head - 3 * evm.LOG_SPAN), toBlock: head, creator: launchLog.creator, maxSpans: 3 }).catch(() => null) : Promise.resolve(null),
     classifyPairTokens([...new Set(px.pairs.map((p) => lower(p.quoteToken?.address)).filter(Boolean))]),
+    gecko.tokenInfo(a).catch((e) => ({ ok: false, error: e.message })),
   ]);
 
   const venue = launchLog ? "pons" : (pons.venueOf(best?.dex)?.venue ?? "unknown");
@@ -237,28 +263,34 @@ export async function gather(address, hook = "") {
   ].filter(Boolean);
 
   const [holders, poolShare, sellSim, buySim, transferSim, mintSim, blacklist, lp, candles, identity] = await Promise.all([
-    /* THE LEDGER FIRST, THE CHAIN'S INDEX WHEN THE LEDGER HAS NO START.
+    /* THE LEDGER FIRST, THE INDEXER WHEN THE LEDGER HAS NO START, THE EXPLORER LAST.
      *
      * A replay from the launch block is the strongest evidence and stays primary. But
      * on a 100ms chain the launch block is unreachable for anything older than the
-     * 120,000-block budget (~3.4 hours), and the fallback was to report UNVERIFIED and
-     * kill the coin. Measured 2026-09-07 on the live RH desk: 673 workups, 673 kills,
-     * zero calls, ever — `unverified_holders` fired on 24 of 24 sampled workups. The
-     * screen was not judging coins, it was reporting that it could not see any.
-     *
-     * blockscout.holdersFromExplorer reads the chain's indexed CURRENT balances, which
-     * is what the replay was trying to reconstruct. It estimates nothing — the 2026-09-05
-     * fail-open was an estimated launch block feeding a partial ledger, and no estimate
-     * appears here. When the explorer cannot answer it returns ok:false and the screen
-     * refuses exactly as before. */
-    supply && launchBlock != null
-      ? evm.holdersFromLedger(a, { fromBlock: launchBlock, toBlock: head, supply, decimals, exclude: excluded })
-          .then((r) => r.ok ? r : blockscout.holdersFromExplorer(a, { supply, decimals, exclude: excluded })
-            .then((x) => x.ok ? { ...x, ledgerError: r.error } : r).catch(() => r))
-      : supply
-        ? blockscout.holdersFromExplorer(a, { supply, decimals, exclude: excluded })
-            .catch((e) => ({ ok: false, error: `no launch block, and the explorer failed: ${e.message}` }))
-        : Promise.resolve({ ok: false, error: "supply unreadable" }),
+     * 120,000-block budget (~3.4 hours), and the fallback used to be the explorer —
+     * which, since 2026-09-13 at the latest, sits behind a Cloudflare challenge that
+     * answers HTTP 403 to every server, browser User-Agent or not. Measured that day on
+     * the live desk: 19,335 workups, 19,334 kills, `unverified_holders` on every one,
+     * zero calls ever. GeckoTerminal's token index (src/data/geckoterminal.js) is what
+     * answers now; the explorer is kept as a last try in case it ever opens again.
+     * Nothing here estimates a launch block: the 2026-09-05 fail-open was an estimated
+     * start feeding a partial ledger, and no estimate appears in any branch. */
+    (async () => {
+      if (!supply) return { ok: false, error: "supply unreadable" };
+      const tried = [];
+      if (launchBlock != null) {
+        const r = await evm.holdersFromLedger(a, { fromBlock: launchBlock, toBlock: head, supply, decimals, exclude: excluded });
+        if (r.ok) return r;
+        tried.push(`ledger: ${r.error}`);
+      } else tried.push("ledger: no launch block inside the scan budget");
+      const g = await gecko.holdersFromIndexer(a, { supply, decimals, exclude: excluded }).catch((e) => ({ ok: false, error: e.message }));
+      if (g.ok) return { ...g, ledgerError: tried[0] ?? null };
+      tried.push(`indexer: ${g.error}`);
+      const x = await blockscout.holdersFromExplorer(a, { supply, decimals, exclude: excluded }).catch((e) => ({ ok: false, error: e.message }));
+      if (x.ok) return { ...x, ledgerError: tried[0] ?? null };
+      tried.push(`explorer: ${x.error}`);
+      return { ok: false, error: `could not read holders from any source (${tried.join("; ")})` };
+    })(),
     supply ? evm.poolShare(a, supply, excluded) : Promise.resolve({ ok: false, error: "supply unreadable" }),
     rt.ok ? evm.sellSim(a, rt.tokensOut, { route: { ok: true, routeSummary: rt._sellRoute, outAmount: rt.sell.outAmount }, build: kyber.build })
       : Promise.resolve({ ok: false, unverified: true, reason: `no sell route to simulate: ${rt.error}` }),
@@ -317,17 +349,51 @@ export async function gather(address, hook = "") {
       if (near?.ok && near.graduated === true && (near.pools?.length ?? 0) > 0) {
         phase = "graduated";
         graduationEvidence = { source: "v4-initialize-log", pools: near.pools.length,
-          aimedAt: near.aimedAt, searched: near.searched };
+          aimedAt: near.aimedAt, searched: near.searched, graduatedAt: near.graduatedAt ?? null };
       }
     } catch { /* an unreachable node leaves the phase unknown, which is the safe answer */ }
   }
 
+  /* ── THE POOL ITSELF, ASKED DIRECTLY ─────────────────────────────────────────
+   * The explorer used to supply `verifiedAmmPool` (a VERIFIED contract named as an AMM
+   * pool among the largest holders). With the explorer gone the same fact is read from
+   * the chain: a Uniswap V3 pool is a contract whose token0()/token1() name this token,
+   * and a V4 pool is an Initialize log on the PoolManager (the search above). Neither
+   * is a DEX LABEL — DexScreener calls a live PONS curve "uniswap", which is exactly why
+   * the label was never accepted. */
+  let chainPoolProof = graduationEvidence?.source === "v4-initialize-log";
+  if (!chainPoolProof && best?.pairAddress && isAddress(best.pairAddress) && best.version === "v3") {
+    try {
+      const [t0, t1] = await evm.readMany([
+        { method: "eth_call", params: [{ to: best.pairAddress, data: encodeCall("token0()") }, "latest"] },
+        { method: "eth_call", params: [{ to: best.pairAddress, data: encodeCall("token1()") }, "latest"] },
+      ]);
+      const tokens = [t0, t1].filter((r) => r.ok).map((r) => decodeAddress(r.data));
+      if (tokens.includes(a)) { chainPoolProof = true; graduationEvidence ??= { source: "v3-pool-tokens", pool: best.pairAddress }; }
+    } catch { /* unreadable is not proof */ }
+  }
+
+  /* ── THE INDEXER'S READING OF THE CURVE, AS ONE MORE SOURCE ─────────────────
+   * GeckoTerminal reports launchpad_details.completed for launchpad coins. A curve it
+   * says is NOT complete is a curve — that can only ever refuse. A curve it says IS
+   * complete, with the pool it migrated to, is accepted only when nothing on chain
+   * contradicts it and the sell still simulates (below); the chain's own logs, when
+   * found, stay the authority. */
+  const lpIndexed = indexed?.ok ? indexed.launchpad : null;
+  if (phase === "unknown" && lpIndexed?.completed === false) phase = "curve";
+  else if (phase === "unknown" && !launchLog && lpIndexed?.completed === true && sellSim?.ok === true) {
+    phase = "graduated";
+    graduationEvidence = { source: "geckoterminal-launchpad", migratedPool: lpIndexed.migratedPool,
+      graduatedAt: lpIndexed.completedAt ?? null };
+  }
+
   phase = resolveAmmPhase({
     phase, hasLaunchLog: !!launchLog,
-    verifiedAmmPool: holders?.verifiedAmmPool === true,
+    verifiedAmmPool: chainPoolProof === true || holders?.verifiedAmmPool === true,
     sellSimOk: sellSim?.ok === true,
-    curveHolder: holders?.curveHolder === true,
+    curveHolder: holders?.curveHolder === true || lpIndexed?.completed === false,
   });
+  const graduatedAtResolved = graduation?.graduatedAt ?? graduationEvidence?.graduatedAt ?? null;
 
   /* Cost of the round trip in dollars, priced at the gas price read on this tick. */
   const gasUsdRoundTrip = rt.ok && gasPrice != null && ethUsd.value
@@ -343,10 +409,21 @@ export async function gather(address, hook = "") {
    * against the aggregator's implied price on the probe; volume against trades. */
   const crosscheck = { verdicts: [], killed: false };
   const xc = (verdict, check, detail) => { crosscheck.verdicts.push({ check, verdict, detail }); if (verdict === "KILLED") crosscheck.killed = true; };
-  const kyberUsd = rt.ok && rt.buy.amountOutUsd && rt.tokensOut ? rt.buy.amountOutUsd / (Number(BigInt(rt.tokensOut)) / 10 ** decimals) : null;
+  /* THE AGGREGATOR'S OWN USD MARK IS NOT A SECOND SOURCE. This used Kyber's
+     amountOutUsd — a USD figure Kyber attaches from its own price feed, which for an
+     illiquid memecoin is whatever it last saw: measured 2026-09-13 on the live desk,
+     KIRKINATORX read $0.0001028 on DexScreener against "$0.003888" from that field
+     (3,683% apart) and CAVEHORSE 1,140% apart, and both died as price_disputed on a
+     number nobody trades at; on AC the field was simply "0". What Kyber CAN say
+     independently is how many tokens one ETH buys, right now, through real pools. So
+     the implied price is ETH in × the desk's ETH/USD ÷ tokens out — the route's own
+     answer, priced in the desk's own dollars — and it includes the $75 probe's impact,
+     which on a thin PONS pool is a few percent and stays well inside the tolerance. */
+  const kyberUsd = rt.ok && rt.tokensOut && ethUsd.value > 0 && BigInt(rt.tokensOut) > 0n
+    ? (fromWei(BigInt(rt.quoteAmountWei)) * ethUsd.value) / (Number(BigInt(rt.tokensOut)) / 10 ** decimals) : null;
   if (kyberUsd && cons.priceUsd > 0) {
     const gapPct = Math.abs(kyberUsd - cons.priceUsd) / cons.priceUsd * 100;
-    if (gapPct > 25) xc("KILLED", "price_disputed", `DexScreener consensus $${cons.priceUsd} vs Kyber $${kyberUsd} disagree by ${gapPct.toFixed(0)}% — the mark is unverifiable`);
+    if (gapPct > 25) xc("KILLED", "price_disputed", `DexScreener consensus $${cons.priceUsd} vs the route-implied $${kyberUsd} disagree by ${gapPct.toFixed(0)}% — the mark is unverifiable`);
     else xc("VERIFIED", "price", `two independent sources agree within ${gapPct.toFixed(1)}%`);
   } else xc("FLAG", "price_single_source", "only one price source answered — treat the mark with suspicion");
   if ((vol24 ?? 0) > 10_000 && txns24 === 0) xc("KILLED", "volume_without_trades", `$${Math.round(vol24)} of volume with zero recorded trades is not a market`);
@@ -368,7 +445,7 @@ export async function gather(address, hook = "") {
       pairTokenClass: cls.class, pairAllowed: !!cls.allowed, pairTokenReason: cls.reason ?? null, liquidityUsd: p.liquidity?.usd ?? null,
       feeTierBps: null };
   });
-  const equityPools = pools.filter((p) => /^equity/.test(p.pairTokenClass));
+  const equityPools = pools.filter((p) => /^(equity|allowed_equity|synthetic_equity)/.test(p.pairTokenClass));
   const equityLiq = equityPools.reduce((s, p) => s + (p.liquidityUsd || 0), 0);
   const deepest = pools.find((p) => p.address === best?.pairAddress) ?? pools[0];
 
@@ -479,7 +556,7 @@ export async function gather(address, hook = "") {
       launchpad: launchLog ? "pons" : (pons.launchpadOf(best?.dex) ?? null),
       curveProgressPct: null,
       curveProgressReason: curveState ? "the curve proxy reverted on every progress view tried (see pons-live.js CURVE_VIEWS)" : (onCurve ? "no curve address known" : null),
-      graduatedAt: graduation?.graduatedAt ?? null,
+      graduatedAt: graduatedAtResolved,
       graduationPool: graduation?.pool ?? null,
       graduationScanComplete: graduation?.complete ?? null,
       block: launchLog?.block ?? null, tx: launchLog?.tx ?? null, curve, vault: launchTx?.vault ?? null,
@@ -506,7 +583,9 @@ export async function gather(address, hook = "") {
     } : { ok: false, address: null, isContract: null, kind: "unknown", txSender: null, priorLaunches: null, priorLaunchesWindowBlocks: null,
       graduated: null, dead: null, sameImplementation: null, fundedBy: null,
       note: "deployer unknown — no PONS V2 launch log inside the scan window" },
-    equityPair: { paired: /^equity/.test(deepest?.pairTokenClass ?? ""), ticker: deepest?.pairTokenClass?.startsWith("equity") ? (deepest.quoteSymbol ?? null) : null,
+    equityPair: { paired: /^(equity|allowed_equity|synthetic_equity)/.test(deepest?.pairTokenClass ?? ""),
+      ticker: /^(equity|allowed_equity|synthetic_equity)/.test(deepest?.pairTokenClass ?? "") ? (deepest.quoteSymbol ?? null) : null,
+      pairTokenClass: deepest?.pairTokenClass ?? null,
       shareOfLiquidityPct: totalLiquidityUsd > 0 ? Number((equityLiq / totalLiquidityUsd * 100).toFixed(1)) : 0 },
     identity,
     lp,
@@ -528,6 +607,10 @@ export async function gather(address, hook = "") {
       // PLANNED: receipts of the pool's last N swaps (status 0x0, no logs = ArbOS void). Unread here.
       voidedTxPct: null,
     },
+    /* The indexer's view, carried whole so the seats can see the developer's holding and
+       the launchpad status beside the chain reads. Absent (ok:false) is absent. */
+    indexed: indexed?.ok ? { source: "geckoterminal", holders: indexed.holders, developer: indexed.developer,
+      launchpad: indexed.launchpad, gtScore: indexed.gtScore, socials: indexed.socials } : { source: "geckoterminal", ok: false, error: indexed?.error ?? "no answer" },
     // Attached by enrichWithXRead() for coins that clear the screen; absent means absent.
     xRead: null,
   };
@@ -614,7 +697,22 @@ export function screen(ev) {
    * never equals "it is fine" — decline and look at the next coin. */
   const c = ev.contract;
   if (!c || c.error) check(true, "unverified_contract", `could not read the contract (${c?.error ?? "no data"}) — proxy, pause and roles are UNKNOWN, not absent`);
-  if (!ev.holders?.ok) check(true, "unverified_holders", `could not rebuild holder distribution (${ev.holders?.error ?? "no data"}) — concentration and bundling are UNKNOWN`);
+  /* HOLDERS ARE A JUDGEMENT INPUT; THE EXIT IS THE SAFETY FACT.
+   *
+   * This refused every bundle whose holders could not be read. On this chain that was
+   * every bundle (see the holder chain in gather()): the ledger cannot reach a launch
+   * block older than ~3.4 hours and the explorer is walled off, so the check was not
+   * asking "is one wallet holding the float" — it was asking "did the explorer answer",
+   * and killing 100% of the market on the answer. The charter's non-negotiable gates are
+   * the exit ones: the token has left the curve, the sell simulates, the round trip
+   * clears the ceiling. Concentration is what the forensics and flow seats WEIGH, and
+   * they are told, in the bundle, when it is unread (holders.ok false, with the reason).
+   * So an unread distribution refuses only when the exit is ALSO unproven — when the
+   * desk can say neither who holds it nor that it can be sold, that is a coin it does
+   * not know. holder_concentration below still kills on a MEASURED top1 over 50%. */
+  const exitProven = ev.sellSim?.ok === true && ev.exitProbe?.roundTripLossPct != null &&
+    ev.exitProbe.roundTripLossPct <= cfg.maxRoundTripSlippagePct;
+  if (!ev.holders?.ok) check(!exitProven, "unverified_holders", `could not rebuild holder distribution (${ev.holders?.error ?? "no data"}) — concentration and bundling are UNKNOWN, and the exit is unproven too`);
   if (ev.exitProbe?.roundTripLossPct == null) check(true, "unverified_exit", `the round-trip probe did not complete (${ev.exitProbe?.error ?? "no result"}) — whether this can be SOLD is unknown`);
   if (!ev.sellSim?.ok) {
     if (ev.sellSim?.revertReason) check(true, "sellsim_reverted", `a simulated sell of the probe's tokens REVERTED: ${ev.sellSim.revertReason}`);

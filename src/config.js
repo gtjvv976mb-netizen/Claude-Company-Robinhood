@@ -16,6 +16,13 @@ if (fs.existsSync(envFile)) {
 
 const num = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
 
+/* THE NUMBERS THE EXECUTOR TRADES ON, IMPORTED RATHER THAN COPIED. Both of these decide
+   whether the desk's authored stop is one the bot can actually honour, so a second copy
+   here is a divergence with a countdown on it. The registry carries the measurement and
+   the date; this file carries the desk's use of it. */
+const { SLIPPAGE_BPS: REGISTERED_SLIPPAGE_BPS, MIN_STOP_DISTANCE_PCT: REGISTERED_MIN_STOP_PCT } =
+  await import("../executor/live-thresholds.mjs");
+
 export const CHARTER = fs.readFileSync(path.join(ROOT, "DESK.md"), "utf8");
 
 /* THE CHAIN. Robinhood Chain, an Arbitrum Nitro L2: chainId 4663 (0x1237), ~100ms
@@ -121,7 +128,14 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),   // overridden by DESK_O
   /* The desk's own access token is never a position: it opens a floor. Read once so the
      screen (evidence.js) and the executor's scope guard refuse it by address. */
   accessToken: (process.env.CLAUDECO_RH_TOKEN || "0x7039986CaC6C7885b53f10c7492E653055470ab9").toLowerCase(),
-  executorSlippageBps: num("EXECUTOR_SLIPPAGE_BPS", 300),
+  /* THE EXECUTOR'S OWN NUMBER, READ FROM THE EXECUTOR'S OWN REGISTRY.
+   *
+   * This was a second copy of 300 sitting beside the executor's, and the desk's stop
+   * floor is computed from it: if the two ever differ the desk authors stops its own bot
+   * can prove unfillable, which is how the Solana desk refused four consecutive live
+   * calls on 2026-09-03. One definition, with provenance, imported. An env override is
+   * kept for a deliberate local experiment and can only be a number someone typed. */
+  executorSlippageBps: num("EXECUTOR_SLIPPAGE_BPS", REGISTERED_SLIPPAGE_BPS),
   executorMaxFeeShareOfStop: Number(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP || 0.25),
 
     /* THE STOP THAT COSTS ALONE WOULD TRIGGER.
@@ -137,7 +151,11 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),   // overridden by DESK_O
      * (1 - 0.97^2 = 5.91% at 300bps), adds a worst-case network fee near 2%, and pump.fun
      * itself takes about 1.25% a side on the small bands. Round to a floor of 12%, which
      * clears all three with room for the measured round trip on top. */
-    minStopDistancePct: num("DESK_MIN_STOP_DISTANCE_PCT", 12),
+    /* Re-derived on this chain and registered with its arithmetic in
+       executor/live-thresholds.mjs (screen.minStopDistancePct): at the measured cheapest
+       clip a stop closer than 12.8% is triggered by the costs alone, so the floor is 14.
+       Read, not restated — the same rule as the slippage above. */
+    minStopDistancePct: num("DESK_MIN_STOP_DISTANCE_PCT", REGISTERED_MIN_STOP_PCT),
 
   /* REWEIGHTED FOR THE MARKET THIS DESK IS ACTUALLY IN.
    *

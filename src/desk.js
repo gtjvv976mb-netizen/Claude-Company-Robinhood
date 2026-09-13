@@ -243,7 +243,12 @@ export async function workup(cycle, mint, hook = "", opts = {}) {
    * (30 against a neutral 50) so it cuts the clearly-dead rather than the marginal — the
    * desk was just told to be MORE open, and a cost saving that quietly tightens the bar
    * would be the wrong trade. DESK_CONVICTION_FLOOR tunes it; 0 disables it. */
-  const convictionFloor = Number(process.env.DESK_CONVICTION_FLOOR ?? 30);
+  /* 20, NOT 30. The Solana desk measured its own conviction over every call it ever
+     published: min 20, median 31, max 51 out of 100 (95be1a3, 2026-09-07). A floor of 30
+     sits ABOVE the median of what the same seats score on the same charter, so it cut the
+     ordinary call, not the clearly-dead one. 20 is the lowest score ever published there
+     and the point of this check is to save two Opus seats on a coin no PM would take. */
+  const convictionFloor = Number(process.env.DESK_CONVICTION_FLOOR ?? 20);
   if (convictionFloor > 0 && weighted < convictionFloor) {
     const rec = { mint, symbol: ev.symbol, outcome: "killed", killedBy: "conviction floor",
       reason: `the five analysts scored this ${weighted.toFixed(1)} of 100, under the ${convictionFloor} floor — ` +

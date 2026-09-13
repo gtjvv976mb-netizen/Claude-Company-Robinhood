@@ -111,7 +111,7 @@ ok("...and none of the gates is reported unverified",
 for (const [name, over, code] of [
   ["still on the curve", { launch: { ...graduated.launch, phase: "curve", graduatedAt: null } }, "not_graduated"],
   ["graduated 60 seconds ago", { launch: { ...graduated.launch, graduatedAt: now - 60e3 } }, "graduated_too_recently"],
-  ["quoted in an unlisted equity", { pairs: { pools: [{ pairToken: "0x4a0e", pairTokenClass: "equity_unlisted" }] } }, "pair_token_gate"],
+  ["quoted in an asset whose class could not be read", { pairs: { pools: [{ pairToken: "0x4a0e", pairTokenClass: "other" }] } }, "pair_token_gate"],
   ["quoted in an obscure ERC-20", { pairs: { pools: [{ pairToken: "0xdead", pairTokenClass: "other" }] } }, "pair_token_gate"],
   ["exempt wallets hold 55% of supply", { launch: { ...graduated.launch, exemptShareOfSupplyPct: 55 } }, "insider_float"],
   ["bespoke unverified code whose sell reverts", { contract: { cloneOf: null, verifiedSource: false, flags: [] }, sellSim: { ok: false, revertReason: "x" } }, "unverified_code"],

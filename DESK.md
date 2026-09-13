@@ -28,8 +28,12 @@ into every agent's system prompt, so these are operating constraints, not docume
 - **Symbols collide** (two USDG, two STONKS). The token is its contract address, never
   its ticker.
 - 203 Robinhood Stock Tokens trade here as ERC-1967 beacon proxies. **An equity may be a
-  pair asset (GOOGL, AMZN, NVDA only), never a position.** A meme quoted in an equity
-  moves with that equity after hours.
+  pair asset, never a position.** PONS V2 launches pair against them by design (SPCX,
+  PLTR, NVDA and leveraged synthetics such as NVDAx3L were the quote assets of the
+  desk's own candidates on 2026-09-13); the bot never holds the pair asset — the
+  aggregator routes ETH → pair → meme in one transaction and the exit is measured in
+  ETH. A meme quoted in an equity moves with that equity after hours; quoted in a
+  leveraged synthetic, several times as far.
 
 ## The thesis this desk is allowed to have
 
@@ -70,7 +74,8 @@ been found; the profit distribution is flat), and any position in a tokenized eq
    `confidence` down and says so. It never fills the hole with a plausible number.
 8. **The deterministic gates are not negotiable by any seat or any coach:** the token has
    left the curve; the pool is older than the graduation floor; the pair token is
-   native/WETH, a stable, or an allowlisted equity; the exempt share is under the insider
+   native/WETH, a stable, a Stock Token the chain's beacon vouches for, or a leveraged
+   synthetic on the known beacon (never an arbitrary ERC-20); the exempt share is under the insider
    ceiling; the code is a recognised PONS clone or the sell simulates; no live mint,
    pause, blacklist or EOA-upgrade role.
 
