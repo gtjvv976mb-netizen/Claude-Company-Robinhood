@@ -1,0 +1,61 @@
+{
+  "site": "https://robinhood.claudedotcompany.com",
+  "recordedAt": "2026-09-13T21:04:42.500Z",
+  "duration": 107.5,
+  "chapters": [
+    {
+      "id": "tower",
+      "title": "The tower",
+      "say": "This is Claude Tower on Robinhood Chain. Fifty floors, one automated research desk each. The house desk sits upstairs on floor fifty, and it publishes the coins it would trade.",
+      "at": 4
+    },
+    {
+      "id": "lease",
+      "title": "Lease a floor",
+      "say": "Pick any vacant floor. Here is what it costs, one floor per wallet. Beside it is the house bot's real record, kept with the house's own money.",
+      "at": 15.6
+    },
+    {
+      "id": "enter",
+      "title": "Watch HQ live",
+      "say": "Watch H Q live. The house floor is open to everyone, with no sign-in needed.",
+      "at": 25.3
+    },
+    {
+      "id": "overview",
+      "title": "The Overview",
+      "say": "The Overview. The bot's profit and loss out of its own journal, what it holds right now, and every closed trade drawn as a bar from the stop to the target.",
+      "at": 41.5
+    },
+    {
+      "id": "calls",
+      "title": "The calls",
+      "say": "Calls. Everything the desk published, each with an entry, a stop and a target. These are the calls your bot takes.",
+      "at": 53.3
+    },
+    {
+      "id": "wallste",
+      "title": "WALL-ST-E",
+      "say": "Wall Street E is the bot. Your own machine, your own key, your own caps. This chain charges a flat six hundred and sixty one thousand gas for a round trip, whatever the size, so the position is what decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default.",
+      "at": 61.6
+    },
+    {
+      "id": "team",
+      "title": "Your track",
+      "say": "Team. The sixteen analysts and the boss who work this floor. On a floor you lease, this tab is also where you choose who runs your bot: yourself, with one command, and the key made on your own machine.",
+      "at": 82.1
+    },
+    {
+      "id": "board",
+      "title": "The board",
+      "say": "And on the wall, the board keeps the live book, redrawn every ten seconds.",
+      "at": 94.9
+    },
+    {
+      "id": "end",
+      "title": "Plug in",
+      "say": "Lease a floor. Plug in. Let it work.",
+      "at": 102.5
+    }
+  ]
+}
