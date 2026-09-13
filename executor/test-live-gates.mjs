@@ -29,8 +29,12 @@ const base = {
   RH_RPC_SECONDARY: "https://independent-rpc.invalid",
   LIVE_TRADING_ACK: wallet, INIT_ONLY: "1",
 };
-const run = (extra = {}) => spawnSync(process.execPath, [poller], {
-  env: { ...base, ...extra }, encoding: "utf8", timeout: 20_000,
+/* `timeout` is a parameter because one case deliberately runs a boot that no longer
+   refuses: past the registry gate it waits on two unreachable test endpoints, backing
+   off, exactly as it should. It is killed after a few seconds and what it printed by
+   then is the assertion. */
+const run = (extra = {}, timeout = 20_000) => spawnSync(process.execPath, [poller], {
+  env: { ...base, ...extra }, encoding: "utf8", timeout,
 });
 let pass = 0;
 const ok = (name, fn) => { fn(); pass++; console.log(`  ok   ${name}`); };
@@ -89,12 +93,12 @@ ok("the public RPC is rejected in the primary lane too", () => {
 
 ok("live deployment and transaction ceilings cannot be raised by environment", () => {
   for (const [name, value] of [
-    ["MAX_ETH_PER_TRADE", "0.0004001"],
-    ["DAILY_ETH_CAP", "0.0008001"],
-    ["DAILY_LOSS_LIMIT_ETH", "0.0008001"],
+    ["MAX_ETH_PER_TRADE", "0.0112001"],
+    ["DAILY_ETH_CAP", "0.1120001"],
+    ["DAILY_LOSS_LIMIT_ETH", "0.0336001"],
     ["MAX_OPEN_POSITIONS", "5"],
     ["MAX_EXIT_PRICE_IMPACT_PCT", "50.01"],
-    ["MAX_ENTRY_ROUND_TRIP_LOSS_PCT", "12.01"],
+    ["MAX_ENTRY_ROUND_TRIP_LOSS_PCT", "16.01"],
     ["MAX_TX_ATTEMPTS", "4"],
     ["MAX_EXIT_TX_ATTEMPTS", "13"],
     ["DEADLINE_BLOCKS", "301"],
@@ -185,13 +189,18 @@ ok("wallet-bound INIT_ONLY creates state without touching an RPC", () => {
   assert.match(result.stdout, /chain 4663/);
 });
 
-ok("a full live boot meets the thresholds registry next — before any provider, and it refuses while anything is VOID", () => {
-  const result = run({ INIT_ONLY: "" });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /not measured on this chain/);
-  assert.match(result.stderr, /exec\.slippageBps/);
-  assert.match(result.stderr, /exec\.inclusionLatencyMs/);
-  assert.doesNotMatch(result.stdout, /RPC unreachable/);
+/* THE REGISTRY GATE STILL RUNS BEFORE ANY PROVIDER — and now that every live-path
+ * number is measured it PASSES, so the next thing a live boot meets is the chain check
+ * against two unreachable test endpoints. Both halves matter: that the gate is consulted
+ * before the network (an unarmed bot never even asks the chain), and that it no longer
+ * refuses. The registry's own refusal path is proved in test-thresholds.mjs by
+ * registering a void live threshold, which is where that assertion belongs — here it
+ * would only re-pin today's registry contents. */
+ok("a full live boot passes the registry gate and reaches the chain check, without a provider being asked first", () => {
+  const result = run({ INIT_ONLY: "", RECEIPT_TIMEOUT_MS: "1000" }, 8_000);
+  assert.doesNotMatch(String(result.stderr), /not measured on this chain/);
+  assert.match(`${result.stdout}${result.stderr}`, /RPC unreachable for the chain check|up — floor/,
+    "the registry let it through, so the boot proceeds to prove the chain");
 });
 
 ok("journal cannot silently rebind to a replacement wallet", () => {

@@ -39,8 +39,17 @@ const executor = fs.readFileSync(new URL("./evm-executor.mjs", import.meta.url),
 
 console.log("\nTHE TWO NUMBERS ARE DIFFERENT KINDS OF THING");
 {
-  ok("the refusal gate is a registry threshold, live, VOID until measured on this chain",
-    threshold("exec.maxNetworkFeeWei").live === true && threshold("exec.maxNetworkFeeWei").value === null);
+  /* MEASURED NOW, AND STILL A GATE. It was VOID until 2026-09-13, when eth_gasPrice was
+     sampled 118× over 240s (median 0.0844 gwei, p99 0.0884). The property this file
+     guards is not that it is void — it is that this number is a CEILING and never a cost
+     model, so the assertion is about its kind, not its value. */
+  ok("the refusal gate is a registry threshold on the live path, measured on THIS chain",
+    threshold("exec.maxNetworkFeeWei").live === true &&
+    threshold("exec.maxNetworkFeeWei").provenance === "measured" &&
+    /2026-09-13/.test(threshold("exec.maxNetworkFeeWei").at ?? ""));
+  ok("...and it is a gas-price DISTRIBUTION, not one spot reading",
+    /median|p99/i.test(threshold("exec.maxNetworkFeeWei").method ?? ""),
+    threshold("exec.maxNetworkFeeWei").method?.slice(0, 60));
   ok("the poller reads the gate from the registry, never from env",
     /maxNetworkFeeWei: registryValue\("exec\.maxNetworkFeeWei"/.test(poller) && !/process\.env\.MAX_NETWORK_FEE/.test(poller));
   ok("the cost model is computed per tick from the measured round-trip gas and the LIVE gas price",
@@ -119,9 +128,16 @@ console.log("\nTHE SIZING ENGINE STILL BUYS AT ETH SCALE  (the assertion that ca
     }
   }
   const floored = planEntry({ call: call(0.8, 30), cfg: { ...cfg(0.0004), minSolPerTrade: undefined }, state });
+  /* The INVARIANT is the fallback floor, not the sentence. A caller that passes no
+     minimum keeps the old SOL-scale 0.0005, and a 0.0004-cap clip cannot clear it —
+     so the refusal must name that floor and the size that missed it, whatever wording
+     the message happens to use. */
   ok("without the poller's explicit minimum the old 0.0005 floor still applies (the desk's paper sizing is unchanged)",
-    floored.action === "skip" && /rounds to nothing/.test(floored.reason), floored.reason);
-  ok("the poller passes that minimum explicitly", /minSolPerTrade: 0\.0001/.test(poller));
+    floored.action === "skip" && /0\.0005/.test(floored.reason) && /0\.000140/.test(floored.reason),
+    floored.reason);
+  /* The poller's explicit minimum is now the REGISTRY's measured minimum clip rather
+     than a literal, so the smallest permitted trade and the cost curve move together. */
+  ok("the poller passes that minimum explicitly, from the registry", /minSolPerTrade: MIN_CLIP_ETH,/.test(poller));
 }
 
 console.log("\nRAISING THE GATE CHANGES NO SIZE AT ALL");

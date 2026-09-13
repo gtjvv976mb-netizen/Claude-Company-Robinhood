@@ -116,6 +116,34 @@ const DEFAULT_CONFIG = Object.freeze({
 });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const SEND_STATS_MAX = 200;
+/** Pure: the rolling send record → the three numbers the registry names as canary. */
+export function summariseSendStats(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  const sends = list.filter((s) => s && s.kind !== "cancel" && ["confirmed", "reverted", "dropped"].includes(s.outcome));
+  /* NULL IS NOT ZERO. A dropped send has no latency, and Number(null) is 0 — which is
+     finite, so an unfiltered map counted every drop as the FASTEST send on record and
+     dragged the median toward zero exactly when the sequencer was behaving worst. The
+     absent case is named before the conversion, as it must be everywhere here. */
+  const latencies = sends
+    .filter((s) => s.latencyMs != null && s.latencyMs !== "")
+    .map((s) => Number(s.latencyMs))
+    .filter((v) => Number.isFinite(v) && v >= 0)
+    .sort((a, b) => a - b);
+  const q = (p) => latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor((latencies.length - 1) * p))] : null;
+  const dropped = sends.filter((s) => s.outcome === "dropped").length;
+  const cancelsLanded = list.filter((s) => s && s.outcome === "cancel-landed").length;
+  return {
+    sends: sends.length, dropped, confirmed: sends.filter((s) => s.outcome === "confirmed").length,
+    reverted: sends.filter((s) => s.outcome === "reverted").length,
+    dropRatePct: sends.length ? Number((dropped / sends.length * 100).toFixed(2)) : null,
+    inclusionLatencyMs: { median: q(0.5), p90: q(0.9), max: latencies.at(-1) ?? null, samples: latencies.length },
+    /* A landed cancel is a same-nonce replacement the sequencer honoured. */
+    nonceReplacementHonoured: cancelsLanded > 0 ? true : dropped > 0 ? false : null,
+    cancelsLanded,
+    lastAt: list.length ? Number(list.at(-1).at) || null : null,
+  };
+}
 const isWei = (v) => /^\d+$/.test(String(v ?? ""));
 const positiveWei = (value, label) => {
   if (!isWei(value) || BigInt(value) <= 0n) throw new Error(`${label} must be a positive integer`);
@@ -616,6 +644,8 @@ export class EvmExecutor {
     const rawTx = await this.wallet.signTransaction(tx);
     const txHash = Transaction.from(rawTx).hash;
     const attemptNo = this.journal.attempts(intent.id).length + 1;
+    this._recordSend({ kind: intent.kind, nonce: attempt.nonce, outcome: "dropped", latencyMs: null,
+      txHash: attempt.txHash, deadlineBlock: attempt.deadlineBlock, provenAtBlock: attempt.provenAtBlock });
     const cancel = this.journal.recordCancel(intent.id, attempt.attempt, {
       attempt: attemptNo, nonce: attempt.nonce, chainId: CHAIN_ID, txHash, rawTx,
       provenAtBlock: head.low, deadlineBlock: head.low + this.cfg.deadlineBlocks,
@@ -627,12 +657,36 @@ export class EvmExecutor {
     await this._send(intent, cancel);
   }
 
+  /* THE MACHINE MEASURES ITSELF. exec.inclusionLatencyMs, exec.dropRatePct and
+     exec.nonceReplacementHonoured can only be produced by real sends, so every send this
+     executor makes records its outcome in journal meta `send_stats`: sent → receipt
+     latency, or a drop (the cancel path ran), and whether a same-nonce cancel was
+     honoured. Bounded, oldest first out; carried on the heartbeat; and the poller reads
+     the rolling drop rate to pause entries when the sequencer is dropping too much. */
+  _recordSend(sample) {
+    try {
+      const raw = this.journal.getMeta("send_stats");
+      const list = Array.isArray(raw) ? raw : [];
+      list.push({ at: this.now(), ...sample });
+      this.journal.setMeta("send_stats", list.slice(-SEND_STATS_MAX));
+    } catch (error) { this.log(`send_stats not recorded: ${error.message}`); }
+  }
+  sendStats() { return summariseSendStats(this.journal.getMeta("send_stats")); }
+
   async _settleReceipt(intent, row, receipt) {
     const gasUsed = fromHex(receipt.gasUsed, "gasUsed");
     const price = fromHex(receipt.effectiveGasPrice ?? receipt.gasPrice ?? "0x0", "effectiveGasPrice");
     const fee = gasUsed * price;
     const blockNumber = fromHexNumber(receipt.blockNumber, "blockNumber");
     const finalizedAtMs = this.now();
+    {
+      const attempt = this.journal.attempts(intent.id).find((a) => a.attempt === row.attempt);
+      const sentAt = Number(attempt?.execute?.sentAt);
+      this._recordSend({ kind: row.role === "cancel" ? "cancel" : intent.kind, nonce: attempt?.nonce ?? null,
+        outcome: row.role === "cancel" ? "cancel-landed" : receipt.status === "0x1" ? "confirmed" : "reverted",
+        latencyMs: Number.isFinite(sentAt) && sentAt > 0 ? Math.max(0, finalizedAtMs - sentAt) : null,
+        blockNumber, txHash: row.txHash });
+    }
     if (row.role === "cancel") {
       const original = row.cancelOf ?? this.journal.attempts(intent.id).find((a) => a.nonce != null && a.order?.role !== "cancel")?.attempt;
       this.journal.markCancelled(intent.id, original, row.attempt, {

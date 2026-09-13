@@ -9768,13 +9768,13 @@ function buildControls(settings) {
 
     box.appendChild(mk("div", "dp-h", "Optional · supervised live canary"));
     box.appendChild(mk("div", "dp-note",
-      "Only after reviewing the dry run: put two private HTTPS Solana RPC URLs from independent providers and the Jupiter API key in separate mode-0600 files. " +
+      "Only after reviewing the dry run: put two private HTTPS Robinhood Chain (4663) RPC URLs from independent providers in separate mode-0600 files. There is no aggregator key — KyberSwap's public endpoints need none. " +
       "The installer shows the new burner address and arms only when you retype that public key in the terminal. " +
-      "The default canary is 0.0004 ETH per trade, 0.0008 ETH rolling deployment, and a 0.0008 ETH rolling realized-loss entry brake. " +
-      "A larger profile is local-only, requires all three values plus a fresh v2 wallet-and-values acknowledgement, and cannot exceed 0.004 / 0.04 / 0.012 ETH."));
+      "The default is 0.0112 ETH per trade, 0.112 ETH rolling deployment, and a 0.0336 ETH rolling realized-loss entry brake — 0.0112 ETH is the clip this chain's measured cost curve is cheapest at (7.35% all in); a smaller one is mostly gas, because gas here is a flat toll rather than a share. " +
+      "A larger profile is local-only, requires all three values plus a fresh v3 wallet-and-values acknowledgement, and cannot exceed 0.1 / 1 / 0.3 ETH."));
     // Same single pinned line as the dry-run install, with the canary flags.
     const liveCmd = hasPinnedExecutorRelease
-      ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company-Robinhood.git && cd Claude-Company-Robinhood && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N} --live --expected-commit ${releaseCommit} --max-eth 0.0004 --daily-cap 0.0008 --daily-loss-cap 0.0008 --rpc-file /absolute/path/to/primary-rpc --secondary-rpc-file /absolute/path/to/secondary-rpc`
+      ? `git clone https://github.com/gtjvv976mb-netizen/Claude-Company-Robinhood.git && cd Claude-Company-Robinhood && git checkout --detach ${releaseCommit} && bash executor/install.sh --floor ${FLOOR_N} --live --expected-commit ${releaseCommit} --max-eth 0.0112 --daily-cap 0.112 --daily-loss-cap 0.0336 --rpc-file /absolute/path/to/primary-rpc --secondary-rpc-file /absolute/path/to/secondary-rpc`
       : "Live-canary installation is unavailable in this local preview. Build a release with an exact EXECUTOR_COMMIT.";
     const liveBox = mk("div", "bud-addr");
     liveBox.style.cssText = "white-space:pre-wrap;word-break:break-all;font-size:10px;line-height:1.5";
@@ -10465,7 +10465,7 @@ const dashMoney = (value) => value == null || !Number.isFinite(Number(value))
 const dashEth = (value) => {
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
-  // nine decimals: a 0.0004 ETH canary and a 0.000001 ETH floor both survive
+  // nine decimals: a 0.0112 ETH default clip and a 0.000001 ETH floor both survive
   const rendered = number.toFixed(9).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
   return (rendered === "-0" ? "0" : rendered) + " ETH";
 };
@@ -11241,14 +11241,14 @@ async function loadWallsteDashboard({ background = false } = {}) {
          Solana spelling made this command fail before it did anything. The numbers
          are install.sh's own LIVE_CANARY_* for this chain. And there is no Jupiter
          here — this chain routes through KyberSwap, which takes no API key at all. */
-      " --max-eth 0.0004 --daily-cap 0.0008 --daily-loss-cap 0.0008" +
+      " --max-eth 0.0112 --daily-cap 0.112 --daily-loss-cap 0.0336" +
       " --rpc-file /absolute/path/to/primary-rpc" +
       " --secondary-rpc-file /absolute/path/to/secondary-rpc";
     const raisedProfileCommand = "bash executor/install.sh --floor " + FLOOR_N +
       " --live --expected-commit " + executorReleaseCommit +
       /* install.sh's LIVE_OPERATOR_MAX_* — and the note under this command already
          quoted these ETH figures while the command itself still said 0.05 SOL. */
-      " --max-eth 0.004 --daily-cap 0.04 --daily-loss-cap 0.012" +
+      " --max-eth 0.1 --daily-cap 1 --daily-loss-cap 0.3" +
       " --rpc-file /absolute/path/to/primary-rpc" +
       " --secondary-rpc-file /absolute/path/to/secondary-rpc";
     const setupCard = dashNode("section", "dashsection");
@@ -11310,7 +11310,7 @@ async function loadWallsteDashboard({ background = false } = {}) {
     copyLive.onclick = () => copyVisibleCommand(copyLive, liveCanaryCommand);
     liveStep.appendChild(copyLive);
     liveStep.appendChild(dashNode("p", "dp-note",
-      "Optional reviewed raised profile: 0.004 ETH/trade, 0.04 ETH rolling deploy, 0.012 ETH rolling realized-loss entry brake. It has materially more real-money risk. The installer accepts it only after you type the exact v2 wallet-and-values sentence locally."));
+      "Optional reviewed raised profile: 0.1 ETH/trade, 1 ETH rolling deploy, 0.3 ETH rolling realized-loss entry brake. It has materially more real-money risk. The installer accepts it only after you type the exact v3 wallet-and-values sentence locally."));
     liveStep.appendChild(dashNode("pre", "commandbox", raisedProfileCommand));
     const copyRaised = dashNode("button", "dp-btn ghost commandcopy", "Copy raised-profile command");
     copyRaised.type = "button";

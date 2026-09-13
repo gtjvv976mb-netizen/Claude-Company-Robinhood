@@ -30,9 +30,9 @@ Commands:
 Options:
   --executor-dir DIR   Directory containing poller.mjs and launchd-runner.mjs.
   --env-file FILE      Existing owner-only .cc-executor.env (default: executor dir).
-  --max-eth ETH        arm-caps: maximum ETH per trade (up to 0.004).
-  --daily-eth-cap ETH  arm-caps: rolling 24-hour deployment cap (up to 0.04).
-  --daily-loss-cap ETH arm-caps: rolling realized-loss entry brake (up to 0.012).
+  --max-eth ETH        arm-caps: maximum ETH per trade (up to 0.1).
+  --daily-eth-cap ETH  arm-caps: rolling 24-hour deployment cap (up to 1).
+  --daily-loss-cap ETH arm-caps: rolling realized-loss entry brake (up to 0.3).
 
 This lifecycle never funds a wallet, changes trading mode, removes pause or hard-stop
 sentinels, or terminates a manually-started poller. arm-caps is the sole cap-changing

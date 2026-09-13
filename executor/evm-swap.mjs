@@ -266,8 +266,23 @@ export async function prepareSwap(rpc, {
    * live pool state. So the floor is measured against that, not against the quote. The
    * distance between what we would accept and what the trade is actually worth is capped
    * at the tolerance we chose, whatever the quote claimed. */
+  /* TWO TRUNCATIONS, AND THEY REFUSED A CORRECTLY PRICED TRADE BY TWO WEI.
+   *
+   * Both sides of this comparison are integer divisions that truncate toward zero: the
+   * embedded floor came from floorFrom(quote, bps) = q·(BPS−s)/BPS, and `allowed` is
+   * sim·s/BPS. When the chain returns almost exactly the quote — which is the NORMAL,
+   * healthy case, measured at 0-3 bps of difference across five live pools on
+   * 2026-09-13 — the gap lands within a couple of wei of the allowance and the sign of
+   * the difference is decided by rounding rather than by anything real. Observed live on
+   * scpinu at 0.0112 ETH: extractable exceeded allowed by 2 wei on a 1.16e23 output, and
+   * the trade was refused with a message about value being extractable.
+   *
+   * The slack is exactly the two truncations, named rather than tuned: one wei each.
+   * Anything a watcher could actually take is orders of magnitude above it — the guard
+   * is measuring percent-scale gaps and is unchanged in every case that matters. */
+  const ROUNDING_SLACK_WEI = 2n;
   const extractable = sim.amountOut - embedded;
-  const allowed = sim.amountOut * BigInt(slippageBps) / BPS;
+  const allowed = sim.amountOut * BigInt(slippageBps) / BPS + ROUNDING_SLACK_WEI;
   if (extractable > allowed)
     throw new Error(`the floor in the calldata is ${embedded} but the chain says these bytes yield ` +
       `${sim.amountOut} — a gap of ${extractable}, which is ${Number(extractable * BPS / sim.amountOut)}bps ` +

@@ -29,7 +29,7 @@ import {
 } from "./journal.mjs";
 import { EvmExecutor, EXECUTION_READINESS_ROUTE, walletFromKeyFile } from "./evm-executor.mjs";
 import { createRpc, erc20Balance, gasPriceConsensus, isAddress, fromHex, plainEthUnits } from "./evm-rpc.mjs";
-import { expectedRoundTripPct } from "./live-thresholds.mjs";
+import { expectedRoundTripPct, CHEAPEST_CLIP_ETH, MIN_CLIP_ETH } from "./live-thresholds.mjs";
 import { assertLiveReady, threshold } from "./thresholds.mjs";
 import {
   RpcBalanceUnavailableError, verifyTrackedBalanceWithFailover,
@@ -49,7 +49,7 @@ import {
 import {
   independentEthUsdPrice, ETH_USD_CACHE_SOURCE, ETH_USD_ORACLE_POLICY, usableEthUsdCache,
 } from "./eth-usd-oracle.mjs";
-import { DEFAULTS, planEntry, openPosition, stepPosition, freshState } from "./strategy.mjs";
+import { DEFAULTS, ENTRY_MODES, planEntry, openPosition, stepPosition, freshState } from "./strategy.mjs";
 import { policyConfigForPosition, resolveTakeProfitRule, validateEntryReference } from "./trade-policy.mjs";
 
 process.umask(0o077);
@@ -100,24 +100,45 @@ const EXPLORER = "https://robinhoodchain.blockscout.com/tx/";
 // newest floor verdict already logged; verdicts older than this are not repeated
 let lastDecisionSeen = Date.now() - 6 * 3600e3;
 
-/* THE LIVE CEILINGS, IN ETH.
+/* THE LIVE CEILINGS, IN ETH — SET WHERE THE MEASURED COST CURVE SAYS A TRADE CAN PAY
+ * FOR ITSELF.
  *
- * These are the ETH translation of the owner's SOL numbers at $2,450/ETH and ~$196/SOL
- * (0.005 SOL → 0.0004 ETH, and so on) — the same translation that produced the house
- * seed of 0.05 / 0.016 ETH in the feed contract — and they are MARKED AS AWAITING OWNER
- * CONFIRMATION: nobody has decided what a canary is worth on this chain, only what the
- * old one was worth in dollars. Two things are known to be different here and both
- * argue the canary is too small, not too large: gas is FLAT (a $0.54 round trip is 54%
- * of a 0.0004 ETH clip and 0.4% of a 0.05 ETH one, live-thresholds.mjs), and the
- * deep-pool round trip is two orders of magnitude cheaper than Solana's. Raising them
- * is the caps ceremony below, exactly as before. */
+ * These were 0.0004 / 0.0008 / 0.0008: the owner's SOL canary translated into ETH at
+ * $2,450 and marked, in this comment, as awaiting owner confirmation. On this chain that
+ * canary CANNOT TRADE AT ANY HIT RATE, and that is arithmetic rather than an opinion.
+ * Gas here is FLAT — 660,996 units a round trip (live-thresholds.mjs) — so two legs are
+ * 55% of a 0.0004 ETH position, the executable-cost guard in onEntry refuses every stop
+ * width the desk publishes, and test-fee-gate-split.mjs measured exactly that: 4 of 4
+ * widths refused at the canary, 3 of 4 cleared at ten times the size. A default that
+ * cannot clear its own entry guard is not caution; it is a bot that can never buy. The
+ * Solana desk learned the same lesson at 0.005 SOL, wrote it down as "a default so
+ * conservative that it cannot clear its own entry guard is not caution", and moved.
+ *
+ * The default clip is therefore the clip the measured cost curve is CHEAPEST at
+ * (size.cheapestClipEth = 0.0112 ETH, about $28 — 7.35% all-in against 9.16% at 0.004
+ * and 55% at 0.0004); the rolling day is ten of them and the realized-loss brake three.
+ * Nothing here is a view about the market: it is the argmin of a curve measured on this
+ * chain, and test-rh-sizing.mjs proves the minimum sits where it is claimed to.
+ *
+ * Raising past these is still the caps ceremony below — all three set explicitly plus a
+ * typed sentence naming this wallet and these numbers — and env may only ever lower. */
 const LIVE_LIMITS = Object.freeze({
-  maxEthPerTrade: 0.0004,
-  dailyEthCap: 0.0008,
-  dailyLossLimitEth: 0.0008,
+  maxEthPerTrade: CHEAPEST_CLIP_ETH,
+  dailyEthCap: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
+  dailyLossLimitEth: Number((CHEAPEST_CLIP_ETH * 3).toFixed(6)),
   maxOpenPositions: 4,
   maxExitPriceImpactPct: 50,
-  maxEntryRoundTripLossPct: 12,
+  /* THE ENTRY ROUND-TRIP CEILING, DERIVED FROM THE DESK'S OWN rather than inherited
+     from Solana's 12. The guard measures a conservative loss of
+     1 − (executable return × (1 − slippage)² − 2 gas legs / clip). The desk publishes
+     nothing whose $75 probe exceeds 8% (src/config.js maxRoundTripSlippagePct); at
+     150 bps a leg (2.98%), 0.00022 ETH of gas on a 0.0112 clip (2.0%) and the 0.9%
+     quote-noise floor, a coin sitting exactly at the desk's ceiling reads 13.9% here.
+     The old 12 refused every call the desk was permitted to publish — the two halves of
+     one system disagreeing about one fact, which is the failure this fork keeps finding.
+     16 admits the desk's ceiling with two points of headroom and refuses anything
+     thinner; the route ladder in onEntry tries smaller clips before giving up. */
+  maxEntryRoundTripLossPct: 16,
   maxEntryQuoteDriftPct: 5,
   maxEntryPreflightAgeMs: 60_000,
   maxExitTriggerAgeMs: 60_000,
@@ -130,12 +151,23 @@ const LIVE_LIMITS = Object.freeze({
   maxAttempts: 3,
   maxExitAttempts: 12,
   /* Blocks after the proving block by which a submitted transaction must have a
-     receipt, or it is treated as dropped and cancelled. ~30s at 100ms blocks. A guess
-     until exec.inclusionLatencyMs is measured (live-thresholds.mjs); bounded so an
+     receipt, or it is treated as dropped and cancelled. ~30s at 100ms blocks. The
+     executor now records every send's REAL latency (evm-executor.mjs send_stats), so
+     this is tunable from evidence rather than from a guess; bounded either way so an
      operator cannot stretch it into "wait forever". */
   deadlineBlocks: 300,
   receiptTimeoutMs: 30_000,
 });
+/* WHEN THE SEQUENCER IS DROPPING SENDS, STOP OPENING POSITIONS.
+ *
+ * exec.dropRatePct cannot be measured without sending, so the executor measures it from
+ * its own sends. Once at least this many are on the record and more than this share were
+ * dropped, new ENTRIES pause; exits, cancels and reconciliation continue, because the
+ * danger of a dropping sequencer is a position that cannot be closed, and refusing to
+ * close is the one thing that makes it worse. It clears itself: the rate is rolling, so
+ * the next few good sends lift the pause with no operator action and no latch to forget. */
+const SEND_DROP_PAUSE_PCT = 34;
+const SEND_DROP_MIN_SAMPLES = 6;
 const log = (...args) => console.log(new Date().toISOString(), "WALL-ST-E", ...args);
 const fatal = (message) => { console.error(new Date().toISOString(), "WALL-ST-E REFUSES:", message); process.exit(1); };
 
@@ -264,7 +296,14 @@ if (EXECUTE) {
  * address) revokes every SOL-era acknowledgement: a retained Solana environment
  * cannot regain authority over an ETH wallet. maxOpenPositions stays frozen because
  * it multiplies every other cap. */
-const OPERATOR_MAX = Object.freeze({ maxEthPerTrade: 0.004, dailyEthCap: 0.04, dailyLossLimitEth: 0.012 });
+/* THE HARD MAXIMA — a code change to move, by design, and the same shape as the Solana
+   desk's own (1 SOL / 1000 SOL / 0.4 SOL). 0.1 ETH a trade is about $250 at the ETH/USD
+   read on 2026-09-13, which is where the measured PONS impact table puts a 67th-
+   percentile pool at roughly 9% a round trip — past that the desk is paying for its own
+   size. 1 ETH is ten of those in a rolling day; 0.3 ETH is the realized-loss brake. Five
+   copies of these numbers exist (launchd-runner.mjs, install.sh, macos-launchagent.sh,
+   src/executor-dashboard.js and here) and the tests hold them equal. */
+const OPERATOR_MAX = Object.freeze({ maxEthPerTrade: 0.1, dailyEthCap: 1, dailyLossLimitEth: 0.3 });
 const capsAckSentence = (wallet, trade, daily, loss) =>
   `I acknowledge WALL-ST-E caps v3 for ${wallet}: ${trade} ETH per trade, ${daily} ETH per day, ${loss} ETH rolling realized-loss entry brake`;
 
@@ -307,9 +346,32 @@ if (EXECUTE) {
   }
 }
 
-/* Paper defaults are the Solana strategy engine's numbers scaled to ETH; they size
-   PAPER decisions only and never reach a signature. */
-const PAPER_DEFAULTS = Object.freeze({ maxEthPerTrade: 0.004, dailyEthCap: 0.04, dailyLossLimitEth: 0.012, fixedEth: 0.0016 });
+/* ── HOW THE BOT DECIDES TO BUY: risk (default) or take-every-call ────────────
+ * Ported from the Solana desk, which arrived at it after measuring that its own edge
+ * rails were refusing calls the desk had already approved. In take-every-call every
+ * published call is bought at the configured size and the EDGE rails — R_net, the
+ * per-name risk cap, book heat — become advisory, logged as WARN and never a refusal.
+ * The MONEY rails do not move in either mode: a call with no stop, the rolling
+ * realized-loss brake, the open-position cap, the rolling deploy cap, the spendable
+ * balance and the minimum viable clip still refuse, and every round-trip, impact,
+ * custody and fee rule on the transaction itself is untouched (strategy.mjs states the
+ * split). Armed like a cap raise, because it is one: the mode, the size, and a typed
+ * sentence naming THIS wallet and THAT size. */
+export const takeEveryCallSentence = (wallet, fixedEth) =>
+  `I take every published call on ${wallet} at ${fixedEth} ETH`;
+const ENTRY_MODE = (() => {
+  const raw = process.env.ENTRY_MODE || "risk";
+  if (!ENTRY_MODES.includes(raw)) fatal(`ENTRY_MODE must be one of ${ENTRY_MODES.join(", ")}`);
+  return raw;
+})();
+
+/* Paper defaults ARE the live defaults. They were the old operator ceiling, so a paper
+   run rehearsed a size the live bot would never take — and a rehearsal of another size
+   is a rehearsal of another trade, on a chain where the size is what decides whether
+   the round trip is affordable at all. They size PAPER decisions only and never reach
+   a signature. */
+const PAPER_DEFAULTS = Object.freeze({ maxEthPerTrade: LIVE_LIMITS.maxEthPerTrade,
+  dailyEthCap: LIVE_LIMITS.dailyEthCap, dailyLossLimitEth: LIVE_LIMITS.dailyLossLimitEth });
 const configuredTradeCap = ethCap("MAX_ETH_PER_TRADE",
   process.env.MAX_ETH_PER_TRADE ?? (EXECUTE ? LIVE_CEILINGS.maxEthPerTrade : PAPER_DEFAULTS.maxEthPerTrade),
   { min: 0.000001, max: EXECUTE ? LIVE_CEILINGS.maxEthPerTrade : 100 });
@@ -344,7 +406,12 @@ const CFG = {
    * It raises nothing on its own — configuredTradeCap is already bounded by
    * LIVE_CEILINGS and cannot exceed what the operator acknowledged. */
   fixedSol: configuredTradeCap.value,
-  minSolPerTrade: 0.0001,
+  /* THE SMALLEST CLIP WORTH OPENING, MEASURED (size.minClipEth). This was 0.0001 ETH —
+     a number at which two gas legs are more than the position. The floor is now the clip
+     at which gas is about 5% of the trade at the 2026-09-04 gas price, and the route
+     ladder in onEntry stops halving here rather than shrinking a trade into its own gas. */
+  minSolPerTrade: MIN_CLIP_ETH,
+  entryMode: ENTRY_MODE,
   maxOpenPositions: openPositions(process.env.MAX_OPEN_POSITIONS ?? DEFAULTS.maxOpenPositions),
   trailPct: number("TRAIL_PCT", process.env.TRAIL_PCT || DEFAULTS.trailPct, { min: 0.01, max: 0.95 }),
   fDefault: number("F_DEFAULT", process.env.F_DEFAULT || DEFAULTS.fDefault, { min: 0.00001, max: 1 }),
@@ -376,6 +443,15 @@ const CFG = {
 };
 log(`sizing: ${CFG.fixedSol} ETH per entry (the configured cap), expected round trip ` +
   `${(CFG.costPct * 100).toFixed(2)}% — measured on PONS, not inherited`);
+if (ENTRY_MODE === "take-every-call") {
+  const expected = takeEveryCallSentence(WALLET, configuredTradeCap.raw);
+  if (EXECUTE && (process.env.ENTRY_MODE_ACK || "") !== expected)
+    fatal("ENTRY_MODE=take-every-call needs a typed acknowledgement. Set ENTRY_MODE_ACK to exactly:\n\n    " + expected + "\n");
+  log(`ENTRY MODE: take-every-call — every published call is bought at ${configuredTradeCap.raw} ETH. ` +
+    "R_net, the per-name risk cap and book heat are ADVISORY and logged as WARN; the missing stop, the " +
+    "realized-loss brake, the open-position cap, the deploy cap, the spendable balance, the minimum clip " +
+    "and every round-trip, impact and custody rule on the transaction still refuse.");
+}
 if (EXECUTE && configuredDailyCap.units < configuredTradeCap.units)
   fatal(`DAILY_ETH_CAP (${CFG.dailySolCap}) is below MAX_ETH_PER_TRADE (${CFG.maxSolPerTrade}) — the day would refuse the first trade`);
 
@@ -1087,6 +1163,16 @@ async function onEntry(ev) {
     return log(`SKIP ${ev.symbol}: authenticated feed latest_id rolled behind durable cursor — entries frozen`);
   if (pauseEntries()) return log(`SKIP ${ev.symbol}: PAUSE ENTRIES file is present`);
   if (hardStop()) return log(`SKIP ${ev.symbol}: HARD STOP file is present`);
+  /* A SEQUENCER THAT IS DROPPING SENDS MUST NOT BE HANDED NEW EXPOSURE. Measured from
+     this executor's own sends, so it is a fact about this wallet on this chain rather
+     than a documented generality. Entries only: the exits below still run. */
+  if (executor) {
+    const stats = executor.sendStats();
+    if (stats.sends >= SEND_DROP_MIN_SAMPLES && stats.dropRatePct > SEND_DROP_PAUSE_PCT)
+      return log(`SKIP ${ev.symbol}: the sequencer dropped ${stats.dropped} of the last ${stats.sends} sends ` +
+        `(${stats.dropRatePct}% > ${SEND_DROP_PAUSE_PCT}%) — entries pause until the rolling rate recovers; ` +
+        "exits, cancels and reconciliation continue");
+  }
   const history = journal.riskHistoryStatus(Date.now());
   if (!history.complete)
     return log(`SKIP ${ev.symbol}: rolling risk history is quarantined until ${new Date(history.incompleteUntil).toISOString()}`);
@@ -1114,6 +1200,7 @@ async function onEntry(ev) {
     target: entryReference.targetRatio, size_sol: ev.size_eth ?? ev.size_sol };
   let plan = planEntry({ call: normalizedCall, cfg: perCall, state: S.state });
   if (plan.action !== "buy") return log(`SKIP ${ev.symbol}: ${plan.reason}`);
+  if (plan.advisories?.length) log(`WARN ${ev.symbol}: ${plan.advisories.join("; ")}`);
 
   if (!EXECUTE) {
     log(`ENTRY ${ev.symbol} — ${plan.sol} ETH | stop ${ev.stop} target ${ev.target}`);
@@ -1121,34 +1208,86 @@ async function onEntry(ev) {
   }
   if (!executor) throw new Error("the EVM executor is unavailable");
 
-  const preliminaryAmountWei = ethToWei(plan.sol);
-  const [preflight, tokenDecimals, ethUsdOracle] = await Promise.all([
-    executor.preflightEntry(ev.mint, preliminaryAmountWei.toString()),
-    executor.tokenDecimals(ev.mint),
-    independentEthUsdPrice(providers),
-  ]);
-  entryEventSubmissionGate({ kind: "entry", context: { event: ev } });
-  const executableReturnRatio = Number(BigInt(preflight.reverse.outAmount) * 1_000_000n /
-    preliminaryAmountWei) / 1_000_000;
-  /* The fee term is the COST MODEL (gas × live gwei, both legs), never the gate. On
-     this chain it is what punishes small clips: at 0.0004 ETH two legs of ~330k gas
-     at 0.3 gwei are ~0.0002 ETH, half the position. The message names the dominant
-     term so a refusal is actionable. */
-  const worstFeeRatio = Number(2n * feeWei * 1_000_000n / preliminaryAmountWei) / 1_000_000;
-  const slippageHaircut = (1 - EXECUTOR_CFG.slippageBps / 10_000) ** 2;
-  const conservativeReturnRatio = executableReturnRatio * slippageHaircut - worstFeeRatio;
-  if (conservativeReturnRatio <= entryReference.stopRatio)
-    throw new Error(`entry round trip plus worst-case fees is already at/below the authored stop ` +
-      `[dominant term: ${worstFeeRatio > (1 - executableReturnRatio * slippageHaircut) ? "the fee model" : "the measured round trip"}] ` +
-      `(measured round trip ${Number(preflight.lossPct ?? 0).toFixed(2)}% → executable ${(executableReturnRatio * 100).toFixed(2)}%; ` +
-      `slippage haircut ${((1 - slippageHaircut) * 100).toFixed(2)}%, worst-case fees ${(worstFeeRatio * 100).toFixed(2)}%; ` +
-      `conservative return ${(conservativeReturnRatio * 100).toFixed(2)}% vs stop at ${(entryReference.stopRatio * 100).toFixed(2)}% of entry)`);
-  const conservativeLossPct = Math.max(preflight.lossPct, (1 - conservativeReturnRatio) * 100);
-  if (conservativeLossPct > EXECUTOR_CFG.maxEntryRoundTripLossPct)
-    throw new Error(`entry round trip ${conservativeLossPct.toFixed(2)}% exceeds the ${EXECUTOR_CFG.maxEntryRoundTripLossPct}% ceiling`);
+  /* ── THE ROUTE LADDER ─────────────────────────────────────────────────────────
+   * Round-trip cost and price impact are HOW MUCH judgements being spent as WHETHER
+   * vetoes. A 0.0112 ETH clip that costs 18% through a thin pool is refused entirely,
+   * when the same pool at a quarter of the size costs 6% and is a trade the desk asked
+   * for. The Solana desk found this the same way (entry-sizing.mjs) and its fix ports:
+   * halve, re-prove, take the largest size that clears.
+   *
+   * TWO THINGS ARE DIFFERENT HERE and both are in the arithmetic below rather than in a
+   * comment. Halving raises the FLAT gas share, so a smaller clip is not automatically
+   * cheaper — the conservative loss counts gas per clip, so a rung that does not help
+   * fails on its own numbers and the ladder stops. And the floor is the measured minimum
+   * clip, not zero: below it the round trip is mostly gas whatever the pool does.
+   *
+   * Every rung is a FULL preflight — scope guard, ERC-20 hazards, price impact, the
+   * floor read out of the calldata, the simulated output — so a smaller size is proven,
+   * never assumed from the larger one's proof. */
+  const ladder = [1, 0.5, 0.25];
+  let preflight = null, tokenDecimals = null, ethUsdOracle = null, preliminaryAmountWei = null;
+  let executableReturnRatio = 0, worstFeeRatio = 0, slippageHaircut = 1;
+  let conservativeReturnRatio = 0, conservativeLossPct = 0;
+  let lastRefusal = null;
+  for (const fraction of ladder) {
+    const sized = Number((plan.sol * fraction).toFixed(6));
+    if (fraction < 1 && sized < CFG.minSolPerTrade) break;
+    preliminaryAmountWei = ethToWei(sized);
+    try {
+      [preflight, tokenDecimals, ethUsdOracle] = await Promise.all([
+        executor.preflightEntry(ev.mint, preliminaryAmountWei.toString()),
+        executor.tokenDecimals(ev.mint),
+        independentEthUsdPrice(providers),
+      ]);
+    } catch (error) {
+      /* A route or impact refusal is a fact about THIS SIZE and the ladder answers it.
+         A transport or oracle fault is not about the size at all, and is rethrown as
+         itself so the retry queue owns it rather than the ladder eating the call. */
+      if (error?.failureClass === "transport" || error?.failureClass === "oracle" ||
+          !/price impact|no route|below our floor/i.test(String(error.message))) throw error;
+      lastRefusal = error;
+      preflight = null;
+      log(`ENTRY ${ev.symbol}: the route refused ${sized} ETH (${String(error.message).slice(0, 120)}) — trying smaller`);
+      continue;
+    }
+    entryEventSubmissionGate({ kind: "entry", context: { event: ev } });
+    executableReturnRatio = Number(BigInt(preflight.reverse.outAmount) * 1_000_000n /
+      preliminaryAmountWei) / 1_000_000;
+    /* The fee term is the COST MODEL (gas × live gwei, both legs), never the gate. On
+       this chain it is what punishes small clips: at 0.0004 ETH two legs of ~330k gas
+       at 0.3 gwei are ~0.0002 ETH, half the position. The message names the dominant
+       term so a refusal is actionable. */
+    worstFeeRatio = Number(2n * feeWei * 1_000_000n / preliminaryAmountWei) / 1_000_000;
+    slippageHaircut = (1 - EXECUTOR_CFG.slippageBps / 10_000) ** 2;
+    conservativeReturnRatio = executableReturnRatio * slippageHaircut - worstFeeRatio;
+    conservativeLossPct = Math.max(preflight.lossPct, (1 - conservativeReturnRatio) * 100);
+    if (conservativeReturnRatio > entryReference.stopRatio &&
+        conservativeLossPct <= EXECUTOR_CFG.maxEntryRoundTripLossPct) {
+      if (fraction < 1)
+        log(`ENTRY ${ev.symbol}: sized down to ${sized} ETH (${fraction}× the cap) — the round trip clears there`);
+      plan = { ...plan, sol: sized, ladderFraction: fraction };
+      lastRefusal = null;
+      break;
+    }
+    lastRefusal = conservativeReturnRatio <= entryReference.stopRatio
+      ? new Error(`entry round trip plus worst-case fees is already at/below the authored stop ` +
+        `[dominant term: ${worstFeeRatio > (1 - executableReturnRatio * slippageHaircut) ? "the fee model" : "the measured round trip"}] ` +
+        `(measured round trip ${Number(preflight.lossPct ?? 0).toFixed(2)}% → executable ${(executableReturnRatio * 100).toFixed(2)}%; ` +
+        `slippage haircut ${((1 - slippageHaircut) * 100).toFixed(2)}%, worst-case fees ${(worstFeeRatio * 100).toFixed(2)}%; ` +
+        `conservative return ${(conservativeReturnRatio * 100).toFixed(2)}% vs stop at ${(entryReference.stopRatio * 100).toFixed(2)}% of entry) at ${sized} ETH`)
+      : new Error(`entry round trip ${conservativeLossPct.toFixed(2)}% exceeds the ` +
+        `${EXECUTOR_CFG.maxEntryRoundTripLossPct}% ceiling at ${sized} ETH`);
+    log(`ENTRY ${ev.symbol}: ${lastRefusal.message} — trying smaller`);
+    preflight = null;
+  }
+  if (!preflight) throw lastRefusal ?? new Error("no size on the route ladder cleared the entry guard");
+  /* Re-plan at the size the ladder proved. fixedSol and the cap are both pinned to it so
+     no rail can size back UP past a clip whose cost was never measured. */
   plan = planEntry({ call: normalizedCall,
-    cfg: { ...perCall, measuredRoundTripLossPct: conservativeLossPct }, state: S.state });
+    cfg: { ...perCall, fixedSol: plan.sol, maxSolPerTrade: Math.min(perCall.maxSolPerTrade, plan.sol),
+      measuredRoundTripLossPct: conservativeLossPct }, state: S.state });
   if (plan.action !== "buy") return log(`SKIP ${ev.symbol} after executable-cost check: ${plan.reason}`);
+  if (plan.advisories?.length) log(`WARN ${ev.symbol}: ${plan.advisories.join("; ")}`);
   const amountWei = ethToWei(plan.sol);
   log(`ENTRY ${ev.symbol} — ${plan.sol} ETH | stop ${ev.stop} target ${ev.target}`);
   const openedAtMs = Date.now();
@@ -1599,6 +1738,9 @@ function sendHeartbeat() {
       caps,
       runtimeCommit: process.env.EXECUTOR_SOURCE_COMMIT || null,
       runtimeFingerprint: RUNTIME_FINGERPRINT,
+      entryMode: ENTRY_MODE,
+      /* The three canary thresholds, as this wallet has actually measured them. */
+      sendStats: executor ? executor.sendStats() : null,
     });
   } catch {
     // Telemetry can lose detail; it can never stop the trading/reconciliation loop.
@@ -1627,6 +1769,9 @@ function sendHeartbeat() {
       caps,
       runtimeCommit: process.env.EXECUTOR_SOURCE_COMMIT || null,
       runtimeFingerprint: RUNTIME_FINGERPRINT,
+      entryMode: ENTRY_MODE,
+      /* The three canary thresholds, as this wallet has actually measured them. */
+      sendStats: executor ? executor.sendStats() : null,
     });
   }
   fetch(`${API}/api/floor/${FLOOR}/executor/heartbeat`, {
@@ -1859,7 +2004,7 @@ async function tick() {
 }
 
 log(`up — floor ${FLOOR} — wallet ${WALLET} — chain ${CHAIN_ID} — ${EXECUTE ? "LIVE" : "PAPER"}`);
-log(`caps: ${CFG.maxSolPerTrade} ETH/trade, ${CFG.dailySolCap} ETH/rolling 24h deploy, ${CFG.dailyLossLimitSol} ETH/rolling realized-loss entry brake, ${CFG.maxOpenPositions} open`);
+log(`caps: ${CFG.maxSolPerTrade} ETH/trade, ${CFG.dailySolCap} ETH/rolling 24h deploy, ${CFG.dailyLossLimitSol} ETH/rolling realized-loss entry brake, ${CFG.maxOpenPositions} open — entry mode ${ENTRY_MODE}`);
 log(`registry: slippage ${EXECUTOR_CFG.slippageBps} bps, impact cap ${EXECUTOR_CFG.maxPriceImpactPct}%, ` +
   `fee gate ${EXECUTOR_CFG.maxNetworkFeeWei} wei, round-trip gas ${EXECUTOR_CFG.roundTripGasUnits}${EXECUTE ? "" : " (paper stand-ins where the registry is VOID)"}`);
 log(`journal: ${STATE_DB}; entries pause: ${PAUSE_ENTRIES_FILE}; ` +

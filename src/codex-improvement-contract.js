@@ -104,7 +104,14 @@ const NamedCountSchema = (key) => z.object({ [key]: bounded(120), count }).stric
 const ThresholdSchema = z.object({
   name: z.string().min(1).max(120).regex(/^[\w.-]+$/),
   value: z.union([z.number().finite(), z.boolean(), z.null(), z.string().max(400)]),
-  provenance: z.enum(["measured", "inherited", "assumed"]),
+  /* `canary` joined the registry when the three send-dependent numbers — inclusion
+     latency, drop rate, whether the sequencer honours a same-nonce replacement — were
+     moved off the live path. They cannot be produced by any read-only probe, so
+     registering them as live-path-blocking made a gate that needed a send in order to
+     let a send happen. They are null, never claimed as measured, and answered by the
+     executor's own sends (executor/live-roundtrip-4663.mjs). The reviewer must be able
+     to see them and to see that they are not measurements. */
+  provenance: z.enum(["measured", "inherited", "assumed", "canary"]),
   at: z.string().max(40).nullable(),
 }).strict();
 

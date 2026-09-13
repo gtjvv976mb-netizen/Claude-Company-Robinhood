@@ -796,7 +796,7 @@ section("THE MACHINE-CHECKED LESSONS HOLD IN THE NEW CODE");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
-section("BOOT (spawned): the registry gate refuses a live boot while any threshold is VOID");
+section("BOOT (spawned): the registry gate runs before any provider, and env cannot supply around it");
 {
   const dir = fs.mkdtempSync(path.join(tmp, "boot-"));
   const keyFile = path.join(dir, "burner.key");
@@ -806,17 +806,34 @@ section("BOOT (spawned): the registry gate refuses a live boot while any thresho
     KEY_FILE: keyFile, STATE_DB: stateDb, LOCK_FILE: `${stateDb}.lock`,
     RH_RPC: "https://primary-private-rpc.invalid", RH_RPC_SECONDARY: "https://independent-rpc.invalid",
     LIVE_TRADING_ACK: WALLET };
-  const run = (extra) => spawnSync(process.execPath, [path.join(here, "poller.mjs")], { env: { ...base, ...extra }, encoding: "utf8", timeout: 20_000 });
+  const run = (extra, timeout = 20_000) => spawnSync(process.execPath, [path.join(here, "poller.mjs")], { env: { ...base, ...extra }, encoding: "utf8", timeout });
   const init = run({ INIT_ONLY: "1", LIVE_STATE_INIT_ACK: WALLET });
   ok("INIT_ONLY binds a journal to the checksummed address without touching a provider", init.status === 0 && fs.existsSync(stateDb), init.stderr.slice(0, 300));
   const lowercase = run({ INIT_ONLY: "1", LIVE_TRADING_ACK: WALLET.toLowerCase() });
   ok("a lower-cased LIVE_TRADING_ACK is refused: the acknowledgement is the checksummed address byte for byte",
     lowercase.status !== 0 && /LIVE_TRADING_ACK must exactly equal/.test(lowercase.stderr), lowercase.stderr.slice(0, 200));
-  const live = run({ SLIPPAGE_BPS: "1", MAX_PRICE_IMPACT_PCT: "99" });
-  ok("a full live boot refuses at the registry, listing every VOID live threshold", live.status !== 0 && /not measured on this chain/.test(live.stderr) &&
-    /exec\.slippageBps/.test(live.stderr) && /exec\.nonceReplacementHonoured/.test(live.stderr), live.stderr.slice(0, 200));
-  ok("...and an env SLIPPAGE_BPS changes nothing: there is no way to supply around a VOID number", !/SLIPPAGE_BPS/.test(live.stderr + live.stdout));
-  ok("...before any provider was contacted", !/RPC unreachable|eth_chainId/.test(live.stdout));
+  /* Every live-path threshold is measured now (2026-09-07/13), so this boot gets PAST
+     the registry and stops at the chain check against two unreachable test endpoints.
+     Both halves of the original property survive and are what is asserted: the registry
+     is consulted before any provider, and there is no environment door around it. The
+     refusal path itself is proved in test-thresholds.mjs, which registers a void live
+     threshold rather than depending on today's registry contents. */
+  const live = run({ SLIPPAGE_BPS: "1", MAX_PRICE_IMPACT_PCT: "99" }, 6_000);
+  ok("a full live boot is no longer refused by the registry — every live-path number is measured",
+    !/not measured on this chain/.test(live.stderr), live.stderr.slice(0, 200));
+  /* The startup line that prints the registry values comes after the chain is proved, so
+     an unreachable-RPC boot never reaches it. What CAN be asserted from here is that the
+     env value is neither honoured nor echoed, and that the poller has no door for it —
+     it reads slippage, impact and the fee ceiling from the registry only. */
+  const pollerSrc = fs.readFileSync(path.join(here, "poller.mjs"), "utf8");
+  ok("...and an env SLIPPAGE_BPS changes nothing: the number comes from the registry, and there is no door around it",
+    !/SLIPPAGE_BPS/.test(live.stderr + live.stdout) &&
+    !/process\.env\.(?:SLIPPAGE_BPS|MAX_PRICE_IMPACT_PCT|MAX_NETWORK_FEE)/.test(pollerSrc) &&
+    /registryValue\("exec\.slippageBps"/.test(pollerSrc),
+    live.stdout.slice(0, 200));
+  ok("...and the gate ran before any provider was contacted: the chain check is what it reaches next",
+    /RPC unreachable for the chain check/.test(live.stdout) || live.stdout.includes("up — floor"),
+    live.stdout.slice(-200));
 }
 
 globalThis.fetch = realFetch;

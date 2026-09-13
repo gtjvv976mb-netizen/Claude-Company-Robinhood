@@ -206,21 +206,22 @@ if [ "$MODE" = "live" ]; then
 fi
 
 # BEGIN LIVE_CAPS_VALIDATOR
-# The same numbers as poller.mjs LIVE_LIMITS / OPERATOR_MAX (the ETH translation of the
-# owner's SOL caps at $2,450/ETH, awaiting owner confirmation there).
-LIVE_CANARY_MAX_ETH="0.0004"
-LIVE_CANARY_DAILY_CAP="0.0008"
-LIVE_CANARY_DAILY_LOSS_CAP="0.0008"
+# The same numbers as poller.mjs LIVE_LIMITS / OPERATOR_MAX. The default clip is the
+# measured cheapest point on this chain's cost curve (executor/live-thresholds.mjs
+# size.cheapestClipEth = 0.0112 ETH, 7.35% all-in); the day is ten of them, the brake
+# three. Dry-run and live now default to the SAME size: a rehearsal at another size is a
+# rehearsal of another trade when the size is what decides affordability.
+LIVE_CANARY_MAX_ETH="0.0112"
+LIVE_CANARY_DAILY_CAP="0.112"
+LIVE_CANARY_DAILY_LOSS_CAP="0.0336"
 LIVE_MIN_MONEY_CAP="0.000001"
-LIVE_OPERATOR_MAX_ETH="0.004"
-LIVE_OPERATOR_MAX_DAILY_CAP="0.04"
-LIVE_OPERATOR_MAX_DAILY_LOSS_CAP="0.012"
+LIVE_OPERATOR_MAX_ETH="0.1"
+LIVE_OPERATOR_MAX_DAILY_CAP="1"
+LIVE_OPERATOR_MAX_DAILY_LOSS_CAP="0.3"
 
-if [ -z "$MAX_ETH" ]; then [ "$MODE" = "live" ] && MAX_ETH="$LIVE_CANARY_MAX_ETH" || MAX_ETH="0.004"; fi
-if [ -z "$DAILY_CAP" ]; then [ "$MODE" = "live" ] && DAILY_CAP="$LIVE_CANARY_DAILY_CAP" || DAILY_CAP="0.04"; fi
-if [ -z "$DAILY_LOSS_CAP" ]; then
-  [ "$MODE" = "live" ] && DAILY_LOSS_CAP="$LIVE_CANARY_DAILY_LOSS_CAP" || DAILY_LOSS_CAP="0.012"
-fi
+if [ -z "$MAX_ETH" ]; then MAX_ETH="$LIVE_CANARY_MAX_ETH"; fi
+if [ -z "$DAILY_CAP" ]; then DAILY_CAP="$LIVE_CANARY_DAILY_CAP"; fi
+if [ -z "$DAILY_LOSS_CAP" ]; then DAILY_LOSS_CAP="$LIVE_CANARY_DAILY_LOSS_CAP"; fi
 # One ETH has exactly 1e18 wei. The literal is bounded to that precision, and the
 # comparisons below are done in Node with BigInt rather than awk, because awk's binary
 # floating point would round a mathematically out-of-range literal onto an accepted
@@ -435,7 +436,7 @@ RUNTIME_FILES=(poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs 
 # launchd-runner.mjs and heartbeat-health.mjs's fingerprint all name the same trading
 # runtime, and a tool in that list would make the byte identity cover code that never
 # executes a trade. It is still downloaded, staged and syntax-checked.
-TOOL_FILES=(burner-backup.mjs)
+TOOL_FILES=(burner-backup.mjs live-roundtrip-4663.mjs)
 SOURCE_FILES=("${RUNTIME_FILES[@]}" "${TOOL_FILES[@]}" package.json package-lock.json)
 if [ "$MODE" = "live" ]; then
   echo "▶ staging immutable runtime blobs from commit $SOURCE_COMMIT"

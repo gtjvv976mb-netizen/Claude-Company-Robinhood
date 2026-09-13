@@ -478,9 +478,15 @@ const heartbeat = (now, extra = {}) => ({
 }
 
 {
-  // The real registry: VOID live thresholds make "safe to unpause" impossible, exactly
-  // as they make the poller refuse to arm — the monitor may not certify a boot the
-  // executor will refuse.
+  /* THE MONITOR MIRRORS THE REGISTRY — IN WHICHEVER DIRECTION IT POINTS.
+   *
+   * This asserted safeToUnpause === false because every live threshold was VOID, which
+   * made it a test of the registry's contents rather than of the mirroring. Now that
+   * they are measured the monitor must NOT invent a refusal the poller would not make:
+   * certifying a boot the executor refuses is the failure this guards, and refusing a
+   * boot the executor would accept is the same defect wearing the safe-looking face.
+   * So the property is that the two agree, and it is asserted by reading the registry
+   * here rather than by restating today's answer. */
   const dir = tmp(); writeConfig(dir);
   makeDb(path.join(dir, ".cc-executor.sqlite"));
   fs.writeFileSync(path.join(dir, ".cc-executor.sqlite.lock"), `${process.pid}\n`, { mode: 0o600 });
@@ -494,10 +500,19 @@ const heartbeat = (now, extra = {}) => ({
         } }) })
       : response({ chain: 4663, cluster: "robinhood-4663", latest_id: 12, events: [] }),
   });
-  assert.equal(report.safeToUnpause, false);
+  const { unmeasuredLiveThresholds } = await import("./thresholds.mjs");
+  await import("./live-thresholds.mjs");
+  const pending = unmeasuredLiveThresholds();
   const gate = report.issues.find((item) => item.code === "thresholds_unmeasured");
-  assert.ok(gate, "the registry gate is mirrored");
-  assert.match(gate.message, /not measured on this chain/);
+  if (pending.length) {
+    assert.equal(report.safeToUnpause, false, "a VOID live threshold must block the certificate");
+    assert.ok(gate, "the registry gate is mirrored");
+    assert.match(gate.message, /not measured on this chain/);
+  } else {
+    assert.ok(!gate, "with every live-path number measured the monitor must not report a registry gate");
+    assert.equal(report.safeToUnpause, true,
+      "the monitor may not withhold a certificate the executor's own gate would grant");
+  }
   assert.equal(report.chain, 4663);
   fs.rmSync(dir, { recursive: true, force: true });
 }

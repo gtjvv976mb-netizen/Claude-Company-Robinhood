@@ -54,6 +54,9 @@ export const DECISION_MANIFEST_FILES = Object.freeze([
   "src/data/eth-usd.js",
   "src/data/evidence.js",
   "src/data/evm.js",
+  /* geckoterminal.js supplies the holder distribution and one of the phase sources now
+     that the explorer is walled off; a change to it alters live kill behaviour. */
+  "src/data/geckoterminal.js",
   "src/data/gmgn.js",
   "src/data/kyber.js",
   "src/data/pons-live.js",

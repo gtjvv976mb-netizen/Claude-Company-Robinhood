@@ -228,22 +228,39 @@ assert.match(route, /executorStatusPayload\(floorNo\)/);
 assert.doesNotMatch(route, /readBody|signTransaction|sendTransaction|executor_secret/);
 
 const pollerSource = fs.readFileSync(new URL("./executor/poller.mjs", import.meta.url), "utf8");
-/* The executor's ETH names (poller.mjs LIVE_LIMITS / OPERATOR_MAX, read 2026-09-05). */
+/* COMPARE WHAT THE SYSTEM COMPUTES, NOT WHAT ITS SOURCE SPELLS.
+ *
+ * This grepped the poller for the literal 0.0004 and friends. That is the shape this
+ * repo's own lessons warn about — "never compare source literals, compare what the
+ * running system computes" — and it bit exactly as predicted: the poller now DERIVES its
+ * defaults from the thresholds registry (LIVE_LIMITS.maxEthPerTrade = CHEAPEST_CLIP_ETH),
+ * so the literals are gone from its source and a grep for them fails while the two sides
+ * agree perfectly.
+ *
+ * The property that matters is that the dashboard's copy equals the executor's, so that
+ * is what is asserted: the same derivation, from the same registry entry. The source is
+ * still read, for the one thing a value comparison cannot see — that the poller has not
+ * quietly gone back to a hardcoded number. */
+const { CHEAPEST_CLIP_ETH } = await import("./executor/live-thresholds.mjs");
 for (const [key, value] of Object.entries({
-  maxEthPerTrade: 0.0004,
-  dailyEthCap: 0.0008,
-  dailyLossLimitEth: 0.0008,
+  maxEthPerTrade: CHEAPEST_CLIP_ETH,
+  rolling24hDeployEth: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
+  rolling24hRealizedLossBrakeEth: Number((CHEAPEST_CLIP_ETH * 3).toFixed(6)),
   maxOpenPositions: 4,
 })) {
-  assert.match(pollerSource, new RegExp(`${key}:\\s*${String(value).replace(".", "\\.")}`),
-    `dashboard canary default ${key} must stay pinned to the executor's default`);
+  assert.equal(EXECUTOR_CANARY_DEFAULTS[key], value,
+    `dashboard default ${key} must equal the executor's, which is derived from the measured cheapest clip`);
 }
+assert.match(pollerSource, /maxEthPerTrade: CHEAPEST_CLIP_ETH,/,
+  "the executor's default must READ the registry, not restate a number beside it");
+assert.match(pollerSource, /OPERATOR_MAX[\s\S]{0,900}maxEthPerTrade: 0\.1, dailyEthCap: 1, dailyLossLimitEth: 0\.3/,
+  "the hard maxima are a deliberate code constant and both copies must name the same three");
 for (const [key, value] of Object.entries({
-  maxEthPerTrade: 0.004,
-  dailyEthCap: 0.04,
-  dailyLossLimitEth: 0.012,
+  maxEthPerTrade: 0.1,
+  rolling24hDeployEth: 1,
+  rolling24hRealizedLossBrakeEth: 0.3,
 })) {
-  assert.match(pollerSource, new RegExp(`OPERATOR_MAX[\\s\\S]*${key}:\\s*${String(value).replace(".", "\\.")}`),
+  assert.equal(EXECUTOR_OPERATOR_MAXIMA[key], value,
     `dashboard operator maximum ${key} must stay pinned to the executor policy`);
 }
 assert.match(pollerSource, /I acknowledge WALL-ST-E caps v3/);

@@ -26,55 +26,58 @@ const run = (extra = {}) => spawnSync(process.execPath, [poller], {
 let pass = 0;
 const ok = (name, fn) => { fn(); pass++; console.log(`  ok   ${name}`); };
 
-/* THE CAPS ARE RAISABLE, WITH CEREMONY. On this chain the reason is sharper than on
- * Solana: gas is FLAT (live-thresholds.mjs), so a ~0.00028 ETH round trip is 70% of the
- * 0.0004 ETH canary and 7% of the 0.004 ETH operator ceiling — the canary can only
- * ever be refused by the executable-cost guard. The canary is still the default; what
- * must stay true is that nothing raises exposure by accident. The v3 wording (ETH, the
- * checksummed address) revokes every SOL-era acknowledgement. */
+/* THE CAPS ARE RAISABLE, WITH CEREMONY. The default is now the measured cheapest clip
+ * (0.0112 ETH, live-thresholds.mjs size.cheapestClipEth) rather than a translated SOL
+ * canary, because gas here is FLAT and at 0.0004 ETH two legs were 55% of the position:
+ * that default could only ever be refused by the executable-cost guard, which is a bot
+ * that cannot trade rather than a careful one. What must stay true is unchanged and is
+ * what this file tests — nothing raises exposure by accident. All three caps set
+ * explicitly, and a v3 sentence (ETH, the checksummed address) naming THIS wallet and
+ * THESE numbers; every SOL-era acknowledgement is revoked. The values below are the new
+ * hard maxima, 0.1 / 1 / 0.3. */
 const ackFor = (t, d, l, acknowledgedWallet = wallet) =>
   `I acknowledge WALL-ST-E caps v3 for ${acknowledgedWallet}: ${t} ETH per trade, ${d} ETH per day, ${l} ETH rolling realized-loss entry brake`;
 
 ok("env alone cannot raise a cap — the ceremony is required", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.04", DAILY_LOSS_LIMIT_ETH: "0.012" });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "1", DAILY_LOSS_LIMIT_ETH: "0.3" });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /typed acknowledgement/);
   assert.match(result.stderr, /I acknowledge WALL-ST-E caps v3/);
 });
 ok("a partial raise is refused and says why", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004" });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1" });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /ALL THREE set explicitly/);
 });
 ok("a sentence naming different numbers is refused", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.04",
-    DAILY_LOSS_LIMIT_ETH: "0.012", LIVE_CAPS_ACK: ackFor("0.003", "0.04", "0.012") });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "1",
+    DAILY_LOSS_LIMIT_ETH: "0.3", LIVE_CAPS_ACK: ackFor("0.09", "1", "0.3") });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /typed acknowledgement/);
 });
 ok("the revoked SOL-era (v2) acknowledgement is refused", () => {
   const legacy = `I acknowledge WALL-ST-E caps v2 for ${wallet}: 0.05 SOL per trade, 0.5 SOL per day, 0.15 SOL rolling realized-loss entry brake`;
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.04",
-    DAILY_LOSS_LIMIT_ETH: "0.012", LIVE_CAPS_ACK: legacy });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "1",
+    DAILY_LOSS_LIMIT_ETH: "0.3", LIVE_CAPS_ACK: legacy });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /typed acknowledgement/);
 });
 ok("a sentence naming a different wallet is refused", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.04",
-    DAILY_LOSS_LIMIT_ETH: "0.012", LIVE_CAPS_ACK: ackFor("0.004", "0.04", "0.012", "0x0000000000000000000000000000000000000001") });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "1",
+    DAILY_LOSS_LIMIT_ETH: "0.3", LIVE_CAPS_ACK: ackFor("0.1", "1", "0.3", "0x0000000000000000000000000000000000000001") });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /typed acknowledgement/);
 });
 ok("a sentence naming the wallet in lower case is refused — the checksum is part of the name", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.04",
-    DAILY_LOSS_LIMIT_ETH: "0.012", LIVE_CAPS_ACK: ackFor("0.004", "0.04", "0.012", wallet.toLowerCase()) });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "1",
+    DAILY_LOSS_LIMIT_ETH: "0.3", LIVE_CAPS_ACK: ackFor("0.1", "1", "0.3", wallet.toLowerCase()) });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /typed acknowledgement/);
 });
 for (const [name, values, message] of [
-  ["per-trade", ["0.0040001", "0.04", "0.012"], /MAX_ETH_PER_TRADE must be between/],
-  ["daily deploy", ["0.004", "0.0400001", "0.012"], /DAILY_ETH_CAP must be between/],
-  ["realized-loss brake", ["0.004", "0.04", "0.0120001"], /DAILY_LOSS_LIMIT_ETH must be between/],
+  ["per-trade", ["0.1000001", "1", "0.3"], /MAX_ETH_PER_TRADE must be between/],
+  ["daily deploy", ["0.1", "1.0000001", "0.3"], /DAILY_ETH_CAP must be between/],
+  ["realized-loss brake", ["0.1", "1", "0.3000001"], /DAILY_LOSS_LIMIT_ETH must be between/],
 ]) ok(`${name} cannot exceed its hard maximum`, () => {
   const [trade, daily, loss] = values;
   const result = run({ MAX_ETH_PER_TRADE: trade, DAILY_ETH_CAP: daily,
@@ -84,9 +87,9 @@ for (const [name, values, message] of [
 });
 ok("over-precise literals cannot round down onto an operator maximum", () => {
   for (const [trade, daily, loss] of [
-    ["0.0040000000000000000000001", "0.04", "0.012"],
-    ["0.004", "0.0400000000000000000000001", "0.012"],
-    ["0.004", "0.04", "0.0120000000000000000000001"],
+    ["0.1000000000000000000000001", "1", "0.3"],
+    ["0.1", "1.0000000000000000000000001", "0.3"],
+    ["0.1", "1", "0.3000000000000000000000001"],
   ]) {
     const result = run({ MAX_ETH_PER_TRADE: trade, DAILY_ETH_CAP: daily,
       DAILY_LOSS_LIMIT_ETH: loss, LIVE_CAPS_ACK: ackFor(trade, daily, loss) });
@@ -113,8 +116,8 @@ ok("live max-open positions must be an integer from one through four", () => {
   }
 });
 ok("the daily deploy cap cannot sit below one allowed trade", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.003",
-    DAILY_LOSS_LIMIT_ETH: "0.012", LIVE_CAPS_ACK: ackFor("0.004", "0.003", "0.012") });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "0.09",
+    DAILY_LOSS_LIMIT_ETH: "0.3", LIVE_CAPS_ACK: ackFor("0.1", "0.09", "0.3") });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /below MAX_ETH_PER_TRADE/);
 });
@@ -134,10 +137,10 @@ ok("a fully lowered tuple still requires daily deploy to cover one trade", () =>
   assert.match(result.stderr, /DAILY_ETH_CAP \(0\.0002\) is below MAX_ETH_PER_TRADE \(0\.0003\)/);
 });
 ok("a matching v3 acknowledgement raises to the exact supported maxima", () => {
-  const result = run({ MAX_ETH_PER_TRADE: "0.004", DAILY_ETH_CAP: "0.04",
-    DAILY_LOSS_LIMIT_ETH: "0.012", LIVE_CAPS_ACK: ackFor("0.004", "0.04", "0.012") });
+  const result = run({ MAX_ETH_PER_TRADE: "0.1", DAILY_ETH_CAP: "1",
+    DAILY_LOSS_LIMIT_ETH: "0.3", LIVE_CAPS_ACK: ackFor("0.1", "1", "0.3") });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /OPERATOR-RAISED CAPS acknowledged: 0\.004 ETH\/trade, 0\.04 ETH\/day deploy, 0\.012 ETH rolling realized-loss entry brake/);
+  assert.match(result.stdout, /OPERATOR-RAISED CAPS acknowledged: 0\.1 ETH\/trade, 1 ETH\/day deploy, 0\.3 ETH rolling realized-loss entry brake/);
 });
 ok("ETH/USD cache age is validated and cannot exceed the feed's heartbeat-plus-slack ceiling", () => {
   for (const value of ["90000001", "not-a-number"]) {
