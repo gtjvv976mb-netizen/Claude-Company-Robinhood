@@ -503,6 +503,19 @@ export function startOffice(port = Number(process.env.PORT) || 4949) {
             try { return cryptoTimingEqual(auth, secret); } catch { return false; }
           })();
           if (!okAuth) return json(401, { error: "bad or missing executor secret" });
+          /* REPAIR BEFORE READ. The alerts table is the bot's only entry and exit
+             channel, and broadcast()/announceExit fire their writes without awaiting
+             them, so a single failed write silently strands a call: offered on the
+             desk, invisible in this feed, absent from every log. The bot's own poll is
+             the right place to close that gap — it is the only caller that always runs
+             when a bot is listening, and it runs every few seconds.
+
+             NEITHER REPAIR MAY EVER FAIL THE POLL. A feed that 500s because a repair
+             threw is strictly worse than the missing alert it was fixing: it stops the
+             bot hearing about every OTHER call too. Both are wrapped, and the feed is
+             served whatever they do. */
+          try { alerts.reconcileMissingEntryAlerts(floorNo); } catch (e) { console.error("[feed] entry repair failed", e?.message ?? e); }
+          try { alerts.reconcileMissingExitAlerts(floorNo); } catch (e) { console.error("[feed] exit repair failed", e?.message ?? e); }
           return json(200, executorFeedPayload(floorNo, url.searchParams.get("after") || 0));
         }
 

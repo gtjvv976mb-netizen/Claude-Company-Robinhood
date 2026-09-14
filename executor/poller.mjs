@@ -61,6 +61,31 @@ const EXECUTE = process.env.EXECUTE === "1";
 const POLL_MS = Number(process.env.POLL_MS || 15_000);
 const FEE_RESERVE = Number(process.env.FEE_RESERVE_ETH || 0.001);
 const MAX_CALL_AGE_MS = Number(process.env.MAX_CALL_AGE_MIN || 45) * 60_000;
+/* THE EXPIRY IS THE BAND'S OWN CLOCK, NOT ONE FLAT NUMBER.
+ *
+ * 45 minutes for everything is wrong in the one direction that costs calls. The desk
+ * records a MINIMUM HOLD on every call (src/bands.js: 6 hours for every band on this
+ * chain, written onto the row as hold_min_ms) and its own comment there says "the
+ * executor does not enforce it" — so a call the desk considers good for six hours was
+ * thrown away by the bot after forty-five minutes. The Solana desk measured the cost of
+ * exactly this: "SKIP FWOG: call is 143m old" and "SKIP Jimothy: call is 130m old", two
+ * real calls lost in a single restart window. Any outage longer than the flat window
+ * silently drops every call published inside it.
+ *
+ * The rule: if more time has passed than you would have HELD the position for, the entry
+ * idea is gone. Otherwise it is still an entry.
+ *
+ * WIDENING ONLY, BY CONSTRUCTION. The window is never shorter than the flat number it
+ * replaces — max() sees to that — so this can admit a call the bot used to drop and can
+ * never drop one it used to admit. A call with no hold_min_ms (a legacy row, or an
+ * unreadable market cap) keeps the flat 45 minutes exactly as before. The upper clamp
+ * stops a malformed or hostile hold_min_ms from turning into an unbounded window. */
+const callExpiryMs = (event) => {
+  const holdMin = Number(event?.hold_min_ms ?? event?.holdMinMs);
+  return Number.isFinite(holdMin) && holdMin > 0
+    ? Math.max(MAX_CALL_AGE_MS, Math.min(holdMin, MAX_CALL_AGE_MS * 8))
+    : MAX_CALL_AGE_MS;
+};
 const MAX_FUTURE_SKEW_MS = Number(process.env.MAX_FUTURE_SKEW_MIN || 5) * 60_000;
 const MAX_ENTRY_MARK_AGE_MS = Number(process.env.MAX_ENTRY_MARK_AGE_MIN || 15) * 60_000;
 const MAX_ENTRY_DEVIATION_PCT = Number(process.env.MAX_ENTRY_DEVIATION_PCT || 10);
@@ -742,7 +767,7 @@ function entryEventSubmissionGate(intent) {
   assertEntriesUnpaused();
   const event = intent.context?.event;
   validEntryEvent(event);
-  if (Date.now() - Number(event.ts) > MAX_CALL_AGE_MS)
+  if (Date.now() - Number(event.ts) > callExpiryMs(event))
     throw new Error("entry call became stale before submission");
   validateEntryReference(event, {
     nowMs: Date.now(), maxMarkAgeMs: MAX_ENTRY_MARK_AGE_MS,
@@ -1157,8 +1182,11 @@ async function onEntry(ev) {
   if (unresolvedPosition)
     return log(`SKIP ${ev.symbol}: ${unresolvedPosition.symbol} blocks new exposure — ${positionEntryBlock(unresolvedPosition)}`);
   const age = Date.now() - Number(ev.ts);
-  if (age > MAX_CALL_AGE_MS)
-    return log(`SKIP ${ev.symbol}: call is ${Math.round(age / 60_000)}m old (max ${MAX_CALL_AGE_MS / 60_000}m)`);
+  const expiryMs = callExpiryMs(ev);
+  if (age > expiryMs)
+    return log(`SKIP ${ev.symbol}: call is ${Math.round(age / 60_000)}m old — the ` +
+      `${ev.hold_band || "default"} band holds for at least ${Math.round(expiryMs / 60_000)}m, ` +
+      `so the entry idea is gone`);
   if (feedRollbackActive())
     return log(`SKIP ${ev.symbol}: authenticated feed latest_id rolled behind durable cursor — entries frozen`);
   if (pauseEntries()) return log(`SKIP ${ev.symbol}: PAUSE ENTRIES file is present`);

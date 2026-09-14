@@ -142,6 +142,85 @@ async function push(url, title, body) {
  * only by opening the Calls pane later — and about the desk's work only at the
  * exit. Durable alert + webhook, same machinery as exits, kind 'entry'.
  */
+/* ── A CALL THAT LOSES ITS ALERT IS REPAIRED, NOT LOST ────────────────────────
+ * THE BOT'S ONLY ENTRY CHANNEL IS THE alerts TABLE. executorFeedPayload() in
+ * office.js selects FROM alerts — a delivery row alone is invisible to the bot.
+ * And broadcast() in copy.js writes the durable delivery, then fires announceEntry
+ * WITHOUT awaiting it and with an empty catch. So a single failed alert write left a
+ * call marked "offered" on the desk, absent from the feed for ever, and absent from
+ * every log: the one failure mode that looks exactly like a quiet market.
+ *
+ * Rather than await the announce — which would let one floor's slow write hold up
+ * every later floor's alert — the gap is REPAIRED on the bot's own poll. The same
+ * shape as the Solana tower's reconciler, fitted to this fork's tables.
+ *
+ * BOUNDED IN THREE DIRECTIONS, because a repair loop that can walk the whole history
+ * is a new outage: only calls still open, only deliveries newer than `withinMs`, and
+ * never more than `limit` rows a poll. raise() is idempotent on its UNIQUE index, so
+ * a repair that races the original announce writes nothing and reports nothing.
+ */
+const REPAIR_WITHIN_MS = 6 * 3600e3;
+
+export function reconcileMissingEntryAlerts(floorNo, { withinMs = REPAIR_WITHIN_MS, limit = 20, now = Date.now() } = {}) {
+  const rows = db.prepare(`
+    SELECT d.call_id, d.floor_no, d.size_eth, c.mint, c.symbol, c.thesis, c.invalidation,
+           c.entry_ref, c.stop, c.target
+    FROM deliveries d
+    JOIN calls c ON c.id = d.call_id
+    LEFT JOIN alerts a ON a.call_id = d.call_id AND a.floor_no = d.floor_no AND a.kind = 'entry'
+    WHERE d.floor_no = ? AND d.verdict = 'offered' AND a.id IS NULL
+      -- only a call the desk still stands behind: a dead call is never resurrected
+      AND c.status = 'live'
+      AND d.delivered_at > ?
+    ORDER BY d.delivered_at LIMIT ?`).all(floorNo, now - withinMs, Math.min(100, limit));
+  let repaired = 0;
+  for (const r of rows) {
+    const sym = r.symbol || String(r.mint || "").slice(0, 6);
+    const title = `New call — ${sym}`;
+    const body = `${r.thesis || "The desk has published a call."}\n` +
+      `Your floor sized it at ${r.size_eth ?? "?"} ETH. Open your floor's Calls tab for the ticket. ` +
+      `This is research; you trade from your own wallet or not at all.`;
+    if (!raise({ floorNo, callId: r.call_id, kind: "entry", urgency: "normal", title, body, mint: r.mint }))
+      continue;                                   // the original landed first; nothing to say
+    repaired++;
+    emit("alert:repaired", { floorNo, callId: r.call_id, symbol: sym, kind: "entry",
+      note: "an offered delivery had no entry alert; the bot could never have seen this call" });
+  }
+  return repaired;
+}
+
+/* THE SAME HOLE ON THE WAY OUT, and it costs more. announceExit is fired the same way
+   from every close path, and the exit alert is the bot's ONLY sell instruction — a lost
+   one is a position held for ever, with the desk believing it told the bot to sell. */
+export function reconcileMissingExitAlerts(floorNo, { withinMs = REPAIR_WITHIN_MS, limit = 20, now = Date.now() } = {}) {
+  const rows = db.prepare(`
+    SELECT d.call_id, d.floor_no, c.mint, c.symbol, c.close_reason, c.close_mark, c.closed_at
+    FROM deliveries d
+    JOIN calls c ON c.id = d.call_id
+    LEFT JOIN alerts a ON a.call_id = d.call_id AND a.floor_no = d.floor_no AND a.kind = 'exit'
+    WHERE d.floor_no = ? AND d.verdict = 'offered' AND a.id IS NULL
+      AND c.status = 'closed'
+      AND c.closed_at > ?
+    ORDER BY c.closed_at LIMIT ?`).all(floorNo, now - withinMs, Math.min(100, limit));
+  let repaired = 0;
+  for (const r of rows) {
+    const sym = r.symbol || String(r.mint || "").slice(0, 6);
+    /* A REPAIRED EXIT IS URGENT BY DEFAULT. The original close carried the desk's own
+       urgency and this row does not record it; between announcing a late sell too
+       loudly and too quietly, only one of the two leaves a position on the book. */
+    const title = `Exit called — ${sym}`;
+    const body = `${r.close_reason ? "The desk closed this call: " + String(r.close_reason).replace(/_/g, " ") : "The desk has closed this call."}\n` +
+      `This alert was repaired after the original was lost, so it may be late.\n` +
+      `This is a research call. Sell in your own wallet; the desk cannot and does not.`;
+    if (!raise({ floorNo, callId: r.call_id, kind: "exit", urgency: "urgent", title, body, mint: r.mint }))
+      continue;
+    repaired++;
+    emit("alert:repaired", { floorNo, callId: r.call_id, symbol: sym, kind: "exit",
+      note: "a closed call had no exit alert; the bot could never have been told to sell" });
+  }
+  return repaired;
+}
+
 export async function announceEntry(call) {
   const rows = db.prepare(`SELECT d.floor_no, d.size_eth, c.webhook_url
                            FROM deliveries d LEFT JOIN copy_settings c ON c.floor_no = d.floor_no
