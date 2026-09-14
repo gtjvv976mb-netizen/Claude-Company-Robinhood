@@ -1783,11 +1783,25 @@ function sendHeartbeat() {
       wallet: WALLET,
       cursor: S.cursor,
       open: openList().length,
-      // WHICH coins, not just how many. Token and size only: no prices, no PnL.
+      /* WHICH coins, not just how many — and enough of each position that the floor can
+         draw it AS a position rather than as a bare mint. This carried token and size
+         only ("no prices, no PnL"); the Solana desk widened the same payload on
+         2026-09-13 at the owner's request, to show every open position and its levels
+         on the floor, and the board here now does the same.
+
+         The levels are the BOT'S OWN, as absolute prices, exactly as the position
+         holds them — the board turns them into ratios against the fill. No live mark
+         rides along, because the bot stores none: it reads one fresh each tick, so a
+         mark in here would be a stale number wearing a live number's clothes. */
       held: openList().slice(0, 20).map((p) => ({
         mint: p.mint,
         eth: Number(weiToEth(p.entryInputWei || 0).toFixed(6)),
         openedAt: Number(p.openedAtMs) || 0,
+        symbol: String(p.symbol || "").slice(0, 24),
+        entry: Number(p.entry) > 0 ? Number(p.entry) : null,
+        stop: Number(p.stop) > 0 ? Number(p.stop) : null,
+        target: Number(p.target) > 0 ? Number(p.target) : null,
+        high: Number(p.high) > 0 ? Number(p.high) : null,
       })),
       health,
       ts: Date.now(),

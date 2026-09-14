@@ -275,6 +275,23 @@ body{
 .dashmetric small{display:block;margin-top:4px;color:var(--ink-faint);font-size:10.5px;line-height:1.35}
 .dashsection{padding:12px;border:1px solid var(--card-line);border-radius:10px;background:var(--card)}
 .dashsection h4{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+/* ── THE BOT'S BOOK ───────────────────────────────────────────────────────────
+   Lifted from the Solana tower's floor. One row per position: the symbol, and a bar
+   from the stop to the target with a tick where the bot went in and a dot where the
+   coin stands now. Every number lives in the row's tooltip and none of it on screen,
+   which is what keeps a book of four positions readable inside a side rail. */
+.bot-book .trow{display:grid;grid-template-columns:minmax(64px,7.5rem) 1fr;gap:.7rem;align-items:center;padding:.32rem 0;border-top:1px solid rgba(128,128,128,.18)}
+.bot-book .trow b{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bot-book .trow.unreported b{opacity:.75}
+.bot-book .tbar{position:relative;height:12px;border-radius:6px;background:linear-gradient(90deg,rgba(208,83,83,.28),rgba(128,128,128,.10) 50%,rgba(47,158,107,.28))}
+.bot-book .tbar .fill{position:absolute;top:0;bottom:0;background:rgba(47,158,107,.55)}
+.bot-book .tbar .fill.bad{background:rgba(208,83,83,.55)}
+.bot-book .tbar .in{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:currentColor;opacity:.7}
+.bot-book .tbar .now{position:absolute;top:-3px;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:var(--panel,#fff);border:3px solid #2f9e6b;box-sizing:border-box}
+.bot-book .tbar .now.bad{border-color:#d05353}
+.bot-book .tbar .now.flat{border-color:rgba(128,128,128,.7)}
+.bot-book .tbar .end{position:absolute;top:0;bottom:0;width:3px;border-radius:2px}
+.bot-book .tbar .end.stop{left:0;background:#d05353}.bot-book .tbar .end.target{right:0;background:#2f9e6b}
 .guide-video{display:block;width:100%;aspect-ratio:16/9;border-radius:10px;background:#000;max-height:60vh}
 .guide-cap{min-height:2.6em;margin:8px 0 6px;font-size:13px;line-height:1.45;opacity:.88}
 .guide-chapters{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
@@ -10709,6 +10726,8 @@ async function loadOverviewDashboard() {
     el.appendChild(section);
   }
 
+  renderBotBook(el, heartbeat, feed);
+
   const recent = dashNode("div", "dashsection");
   recent.appendChild(dashNode("h4", "", "Recent published calls"));
   if (!feed.length) recent.appendChild(dashNode("p", "dp-note",
@@ -10722,6 +10741,80 @@ async function loadOverviewDashboard() {
     ]));
   }
   el.appendChild(recent);
+}
+
+/* THE BOT'S OWN BOOK, drawn from the bot's own heartbeat. Ported from the Solana
+ * tower's floor, where the owner asked for every open position and its levels rather
+ * than a count of mints.
+ *
+ * WHAT IT PRICES AGAINST. The bot stores no live mark — it reads one fresh each tick —
+ * so the dot's position comes from the DESK's latest mark for the same call, off the
+ * floor feed. When the desk has no mark for a coin the bot holds, the dot sits on the
+ * entry and is drawn flat: "no mark" is shown as no movement, never as zero movement.
+ *
+ * CLOSED TRADES ARE NOT HERE YET, and the card says so rather than rendering an empty
+ * list. This fork's executor has no fill-reporting subsystem — the Solana poller builds
+ * its closes from journal.accountedIntentsWithCallId(), which this journal does not
+ * have — so a "0 closed trades" card would be a claim the machine cannot support.
+ */
+function renderBotBook(el, heartbeat, feedRows) {
+  if (!heartbeat) return;
+  const held = Array.isArray(heartbeat.held) ? heartbeat.held : [];
+  const feed = Array.isArray(feedRows) ? feedRows : [];
+  const pct = (x) => (x >= 0 ? "+" : "\u2212") + Math.abs(x * 100).toFixed(1) + "%";
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  /* One bar. `lo` and `hi` are price ratios to the fill (stop 0.86, target 1.5); `now`
+     is the current ratio or null. The fill is always at ratio 1. */
+  const bar = (lo, hi, now, title, { flat = false } = {}) => {
+    const b = dashNode("div", "tbar");
+    if (title) b.title = title;
+    const span = hi > lo ? hi - lo : 1;
+    const x = (r) => clamp((r - lo) / span) * 100;
+    b.append(dashNode("i", "end stop"), dashNode("i", "end target"));
+    const entryX = x(1);
+    if (now != null) {
+      const nowX = x(now);
+      const fill = dashNode("i", "fill" + (now < 1 ? " bad" : ""));
+      fill.style.left = Math.min(entryX, nowX) + "%";
+      fill.style.width = Math.abs(nowX - entryX) + "%";
+      b.append(fill);
+    }
+    const tick = dashNode("i", "in"); tick.style.left = entryX + "%"; b.append(tick);
+    const dot = dashNode("i", "now" + (now == null || flat ? " flat" : now < 1 ? " bad" : ""));
+    dot.style.left = (now == null ? entryX : x(now)) + "%"; b.append(dot);
+    return b;
+  };
+  const card = dashNode("section", "dashsection bot-book");
+  card.append(dashNode("h4", "", "The bot's book \u00b7 " + (held.length ? held.length + " open" : "nothing open")));
+
+  for (const p of held) {
+    const call = feed.find((c) => c.mint && p.mint &&
+      String(c.mint).toLowerCase() === String(p.mint).toLowerCase()) || null;
+    /* The fill the bot actually paid, not the price the desk published: the bar is the
+       bot's own trade. Without it there is no ratio to draw, so the row stays flat. */
+    const entry = Number(p.entry) > 0 ? Number(p.entry) : null;
+    const mark = Number(call?.last_mark) > 0 ? Number(call.last_mark) : null;
+    const now = mark != null && entry ? mark / entry : null;
+    const lo = entry && Number(p.stop) > 0 ? Number(p.stop) / entry : 0.86;
+    const hi = entry && Number(p.target) > 0 ? Number(p.target) / entry : 1.5;
+    const title = [
+      p.eth != null ? Number(p.eth).toFixed(6) + " ETH in" : null,
+      entry ? "stop " + pct(lo - 1) : "stop not reported",
+      entry ? "target " + pct(hi - 1) : null,
+      now == null ? "no desk mark yet" : "now " + pct(now - 1),
+      p.openedAt ? "opened " + dashWhen(p.openedAt) : null,
+    ].filter(Boolean).join(" \u00b7 ");
+    const r = dashNode("div", "trow");
+    const name = dashNode("b", "", p.symbol || String(p.mint || "").slice(0, 6) + "\u2026");
+    name.title = p.mint || "";
+    r.append(name, bar(lo, hi, now, title, { flat: now == null }));
+    card.append(r);
+  }
+  if (!held.length) card.append(dashNode("p", "dp-note", "The bot reports no open position."));
+  card.append(dashNode("p", "dp-note",
+    "Closed trades are not on this board yet: the executor does not report its own exits, " +
+    "so the desk cannot show a settled record it has not been told."));
+  el.appendChild(card);
 }
 
 const CANDIDATE_BANDS = [
