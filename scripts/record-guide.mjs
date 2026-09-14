@@ -55,15 +55,19 @@ fs.mkdirSync(path.join(WORK, "voice"), { recursive: true });
    clip, the hold. A guide that quotes a number the machine does not use is marketing;
    the assertion below keeps these two honest with each other. */
 export const CHAPTERS = [
-  { id: "tower",    title: "The tower",       say: "This is Claude Tower on Robinhood Chain. Fifty floors, one automated research desk each. The house desk sits upstairs on floor fifty, and it publishes the coins it would trade." },
-  { id: "lease",    title: "Lease a floor",   say: "Pick any vacant floor. Here is what it costs, one floor per wallet. Beside it is the house bot's real record, kept with the house's own money." },
-  { id: "enter",    title: "Watch HQ live",   say: "Watch H Q live. The house floor is open to everyone, with no sign-in needed." },
-  { id: "overview", title: "The Overview",    say: "The Overview. The bot's profit and loss out of its own journal, what it holds right now, and every closed trade drawn as a bar from the stop to the target." },
-  { id: "calls",    title: "The calls",       say: "Calls. Everything the desk published, each with an entry, a stop and a target. These are the calls your bot takes." },
-  { id: "wallste",  title: "WALL-ST-E",       say: "Wall Street E is the bot. Your own machine, your own key, your own caps. This chain charges a flat six hundred and sixty one thousand gas for a round trip, whatever the size, so the position is what decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default." },
-  { id: "team",     title: "Your track",      say: "Team. The sixteen analysts and the boss who work this floor. On a floor you lease, this tab is also where you choose who runs your bot: yourself, with one command, and the key made on your own machine." },
-  { id: "board",    title: "The board",       say: "And on the wall, the board keeps the live book, redrawn every ten seconds." },
-  { id: "end",      title: "Plug in",         say: "Lease a floor. Plug in. Let it work." },
+  { id: "hook",     title: "Fifty floors",     say: "Fifty floors. Sixteen analysts on every one of them. And a bot that trades what they publish \u2014 on Robinhood Chain, with your key, on your machine." },
+  { id: "tower",    title: "The tower",        say: "This is Claude Tower. Every floor is one automated research desk, working the same chain, around the clock. The house desk runs upstairs on floor fifty, and everything it finds is published in the open." },
+  { id: "directory",title: "The directory",    say: "Forty nine floors are yours to take. Floor fifty is the house. Every floor shows its own record \u2014 nothing is hidden behind a login, and nothing is back-dated." },
+  { id: "lease",    title: "Lease a floor",    say: "Pick a vacant floor and here is what it costs. One floor per wallet. Beside it, the house bot's real record, kept with the house's own money." },
+  { id: "enter",    title: "Walk in",          say: "Let's walk into headquarters. No sign-in, no pass, no waiting list." },
+  { id: "desk",     title: "The desk",         say: "This is the floor. Sixteen agents, each with one job and one question to answer. A scout hunting today's launches. Forensics reading the contract for traps. Liquidity asking the only question that matters \u2014 can I get back out. And a red team paid to argue that the whole idea loses money." },
+  { id: "overview", title: "The book",         say: "The Overview is the desk's own book. Profit and loss straight out of the journal, what the bot is holding right now, and every closed trade drawn from its stop to its target." },
+  { id: "calls",    title: "The calls",        say: "Calls. Every idea the desk publishes, with an entry, a stop and a target, timestamped the moment it was made. Nothing is edited after the fact. These are the calls your bot takes." },
+  { id: "team",     title: "Your team",        say: "The Team tab is the roster \u2014 and on a floor you lease, it is where you choose who runs your bot. That is one command on your own machine, and a key that never leaves it." },
+  { id: "wallste",  title: "WALL-ST-E",        say: "Wall Street E is the bot. Here is the thing this chain does differently: gas is flat. Six hundred and sixty one thousand units a round trip, whatever you trade. So the size of the position, not the price of the coin, decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default." },
+  { id: "custody",  title: "Your key",         say: "The desk never holds a key. It cannot reach your wallet, it cannot move your money, and it never sees your private key \u2014 that is made on your machine and stays there. The site publishes research. You trade, or you don't." },
+  { id: "board",    title: "The board",        say: "And on the wall, the board keeps the live book, redrawn every ten seconds." },
+  { id: "end",      title: "Plug in",          say: "Lease a floor. Plug in. Let it work." },
 ];
 
 /* THE NARRATION AND THE REGISTRY MUST AGREE. The Solana desk's own lesson — two copies
@@ -77,7 +81,10 @@ export const CHAPTERS = [
   const said = CHAPTERS.find((c) => c.id === "wallste").say;
   if (clip !== 0.0112) throw new Error(`the narration says 0.0112 ETH; the registry says ${clip}. Re-record with the right words.`);
   if (gasK !== 661) throw new Error(`the narration says 661k gas; the registry says ${gasK}k. Re-record with the right words.`);
-  if (!/eleven point two thousandths/.test(said) || !/six hundred and sixty one thousand/.test(said))
+  /* Case-insensitive: the sentence that carries the gas figure may begin with it, and a
+     capital letter is not a changed number. The guard exists to catch a number that
+     drifted from the registry, not a rewritten sentence. */
+  if (!/eleven point two thousandths/i.test(said) || !/six hundred and sixty one thousand/i.test(said))
     throw new Error("the WALL-ST-E line no longer spells out the registry's numbers");
 }
 
@@ -90,7 +97,11 @@ const wavSeconds = (file) => {
 const spoken = {};
 for (const c of CHAPTERS) {
   const wav = path.join(WORK, "voice", `${c.id}.wav`);
-  execFileSync("python3", ["-m", "piper", "--model", VOICE, "--output_file", wav, "--length_scale", "1.05"], { input: c.say });
+  /* LENGTH_SCALE IS THE DELIVERY, NOT A DETAIL. 1.05 read as a man reciting a form;
+     0.96 is closer to someone telling you about something they built. The voice itself
+     is chosen by PIPER_VOICE — en_US-ryan-high carries sentence stress that the medium
+     models flatten, which is most of the difference between "narrated" and "read". */
+  execFileSync("python3", ["-m", "piper", "--model", VOICE, "--output_file", wav, "--length_scale", "0.96"], { input: c.say });
   spoken[c.id] = wavSeconds(wav);
 }
 const holdFor = (id, floorMs) => Math.max(floorMs, Math.ceil(spoken[id] * 1000) + 900);
@@ -153,7 +164,12 @@ const VACANT = await (async () => {
     return vacant[0] || 14;
   } catch { return 14; }
 })();
-const PALETTE = [[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],[255,128,0],[128,0,255],[0,128,255]];
+/* One colour per chapter, and they must stay far apart in RGB: the chapter clock is
+   read back by sampling this marker out of the finished video, and nearest() only
+   accepts a match inside 90 units. Thirteen chapters, thirteen corners of the cube. */
+const PALETTE = [[255,0,0],[0,255,0],[0,0,255],[255,255,0],[255,0,255],[0,255,255],
+                 [255,128,0],[128,0,255],[0,128,255],[128,255,0],[255,0,128],[0,255,128],[255,255,255]];
+if (PALETTE.length < CHAPTERS.length) throw new Error("every chapter needs its own marker colour");
 const t0 = Date.now();
 const marks = [];
 const chapter = async (id) => {
@@ -175,29 +191,89 @@ const clickTab = async (dest) => {
   if (!found) throw new Error(`the floor page has no tab "${dest}" — the site changed; fix the chapter list`);
 };
 
+/* ── CAMERA WORK, THROUGH THE PAGE'S OWN CONTROLS ─────────────────────────────
+ * The first take opened on tower.html at its default framing and the building came out
+ * a speck in a purple void, cropped off the bottom — a guide to a fifty-floor tower in
+ * which you cannot see the tower. Both fixes drive the real UI rather than poking the
+ * scene graph: the page's wheel handler owns the zoom (camWorldWidth, clamped 16..150,
+ * default 78) and its pointer handlers own the orbit, so the recording can never
+ * desync from what a visitor's own mouse would do. Reaching past them into
+ * __tower.camera would also have been undone on the next frame: placeCamera() runs
+ * every frame from module-scoped state. */
+const stage = "#stage, canvas";
+const wheelBy = async (deltaY, steps = 8) => {
+  const box = await page.locator(stage).first().boundingBox();
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  for (let i = 0; i < steps; i++) {
+    await page.mouse.move(cx, cy);
+    await page.mouse.wheel(0, deltaY / steps);
+    await page.waitForTimeout(40);
+  }
+};
+const orbitBy = async (dx, ms = 2200) => {
+  const box = await page.locator(stage).first().boundingBox();
+  const cy = box.y + box.height * 0.55;
+  const from = box.x + box.width * 0.45;
+  await page.mouse.move(from, cy);
+  await page.mouse.down();
+  const steps = Math.max(12, Math.round(ms / 45));
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(from + (dx * i) / steps, cy, { steps: 1 });
+    await page.waitForTimeout(ms / steps);
+  }
+  await page.mouse.up();
+};
+
 await page.goto(`${SITE}/tower.html`, { waitUntil: "load", timeout: 120000 });
-await hold(2500);
-await chapter("tower");            await hold(holdFor("tower", 7000));
+await hold(3000);
+/* WIDE, THEN IN. The line over the opening shot is "fifty floors", so the opening shot
+   has to contain fifty floors: the first cut pushed straight to about 34 world units and
+   said it over a close-up of the penthouse. Establish the whole building (78 -> ~53),
+   then push in on the second chapter, which is where the detail belongs. */
+await wheelBy(-420);
+await hold(700);
+
+await chapter("hook");        await orbitBy(200, 3000);
+                              await hold(Math.max(600, holdFor("hook", 6500) - 3000));
+await chapter("tower");       await wheelBy(-340, 10);
+                              await orbitBy(-240, 3200);
+                              await hold(Math.max(600, holdFor("tower", 9500) - 3600));
+await chapter("directory");   await hold(holdFor("directory", 8000));
 await chapter("lease");
 await page.evaluate((n) => { try { select(n, true); } catch {} }, VACANT);
 await hold(holdFor("lease", 8000));
-await chapter("enter");            await hold(2500);
+
+await chapter("enter");       await hold(holdFor("enter", 4000));
 await page.goto(`${SITE}/floor.html?floor=50`, { waitUntil: "load", timeout: 120000 });
 await hold(9000);
-await chapter("overview");         await clickTab("overview"); await hold(5000);
-await page.evaluate(() => document.querySelector(".bot-book")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-await hold(holdFor("overview", 11000) - 5000);
-await chapter("calls");            await clickTab("calls");    await hold(holdFor("calls", 7000));
-await chapter("wallste");          await clickTab("wallste");  await hold(holdFor("wallste", 6000));
-await chapter("team");             await clickTab("team");     await hold(3000);
+
+/* THE OFFICE IS THE BEST SHOT ON THE SITE and the first take walked straight past it
+   into the tabs. Close the rail, let the room and its named agents carry the chapter. */
+await chapter("desk");
+await page.evaluate(() => { try { closeRail(); } catch {} });
+await hold(holdFor("desk", 15000));
+
+await chapter("overview");    await clickTab("overview"); await hold(4500);
+await page.evaluate(() => document.querySelector(".bot-book")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+await hold(Math.max(1000, holdFor("overview", 11000) - 4500));
+await chapter("calls");       await clickTab("calls");    await hold(holdFor("calls", 9000));
+await chapter("team");        await clickTab("team");     await hold(3000);
 await page.evaluate(() => (document.querySelector("[data-runner-option]") || document.querySelector("#teamcontrolpanel"))?.scrollIntoView({ block: "start", behavior: "smooth" }));
-await hold(holdFor("team", 12000) - 3000);
+await hold(Math.max(1000, holdFor("team", 12000) - 3000));
+await chapter("wallste");     await clickTab("wallste");  await hold(holdFor("wallste", 18000));
+await chapter("custody");     await hold(holdFor("custody", 12000));
 await chapter("board");
 await page.evaluate(() => { try { closeRail(); } catch {} });
 await hold(holdFor("board", 7000));
-await chapter("end");              await hold(holdFor("end", 4500));
+await chapter("end");         await hold(holdFor("end", 4500));
+/* TAIL PADDING, BECAUSE THE ENCODER LOSES THE LAST FEW SECONDS. Playwright finalises the
+   video when the context closes, and the first take of this cut ran 197.4s by the wall
+   clock and 191.2s in the file — the closing chapter's marker was never written, and the
+   readback below correctly refused to place it. The caption is cleared and the page then
+   sits for six seconds doing nothing, so what the encoder drops is padding rather than
+   the last thing the film says. */
 await page.evaluate(() => window.__cap?.("", "", "transparent"));
-await hold(800);
+await hold(6000);
 const video = page.video();
 await ctx.close();
 const webm = await video.path();
@@ -217,10 +293,24 @@ const nearest = (r, g, b) => {
   return d < 90 * 90 ? best : -1;
 };
 const seq = []; for (let i = 0; i + 2 < raw.length; i += 3) seq.push(nearest(raw[i], raw[i + 1], raw[i + 2]));
+/* MONOTONIC, BECAUSE CHAPTERS ARE. Searching the whole film for each colour from zero
+   put the last chapter at 0.0s: a Playwright recording opens on about a second of blank
+   WHITE page before the first paint, and the thirteenth marker is white. Any colour can
+   collide with something that happens before its chapter — the browser's own loading
+   frames, a flash of a light theme — and no palette fixes that in general. Chapter k+1
+   cannot begin before chapter k, so each search starts where the last one ended, and a
+   collision earlier in the film is simply never looked at. */
+let from = 0;
 marks.forEach((m, k) => {
-  for (let i = 0; i + 2 < seq.length; i++) if (seq[i] === k && seq[i + 1] === k && seq[i + 2] === k) { m.at = i / 10; return; }
-  console.warn(`chapter ${m.id}: marker not found in the video; keeping the wall-clock second ${m.at}`);
+  for (let i = from; i + 2 < seq.length; i++)
+    if (seq[i] === k && seq[i + 1] === k && seq[i + 2] === k) { m.at = i / 10; from = i + 1; return; }
+  console.warn(`chapter ${m.id}: marker not found after ${(from / 10).toFixed(1)}s; keeping the wall-clock second ${m.at}`);
 });
+/* A chapter map that is not increasing would put narration under the wrong screen, which
+   is the whole failure this readback exists to prevent. Refuse rather than ship it. */
+for (let i = 1; i < marks.length; i++)
+  if (!(marks[i].at > marks[i - 1].at))
+    throw new Error(`chapter clock is not monotonic: ${marks[i - 1].id}@${marks[i - 1].at}s then ${marks[i].id}@${marks[i].at}s`);
 
 /* 4 · THE MIX: each line laid at its chapter's second, then muxed with the picture. */
 const inputs = [];
