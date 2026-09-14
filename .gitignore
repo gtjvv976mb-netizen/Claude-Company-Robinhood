@@ -16,3 +16,7 @@ reports/*.md
 
 # paper-trade.mjs caches GeckoTerminal responses so a rerun costs no rate limit
 executor/.paper-cache/
+
+# The guide recorder scratch: raw takes and synthesized voice. The finished
+# media in token/ is committed; this is the workshop floor.
+.guide-work/
