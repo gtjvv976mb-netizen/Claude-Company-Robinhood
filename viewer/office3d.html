@@ -275,6 +275,13 @@ body{
 .dashmetric small{display:block;margin-top:4px;color:var(--ink-faint);font-size:10.5px;line-height:1.35}
 .dashsection{padding:12px;border:1px solid var(--card-line);border-radius:10px;background:var(--card)}
 .dashsection h4{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)}
+.guide-video{display:block;width:100%;aspect-ratio:16/9;border-radius:10px;background:#000;max-height:60vh}
+.guide-cap{min-height:2.6em;margin:8px 0 6px;font-size:13px;line-height:1.45;opacity:.88}
+.guide-chapters{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.guide-ch{width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 9px;border:1px solid rgba(128,128,128,.28);border-radius:8px;background:transparent;color:inherit;font:inherit;font-size:11.5px;cursor:pointer;text-align:left}
+.guide-ch b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.guide-ch span{opacity:.6;font-variant-numeric:tabular-nums;flex:none}
+.guide-ch.on{border-color:var(--claude,#d97757);box-shadow:inset 0 0 0 1px var(--claude,#d97757)}
 .dashactions{display:flex;gap:7px;flex-wrap:wrap}
 .dashactions .dp-btn{min-height:31px}
 .subtabs{display:flex;gap:5px;padding:9px 12px;border-bottom:1px solid var(--panel-line);background:var(--card)}
@@ -738,6 +745,7 @@ select.dp-in{cursor:pointer}
   <div class="sr" id="alert-live" role="status" aria-live="polite"></div>
   <div class="dock" id="primary-nav" role="tablist" aria-label="Floor dashboard destinations">
     <button class="dtab" id="dash-tab-overview" role="tab" aria-controls="overviewpanel" aria-selected="false" tabindex="0" data-destination="overview">Overview</button>
+    <button class="dtab" id="dash-tab-guide" role="tab" aria-controls="guidepanel" aria-selected="false" tabindex="-1" data-destination="guide">Guide</button>
     <button class="dtab" id="dash-tab-calls" role="tab" aria-controls="callsworkspace" aria-selected="false" tabindex="-1" data-destination="calls">Calls<span class="dot" id="live-dot"></span></button>
     <button class="dtab" id="dash-tab-wallste" role="tab" aria-controls="wallstepanel" aria-selected="false" tabindex="-1" data-destination="wallste">WALL-ST-E</button>
     <button class="dtab" id="dash-tab-team" role="tab" aria-controls="teampanel" aria-selected="false" tabindex="-1" data-destination="team">Team</button>
@@ -771,6 +779,9 @@ select.dp-in{cursor:pointer}
       <div class="dashbody" id="overviewbody"></div>
     </section>
 
+    <section class="dashpanel" id="guidepanel" role="tabpanel" aria-labelledby="dash-tab-guide" tabindex="0" hidden>
+      <div class="dashbody" id="guidebody"></div>
+    </section>
     <section class="dashpanel" id="callsworkspace" role="tabpanel" aria-labelledby="dash-tab-calls" tabindex="0" hidden>
       <div class="subtabs" role="tablist" aria-label="Calls views">
         <button class="subtab" id="calls-tab-candidates" role="tab" aria-controls="candidatepanel" aria-selected="true" tabindex="0" data-calls-view="candidates">Candidates</button>
@@ -8342,7 +8353,7 @@ const RAIL = document.getElementById("rail");
 const RAIL_TITLE = document.getElementById("rail-title");
 const DASHBOARD_TITLE = { overview: "Overview", calls: "Calls", wallste: "WALL-ST-E",
   team: "Team", callouts: "Callouts", activity: "Activity", performance: "Performance", settings: "Settings" };
-const DASHBOARD_PANEL = { overview: "overviewpanel", calls: "callsworkspace", wallste: "wallstepanel",
+const DASHBOARD_PANEL = { overview: "overviewpanel", guide: "guidepanel", calls: "callsworkspace", wallste: "wallstepanel",
   team: "teampanel", callouts: "calloutspanel", activity: "activityworkspace",
   performance: "performanceworkspace", settings: "settingspanel" };
 const primaryTabs = [...document.querySelectorAll("#primary-nav [role=tab][data-destination]")];
@@ -11737,8 +11748,87 @@ async function loadSettingsDashboard() {
   }
 }
 
+/* ── THE GUIDE ────────────────────────────────────────────────────────────────
+ * Ported from the Solana tower's floor, which is where this HUD comes from. The
+ * recording is a real take of THIS site (scripts/record-guide.mjs), so the panel
+ * only ever plays media the build published — it invents nothing and fetches
+ * nothing from the API.
+ *
+ * The caption under the player follows the video's own clock rather than a timer
+ * of its own: chapter seconds were read back from the finished file's frames, so
+ * `timeupdate` is the only clock that cannot drift away from the picture. */
+const GUIDE_VIDEO = "assets/guide-walkthrough.mp4";
+const GUIDE_VIDEO_WEBM = "assets/guide-walkthrough.webm";
+const GUIDE_CHAPTERS = "assets/guide-chapters.json";
+let guideLoaded = false;
+async function loadGuideDashboard() {
+  const el = document.getElementById("guidebody");
+  if (!el || guideLoaded) return;
+  guideLoaded = true;
+  el.innerHTML = "";
+  dashReady(el);
+  el.append(dashLead(null,
+    "Two minutes on the real site: the tower, a lease, the house floor, the bot, and how to plug in yourself. " +
+    "Every step is a real click on the published pages, and the numbers on screen were live when it was recorded."));
+  const wrap = dashNode("section", "dashsection guide");
+  const video = document.createElement("video");
+  video.className = "guide-video"; video.controls = true; video.playsInline = true; video.preload = "metadata";
+  /* H.264 first, VP9 second: a Chromium build without H.264 falls through to the
+     second source, and a browser without VP9 never reaches it. */
+  for (const [src, type] of [[GUIDE_VIDEO, "video/mp4"], [GUIDE_VIDEO_WEBM, "video/webm"]]) {
+    const source = document.createElement("source"); source.src = src; source.type = type; video.append(source);
+  }
+  video.setAttribute("aria-label", "Guided walkthrough of the tower and the house floor, narrated");
+  wrap.append(video);
+  const cap = dashNode("div", "guide-cap", "");
+  cap.setAttribute("aria-live", "polite");
+  wrap.append(cap);
+  const list = dashNode("ol", "guide-chapters");
+  wrap.append(list);
+  el.append(wrap);
+
+  let chapters = [];
+  try {
+    const r = await fetch(GUIDE_CHAPTERS, { cache: "no-store" });
+    if (r.ok) chapters = ((await r.json())?.chapters || []).filter((c) => Number.isFinite(Number(c.at)));
+  } catch {}
+  chapters.forEach((c, i) => {
+    const li = dashNode("li", "", "");
+    const b = dashNode("button", "guide-ch", "");
+    b.type = "button";
+    b.append(dashNode("b", "", String(i + 1) + " \u00b7 " + c.title), dashNode("span", "", Math.round(Number(c.at)) + "s"));
+    b.title = c.say;
+    b.onclick = () => { video.currentTime = Number(c.at); video.play().catch(() => {}); };
+    li.append(b);
+    list.append(li);
+  });
+  const current = () => {
+    let hit = null;
+    for (const c of chapters) if (video.currentTime + 0.05 >= Number(c.at)) hit = c;
+    return hit;
+  };
+  const follow = () => {
+    const c = current();
+    cap.textContent = c ? c.say : "";
+    [...list.querySelectorAll(".guide-ch")].forEach((b, i) => b.classList.toggle("on", chapters[i] === c));
+  };
+  video.addEventListener("timeupdate", follow);
+  video.addEventListener("seeked", follow);
+  /* A LOCAL PREVIEW HAS NO assets/ DIRECTORY. Say so in the caption rather than
+     leaving a dead black rectangle that reads as a broken site. */
+  video.querySelectorAll("source")[1]?.addEventListener("error", () => {
+    cap.textContent = "The recording is not published on this host yet. It ships with the site build (assets/guide-walkthrough.mp4).";
+  });
+  /* The play button, beside the figures, for a reader who has not found the controls. */
+  const play = dashNode("button", "dp-btn ghost", "Play the guide");
+  play.type = "button";
+  play.onclick = () => { video.play().catch(() => {}); video.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
+  el.append(play);
+}
+
 window.__loadDashboardDestination = (which) => {
   if (which === "overview") loadOverviewDashboard();
+  else if (which === "guide") loadGuideDashboard();
   else if (which === "calls") activateDashboardSubview("calls", dashboardSubview.calls);
   else if (which === "wallste") loadWallsteDashboard();
   else if (which === "team") window.__renderTeamInto?.(document.getElementById("teamcontrolpanel"), { includeBot: true });

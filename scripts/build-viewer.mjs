@@ -41,6 +41,10 @@ const ASSETS = [
   "banner-1500x500.png", "banner-1200x630.png",
   "codex-turntable-cover.png", "codex-turntable.gif", "codex-turntable.mp4",
   "grox-mulder-front.png",
+  /* The guide recording, both codecs, and its chapter map. The GUIDE tab plays these
+     from assets/; the copy loop below throws on a missing file, so a build can never
+     publish a floor whose Guide tab is a dead black rectangle. */
+  "guide-walkthrough.mp4", "guide-walkthrough.webm", "guide-chapters.json",
 ];
 const PUBLIC_FONTS = ["Archivo-Bold.ttf", "InstrumentSerif-Regular.ttf"];
 // Publish only the finished article artifacts. README files, render templates,

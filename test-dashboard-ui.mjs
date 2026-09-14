@@ -11,6 +11,10 @@ const destinations = [...html.matchAll(
 )].map((match) => [match[1], match[2].trim()]);
 assert.deepEqual(destinations, [
   ["overview", "Overview"],
+  /* GUIDE sits second, where the Solana tower puts it: a reader who has just arrived
+     wants the walkthrough before the working tabs, and it is the only tab that explains
+     the other seven. */
+  ["guide", "Guide"],
   ["calls", "Calls"],
   ["wallste", "WALL-ST-E"],
   ["team", "Team"],
@@ -18,9 +22,13 @@ assert.deepEqual(destinations, [
   ["activity", "Activity"],
   ["performance", "Performance"],
   ["settings", "Settings"],
-], "the redesigned HUD exposes eight purposeful destinations in order");
+], "the redesigned HUD exposes nine purposeful destinations in order");
 assert.match(html, /id="primary-nav" role="tablist"/);
-assert.equal((html.match(/data-destination=/g) || []).length, 8);
+/* Derived, not a second literal: this counts every data-destination in the file against
+   the tab strip parsed above, so it catches a destination declared somewhere the strip
+   does not show it — and it cannot drift out of step with the list when a tab is added. */
+assert.equal((html.match(/data-destination=/g) || []).length, destinations.length,
+  "every data-destination in the file belongs to a tab in the strip");
 assert.doesNotMatch(html.slice(html.indexOf('id="primary-nav"'), html.indexOf("</div>", html.indexOf('id="primary-nav"'))), />Whales</,
   "Whales is no longer a visible destination");
 
