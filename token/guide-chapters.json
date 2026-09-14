@@ -1,61 +1,85 @@
 {
   "site": "https://robinhood.claudedotcompany.com",
-  "recordedAt": "2026-09-13T21:04:42.500Z",
-  "duration": 107.5,
+  "recordedAt": "2026-09-14T22:34:21.702Z",
+  "duration": 198.3,
   "chapters": [
+    {
+      "id": "hook",
+      "title": "Fifty floors",
+      "say": "Fifty floors. Sixteen analysts on every one of them. And a bot that trades what they publish — on Robinhood Chain, with your key, on your machine.",
+      "at": 8.3
+    },
     {
       "id": "tower",
       "title": "The tower",
-      "say": "This is Claude Tower on Robinhood Chain. Fifty floors, one automated research desk each. The house desk sits upstairs on floor fifty, and it publishes the coins it would trade.",
-      "at": 4
+      "say": "This is Claude Tower. Every floor is one automated research desk, working the same chain, around the clock. The house desk runs upstairs on floor fifty, and everything it finds is published in the open.",
+      "at": 30.3
+    },
+    {
+      "id": "directory",
+      "title": "The directory",
+      "say": "Forty nine floors are yours to take. Floor fifty is the house. Every floor shows its own record — nothing is hidden behind a login, and nothing is back-dated.",
+      "at": 62.2
     },
     {
       "id": "lease",
       "title": "Lease a floor",
-      "say": "Pick any vacant floor. Here is what it costs, one floor per wallet. Beside it is the house bot's real record, kept with the house's own money.",
-      "at": 15.6
+      "say": "Pick a vacant floor and here is what it costs. One floor per wallet. Beside it, the house bot's real record, kept with the house's own money.",
+      "at": 71.2
     },
     {
       "id": "enter",
-      "title": "Watch HQ live",
-      "say": "Watch H Q live. The house floor is open to everyone, with no sign-in needed.",
-      "at": 25.3
+      "title": "Walk in",
+      "say": "Let's walk into headquarters. No sign-in, no pass, no waiting list.",
+      "at": 79.7
+    },
+    {
+      "id": "desk",
+      "title": "The desk",
+      "say": "This is the floor. Sixteen agents, each with one job and one question to answer. A scout hunting today's launches. Forensics reading the contract for traps. Liquidity asking the only question that matters — can I get back out. And a red team paid to argue that the whole idea loses money.",
+      "at": 96.5
     },
     {
       "id": "overview",
-      "title": "The Overview",
-      "say": "The Overview. The bot's profit and loss out of its own journal, what it holds right now, and every closed trade drawn as a bar from the stop to the target.",
-      "at": 41.5
+      "title": "The book",
+      "say": "The Overview is the desk's own book. Profit and loss straight out of the journal, what the bot is holding right now, and every closed trade drawn from its stop to its target.",
+      "at": 113.1
     },
     {
       "id": "calls",
       "title": "The calls",
-      "say": "Calls. Everything the desk published, each with an entry, a stop and a target. These are the calls your bot takes.",
-      "at": 53.3
+      "say": "Calls. Every idea the desk publishes, with an entry, a stop and a target, timestamped the moment it was made. Nothing is edited after the fact. These are the calls your bot takes.",
+      "at": 125
+    },
+    {
+      "id": "team",
+      "title": "Your team",
+      "say": "The Team tab is the roster — and on a floor you lease, it is where you choose who runs your bot. That is one command on your own machine, and a key that never leaves it.",
+      "at": 135.8
     },
     {
       "id": "wallste",
       "title": "WALL-ST-E",
-      "say": "Wall Street E is the bot. Your own machine, your own key, your own caps. This chain charges a flat six hundred and sixty one thousand gas for a round trip, whatever the size, so the position is what decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default.",
-      "at": 61.6
+      "say": "Wall Street E is the bot. Here is the thing this chain does differently: gas is flat. Six hundred and sixty one thousand units a round trip, whatever you trade. So the size of the position, not the price of the coin, decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default.",
+      "at": 148.6
     },
     {
-      "id": "team",
-      "title": "Your track",
-      "say": "Team. The sixteen analysts and the boss who work this floor. On a floor you lease, this tab is also where you choose who runs your bot: yourself, with one command, and the key made on your own machine.",
-      "at": 82.1
+      "id": "custody",
+      "title": "Your key",
+      "say": "The desk never holds a key. It cannot reach your wallet, it cannot move your money, and it never sees your private key — that is made on your machine and stays there. The site publishes research. You trade, or you don't.",
+      "at": 168.6
     },
     {
       "id": "board",
       "title": "The board",
       "say": "And on the wall, the board keeps the live book, redrawn every ten seconds.",
-      "at": 94.9
+      "at": 180.9
     },
     {
       "id": "end",
       "title": "Plug in",
       "say": "Lease a floor. Plug in. Let it work.",
-      "at": 102.5
+      "at": 188.2
     }
   ]
 }
