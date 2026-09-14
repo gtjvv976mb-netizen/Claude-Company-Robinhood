@@ -26,6 +26,18 @@ services:
       mountPath: /var/data
       sizeGB: 1
     envVars:
+      # THE NODE VERSION IS PINNED, OR THE DISK IS THE ONLY THING THAT SURVIVES.
+      # This service was deployed with no Node version pinned anywhere — not here, not
+      # in .node-version, not in .nvmrc — and package.json only carries a RANGE
+      # (">=22.13.0 <25"). A range is not a pin: the platform picks, and the pick can
+      # change under a service that has not been redeployed in days. This app cannot
+      # run on the wrong side of that: src/lib/store.js imports DatabaseSync from
+      # node:sqlite, which does not exist before Node 22.5, so an older default turns
+      # every boot and every one of the 114 test files into an import error. Pinned in
+      # two places on purpose — .node-version is what the build image reads, and this
+      # is what a reader of the blueprint sees. test-node-pin.mjs holds them equal.
+      - key: NODE_VERSION
+        value: "22.22.2"
       - key: CLAUDE_CO_DB
         value: /var/data/claude-co.db      # on the disk, not the ephemeral filesystem
       # Robinhood Chain (chainId 4663, Arbitrum Nitro). The public RPC answered
