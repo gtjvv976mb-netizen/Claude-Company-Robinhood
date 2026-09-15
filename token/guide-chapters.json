@@ -1,85 +1,163 @@
 {
   "site": "https://robinhood.claudedotcompany.com",
-  "recordedAt": "2026-09-14T22:34:21.702Z",
-  "duration": 198.3,
+  "recordedAt": "2026-09-15T02:33:21.285Z",
+  "duration": 318.8,
   "chapters": [
     {
       "id": "hook",
       "title": "Fifty floors",
       "say": "Fifty floors. Sixteen analysts on every one of them. And a bot that trades what they publish — on Robinhood Chain, with your key, on your machine.",
-      "at": 8.3
+      "at": 1.5
     },
     {
       "id": "tower",
       "title": "The tower",
       "say": "This is Claude Tower. Every floor is one automated research desk, working the same chain, around the clock. The house desk runs upstairs on floor fifty, and everything it finds is published in the open.",
-      "at": 30.3
+      "at": 25.4
     },
     {
       "id": "directory",
       "title": "The directory",
-      "say": "Forty nine floors are yours to take. Floor fifty is the house. Every floor shows its own record — nothing is hidden behind a login, and nothing is back-dated.",
-      "at": 62.2
+      "say": "The directory. Forty nine floors are yours to take; floor fifty is the house. Every floor shows its own record — nothing hidden behind a login, nothing back-dated.",
+      "at": 59.2
     },
     {
       "id": "lease",
       "title": "Lease a floor",
-      "say": "Pick a vacant floor and here is what it costs. One floor per wallet. Beside it, the house bot's real record, kept with the house's own money.",
-      "at": 71.2
+      "say": "Pick a vacant floor and here is what it costs. One floor per wallet. And beside it, the house bot's real record, kept with the house's own money.",
+      "at": 68.8
     },
     {
       "id": "enter",
       "title": "Walk in",
       "say": "Let's walk into headquarters. No sign-in, no pass, no waiting list.",
-      "at": 79.7
+      "at": 78.1
     },
     {
       "id": "desk",
       "title": "The desk",
-      "say": "This is the floor. Sixteen agents, each with one job and one question to answer. A scout hunting today's launches. Forensics reading the contract for traps. Liquidity asking the only question that matters — can I get back out. And a red team paid to argue that the whole idea loses money.",
-      "at": 96.5
+      "say": "This is the floor. Sixteen agents. Each has one job and one question to answer, and they work in order — cheap code narrows the field, and the expensive minds only reason about what survived.",
+      "at": 91.6
     },
     {
-      "id": "overview",
-      "title": "The book",
-      "say": "The Overview is the desk's own book. Profit and loss straight out of the journal, what the bot is holding right now, and every closed trade drawn from its stop to its target.",
+      "id": "scout",
+      "title": "The scout",
+      "say": "Austin Powerz is the scout. He sweeps the field: every new launch on the chain, today, and what deserves attention right now.",
+      "at": 104.8
+    },
+    {
+      "id": "screener",
+      "title": "The screen",
+      "say": "Maxwell Smort runs the screen. It costs nothing and it kills most of them — no volume, no participants, too small, too big, a market that looks washed.",
       "at": 113.1
     },
     {
-      "id": "calls",
-      "title": "The calls",
-      "say": "Calls. Every idea the desk publishes, with an entry, a stop and a target, timestamped the moment it was made. Nothing is edited after the fact. These are the calls your bot takes.",
-      "at": 125
+      "id": "forensics",
+      "title": "Forensics",
+      "say": "Sterling Archor reads the contract. Loudly. Can this token be used against the holder — a pause switch, a blocklist, a proxy somebody else controls? He executes a real transfer in simulation and measures what actually arrives.",
+      "at": 122.8
+    },
+    {
+      "id": "liquidity",
+      "title": "Liquidity",
+      "say": "Ethan Hunted asks the only question that matters: can I get back out? He simulates the sell before anyone is allowed to buy. An unproven exit is a trap until proven otherwise.",
+      "at": 136.3
+    },
+    {
+      "id": "flow",
+      "title": "Flow",
+      "say": "Sam Fishy watches the real traffic, in the dark. Is the demand real, or manufactured?",
+      "at": 147.2
+    },
+    {
+      "id": "narrative",
+      "title": "Narrative",
+      "say": "Black Widower gets the truth out of the story. Is there one, is it true, and are we early?",
+      "at": 154.4
+    },
+    {
+      "id": "redteam",
+      "title": "The red team",
+      "say": "Then Agent Forty Eight. The red team. Paid to argue that the whole idea loses money — and if he wins the argument, there is no trade.",
+      "at": 161.7
+    },
+    {
+      "id": "risk",
+      "title": "Risk",
+      "say": "Mini-Meh makes your size smaller. The stop, the target and the position are derived from the numbers, never guessed.",
+      "at": 170
+    },
+    {
+      "id": "ceo",
+      "title": "The sign-off",
+      "say": "And Big C signs off. Or doesn't. Nothing is published without the boss.",
+      "at": 177.6
     },
     {
       "id": "team",
       "title": "Your team",
-      "say": "The Team tab is the roster — and on a floor you lease, it is where you choose who runs your bot. That is one command on your own machine, and a key that never leaves it.",
-      "at": 135.8
+      "say": "The Team tab is the roster. On a floor you lease, this is also where you choose who runs your bot — one command on your own machine, and a key that never leaves it.",
+      "at": 185.5
+    },
+    {
+      "id": "candidates",
+      "title": "Candidates",
+      "say": "Now the calls. Start with candidates: five ranked slots in every market-cap tier, captured after the free screen and before any decision. Not reviewed, not approved, not executable — and the page says so.",
+      "at": 198.3
+    },
+    {
+      "id": "published",
+      "title": "Published",
+      "say": "Published is what survived the whole floor. An entry, a stop and a target, timestamped the moment it was made, and never edited after. These are the calls your bot takes.",
+      "at": 212.4
+    },
+    {
+      "id": "book",
+      "title": "The book",
+      "say": "The Overview is the desk's own book. What the bot is holding, drawn from its stop to its target, with a dot where the coin stands now.",
+      "at": 223.1
+    },
+    {
+      "id": "tape",
+      "title": "The tape",
+      "say": "Activity. The tape is every event as it happened — names in, the shortlist, the workups — each one timestamped.",
+      "at": 233.4
+    },
+    {
+      "id": "decisions",
+      "title": "Decisions",
+      "say": "Decisions is the why. When a call was withheld, the reason is written down, in plain words, next to the coin.",
+      "at": 243.8
+    },
+    {
+      "id": "performance",
+      "title": "Performance",
+      "say": "Performance is the building's record. Floors leased, calls published, closed above entry, closed below. Settled results — not a projection.",
+      "at": 252.9
     },
     {
       "id": "wallste",
       "title": "WALL-ST-E",
-      "say": "Wall Street E is the bot. Here is the thing this chain does differently: gas is flat. Six hundred and sixty one thousand units a round trip, whatever you trade. So the size of the position, not the price of the coin, decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default.",
-      "at": 148.6
+      "say": "And this is Wall Street E. The bot. Here is the thing this chain does differently: gas is flat. Six hundred and sixty one thousand units a round trip, whatever you trade. So the size of the position, not the price of the coin, decides whether a trade can pay for itself. The measured cheapest clip is eleven point two thousandths of an E T H, and that is the default.",
+      "at": 264
     },
     {
       "id": "custody",
       "title": "Your key",
-      "say": "The desk never holds a key. It cannot reach your wallet, it cannot move your money, and it never sees your private key — that is made on your machine and stays there. The site publishes research. You trade, or you don't.",
-      "at": 168.6
+      "say": "The desk never holds a key. Its own bot panel is owner-only — the site cannot reach your wallet, cannot move your money, and never sees your private key. That key is made on your machine and stays there. The site publishes research. You trade, or you don't.",
+      "at": 285.4
     },
     {
       "id": "board",
       "title": "The board",
       "say": "And on the wall, the board keeps the live book, redrawn every ten seconds.",
-      "at": 180.9
+      "at": 300.1
     },
     {
       "id": "end",
       "title": "Plug in",
       "say": "Lease a floor. Plug in. Let it work.",
-      "at": 188.2
+      "at": 308.6
     }
   ]
 }
