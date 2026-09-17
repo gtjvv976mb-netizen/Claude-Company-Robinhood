@@ -29,7 +29,8 @@ import {
 } from "./journal.mjs";
 import { EvmExecutor, EXECUTION_READINESS_ROUTE, walletFromKeyFile } from "./evm-executor.mjs";
 import { createRpc, erc20Balance, gasPriceConsensus, isAddress, fromHex, plainEthUnits } from "./evm-rpc.mjs";
-import { expectedRoundTripPct, CHEAPEST_CLIP_ETH, MIN_CLIP_ETH, LIVE_CAPS } from "./live-thresholds.mjs";
+import { expectedRoundTripPct, CHEAPEST_CLIP_ETH, MIN_CLIP_ETH, LIVE_CAPS,
+  MAX_FEE_SHARE_OF_STOP, clampFeeShareOfStop } from "./live-thresholds.mjs";
 import { assertLiveReady, threshold } from "./thresholds.mjs";
 import {
   RpcBalanceUnavailableError, verifyTrackedBalanceWithFailover,
@@ -49,7 +50,7 @@ import {
 import {
   independentEthUsdPrice, ETH_USD_CACHE_SOURCE, ETH_USD_ORACLE_POLICY, usableEthUsdCache,
 } from "./eth-usd-oracle.mjs";
-import { DEFAULTS, ENTRY_MODES, planEntry, openPosition, stepPosition, freshState } from "./strategy.mjs";
+import { DEFAULTS, ENTRY_MODES, planEntry, openPosition, stepPosition, freshState, feeFloorFor } from "./strategy.mjs";
 import { policyConfigForPosition, resolveTakeProfitRule, validateEntryReference } from "./trade-policy.mjs";
 
 process.umask(0o077);
@@ -147,6 +148,11 @@ let lastDecisionSeen = Date.now() - 6 * 3600e3;
  *
  * Raising past these is still the caps ceremony below — all three set explicitly plus a
  * typed sentence naming this wallet and these numbers — and env may only ever lower. */
+/* An operator may TIGHTEN the share of the risked distance gas is allowed to eat, which
+   RAISES the derived floor and can only ever refuse more. Loosening it is refused at boot
+   by the clamp rather than accepted and quietly halving a safety floor. */
+const FEE_SHARE_OF_STOP = clampFeeShareOfStop(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP);
+
 const LIVE_LIMITS = Object.freeze({
   /* The four caps live in live-thresholds.mjs LIVE_CAPS, derived there from the measured
      cheapest clip, because simulate.mjs has to run the rails at the SAME scale this
@@ -1223,8 +1229,17 @@ async function onEntry(ev) {
   // Tenant sizes arrive as ETH decimal strings (fixed_eth); the operator cap wins.
   const fixed = Number(ev.fixed_eth) > 0 ? Math.min(Number(ev.fixed_eth), CFG.maxSolPerTrade) : CFG.fixedSol;
   const feeWei = EXECUTE ? await expectedNetworkFeeWei() : 0n;
+  /* THE FLOOR TWO GAS LEGS DERIVE AT THIS CALL'S STOP. Solved per call rather than
+     configured, because gas moved 0.02 -> 0.7 gwei in a fortnight and a constant would
+     have been wrong within the hour in whichever direction hurt. It can only ever REFUSE
+     (strategy.mjs feeFloorFor): its own cfg key, never minSolPerTrade, which also floors
+     conviction sizing and would turn an expensive network into a bigger position. */
+  const feeReserveEth = EXECUTE ? weiToEth(feeWei) : 0;
+  const feeFloor = feeFloorFor({ feeReserveSol: feeReserveEth,
+    effectiveStopFrac: Math.min(1, Number(entryReference.stopRatio) > 0 ? 1 - Number(entryReference.stopRatio) : 0),
+    maxFeeShareOfStop: FEE_SHARE_OF_STOP });
   const perCall = { ...CFG, ...takeProfitRule, fixedSol: fixed,
-    networkFeeReserveSol: EXECUTE ? weiToEth(feeWei) : 0 };
+    networkFeeReserveSol: feeReserveEth, feeFloorSolPerTrade: feeFloor };
   const normalizedCall = { ...ev, entry_ref: 1, stop: entryReference.stopRatio,
     target: entryReference.targetRatio, size_sol: ev.size_eth ?? ev.size_sol };
   let plan = planEntry({ call: normalizedCall, cfg: perCall, state: S.state });
@@ -1260,7 +1275,10 @@ async function onEntry(ev) {
   let lastRefusal = null;
   for (const fraction of ladder) {
     const sized = Number((plan.sol * fraction).toFixed(6));
-    if (fraction < 1 && sized < CFG.minSolPerTrade) break;
+    /* THE LADDER BREAKS WHERE planEntry WOULD REFUSE, not at the static floor alone.
+       Halving a clip past the derived fee floor only produces rungs the sizing engine
+       has already said no to, and each one costs a preflight round trip to learn it. */
+    if (fraction < 1 && sized < Math.max(CFG.minSolPerTrade, feeFloor)) break;
     preliminaryAmountWei = ethToWei(sized);
     try {
       [preflight, tokenDecimals, ethUsdOracle] = await Promise.all([

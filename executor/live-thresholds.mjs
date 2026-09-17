@@ -197,6 +197,47 @@ export const GATE_PROMOTION_SAMPLE = defineThreshold("gates.promotionSampleFloor
     note: "a new refusal clause records pass/would_refuse/unreadable until it clears this, " +
       "then a human reads observations-report.mjs and promotes it deliberately" });
 
+/* THE SHARE OF THE RISKED DISTANCE THAT NETWORK FEES MAY EAT.
+ *
+ * ASSUMED and live:false, and both labels are the honest ones. Nobody has measured that
+ * a quarter is the right share on chain 4663 — it is the desk's policy constant, and
+ * src/agents/risk-rails.js stopFloorDetail() already solves the PUBLISHED stop floor from
+ * it. This is its home; src/config.js imports it, the same direction SLIPPAGE_BPS and
+ * MIN_STOP_DISTANCE_PCT already travel. Do not launder it to MEASURED to satisfy
+ * assertLiveReady(): it is not a gate, it is the constant a derived gate is solved from,
+ * and that gate must earn its own promotion. INHERITED would be the wrong label too, and
+ * not a kinder one: in this registry INHERITED means VOID UNTIL RE-MEASURED and BLOCKING
+ * (thresholds.mjs, and test-thresholds.mjs holds every inherited row to value === null,
+ * live === true). A null here would delete the floor this constant derives, which is the
+ * opposite of what marking it honestly is for. ASSUMED — "a starting guess nobody has
+ * checked" — is exactly what 0.25 is on this chain.
+ *
+ * IT WAS ENV-LOOSENABLE, WHICH IS THE BUG. src/config.js read
+ * `Number(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP || 0.25)` with no clamp, so
+ * share=1 quartered the floor this constant derives and share=0 deleted it outright — a
+ * safety number an environment variable could switch off. Configuration may TIGHTEN a
+ * safety number and never loosen it, so the clamp below admits (0, 0.25] and throws on
+ * anything else rather than falling back to a default the operator did not ask for. */
+export const MAX_FEE_SHARE_OF_STOP = defineThreshold("exec.maxFeeShareOfStop", 0.25,
+  { provenance: P.ASSUMED, live: false, unit: "fraction",
+    note: "the share of the risked distance network fees may consume; risk-rails' " +
+      "stopFloorDetail() solves the published stop floor from it, and the executor's " +
+      "fee floor is solved from the same number so the two halves cannot disagree" });
+
+/** An override may only ever TIGHTEN. (0, 0.25]; anything else throws at boot. */
+export function clampFeeShareOfStop(raw) {
+  if (raw == null || raw === "") return MAX_FEE_SHARE_OF_STOP;
+  const v = Number(raw);
+  if (!Number.isFinite(v))
+    throw new Error(`EXECUTOR_MAX_FEE_SHARE_OF_STOP must be a number, got "${raw}"`);
+  if (!(v > 0))
+    throw new Error(`EXECUTOR_MAX_FEE_SHARE_OF_STOP must be above 0 — 0 deletes the fee floor entirely`);
+  if (v > MAX_FEE_SHARE_OF_STOP)
+    throw new Error(`EXECUTOR_MAX_FEE_SHARE_OF_STOP may only tighten: ${v} is above the ` +
+      `${MAX_FEE_SHARE_OF_STOP} the desk derives its published stop floor from`);
+  return v;
+}
+
 export const LIVE_CAPS = Object.freeze({
   maxEthPerTrade: CHEAPEST_CLIP_ETH,
   dailyEthCap: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
