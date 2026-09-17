@@ -63,7 +63,8 @@
  * author the number that checks the counterparty (evm-swap.mjs).
  */
 import { Wallet, Transaction } from "ethers";
-import { prepareSwap, quote, build, NATIVE_SENTINEL, isNative } from "./evm-swap.mjs";
+import { prepareSwap, quote, build, floorFrom, NATIVE_SENTINEL, isNative } from "./evm-swap.mjs";
+import { proveExit } from "./sell-proof.mjs";
 import { planApproval, assertApproved, residualAllowance } from "./approvals.mjs";
 import { validateExecutableEntryOrder } from "./entry-quote-guard.mjs";
 import { validateExecutableExitOrder } from "./exit-trigger.mjs";
@@ -861,6 +862,46 @@ export class EvmExecutor {
     const lossPct = Number((amount - back) * 1_000_000n / amount) / 10_000;
     return { forward: { outAmount: prepared.simulatedOut.toString(), quoted: prepared.quotedOut.toString() },
       reverse: { outAmount: back.toString() }, lossPct, prepared };
+  }
+
+  /**
+   * PROVE THE EXIT, OBSERVE-ONLY.
+   *
+   * The note on preflightExitMark below records this as a "documented downgrade from the
+   * Solana build, which simulated this — a sell simulation needs the allowance in place,
+   * and the wallet only grants that when it is actually selling." That premise is what
+   * this method breaks: an eth_call STATE OVERRIDE can hand the wallet the position and
+   * the allowance for the length of one request, so the sell can be executed in
+   * simulation before a single wei is spent. Nothing is signed and nothing is written.
+   *
+   * IT IS SEPARATE FROM preflightEntry ON PURPOSE. preflightEntry decides whether money
+   * moves; this decides nothing yet. Keeping them apart means a bug in here cannot change
+   * an entry, and the poller calls it in a try/catch that cannot fail a trade. It becomes
+   * a refusal only when gate_observations shows it has earned one.
+   */
+  async proveExitRoute(token, amountRaw, { floorBps = null } = {}) {
+    const amount = positiveWei(amountRaw, "exit proof amount");
+    /* The sell route the position would really take, built for THIS wallet. scopeCheck
+       is off: the buy leg already ran it, and re-running it here would refuse a token on
+       the measurement path for a reason the entry path has already judged. */
+    const sell = await prepareSwap(this.primary, {
+      tokenIn: token, tokenOut: NATIVE_SENTINEL, amountIn: amount, sender: this.address,
+      slippageBps: this.cfg.slippageBps, direction: "sell", scopeCheck: false,
+      hazards: { maxTaxBps: this.cfg.maxTransferTaxBps },
+    });
+    const quoted = BigInt(sell.quotedOut);
+    const floor = floorBps == null ? floorFrom(quoted, this.cfg.slippageBps)
+      : (quoted * BigInt(10_000 - floorBps)) / 10_000n;
+    /* One adapter, so storage-slots.mjs stays runnable offline against a fake chain. */
+    const call = async (to, data, overrides, opts = {}) => {
+      try {
+        const params = [{ ...opts, to, data }, "latest"];
+        if (overrides) params.push(overrides);
+        return { ok: true, data: await this.primary("eth_call", params) };
+      } catch (e) { return { ok: false, error: String(e?.message || e) }; }
+    };
+    return proveExit(call, { token, amount, router: sell.routerAddress, data: sell.data,
+      wallet: this.address, floor, quotedOut: quoted });
   }
 
   /** The exit mark: what selling the whole position returns, per the aggregator's

@@ -56,8 +56,13 @@ console.log("\nTHE TWO NUMBERS ARE DIFFERENT KINDS OF THING");
     /async function expectedNetworkFeeWei\(\)/.test(poller) &&
     /BigInt\(Math\.ceil\(EXECUTOR_CFG\.roundTripGasUnits \/ 2\)\) \* gas\.max/.test(poller) &&
     /roundTripGasUnits: threshold\("swap\.roundTripGasUnits"\)\.value/.test(poller));
+  /* The reserve is now named once and used twice — as the sizing reserve and as the input
+     to the derived fee floor — so the assertion follows it. What matters is unchanged:
+     it comes from feeWei (the per-tick COST MODEL) and never from the registry gate. */
   ok("the sizing reserve reads the cost model, not the gate",
-    /networkFeeReserveSol: EXECUTE \? weiToEth\(feeWei\)/.test(poller));
+    /const feeReserveEth = EXECUTE \? weiToEth\(feeWei\) : 0;/.test(poller) &&
+    /networkFeeReserveSol: feeReserveEth/.test(poller) &&
+    !/networkFeeReserveSol:[^,]*maxNetworkFeeWei/.test(poller));
   ok("the executable-cost guard reads the cost model, not the gate",
     /worstFeeRatio = Number\(2n \* feeWei/.test(poller));
   ok("the gate itself is enforced in the executor, before signing, as a comparison only",

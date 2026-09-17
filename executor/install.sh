@@ -160,7 +160,7 @@ if [ "$MODE" = "live" ]; then
     echo "live --expected-commit must exactly match the published commit $SOURCE_COMMIT" >&2
     exit 1
   fi
-  for source_file in poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs package.json package-lock.json; do
+  for source_file in poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs storage-slots.mjs sell-proof.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs package.json package-lock.json; do
     if [ -n "$(git -C "$source_root" status --porcelain -- "executor/$source_file")" ]; then
       echo "live source file executor/$source_file differs from commit $SOURCE_COMMIT" >&2
       exit 1
@@ -430,13 +430,13 @@ rollback_install() {
 trap rollback_install EXIT
 
 echo "▶ fetching the executor and shared policy…"
-RUNTIME_FILES=(poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs)
+RUNTIME_FILES=(poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs approvals.mjs scope-guard.mjs erc20-hazards.mjs storage-slots.mjs sell-proof.mjs thresholds.mjs live-thresholds.mjs eth-usd-oracle.mjs balance-verification.mjs entry-quote-guard.mjs exit-trigger.mjs feed-drain.mjs heartbeat-health.mjs sleep-assertion.mjs monitor.mjs strategy.mjs trade-policy.mjs)
 # TOOLS SHIP WITH THE RELEASE BUT ARE NOT THE TRADING RUNTIME. burner-backup.mjs is
 # never imported by poller.mjs, so it must stay out of RUNTIME_FILES: the installer,
 # launchd-runner.mjs and heartbeat-health.mjs's fingerprint all name the same trading
 # runtime, and a tool in that list would make the byte identity cover code that never
 # executes a trade. It is still downloaded, staged and syntax-checked.
-TOOL_FILES=(burner-backup.mjs live-roundtrip-4663.mjs)
+TOOL_FILES=(burner-backup.mjs live-roundtrip-4663.mjs observations-report.mjs)
 SOURCE_FILES=("${RUNTIME_FILES[@]}" "${TOOL_FILES[@]}" package.json package-lock.json)
 if [ "$MODE" = "live" ]; then
   echo "▶ staging immutable runtime blobs from commit $SOURCE_COMMIT"

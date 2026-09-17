@@ -63,6 +63,37 @@ export const HAZARD_SELECTORS = Object.freeze({
   }),
 });
 
+/* THE THREE THE DESK PROBES AND THIS FILE DID NOT SCAN FOR.
+ *
+ * src/data/evidence.js blacklistProbe() eth_calls six signatures; this scanner looked for
+ * six DIFFERENT ones, and the overlap is only three. So the copy that runs on the MONEY
+ * path — the one whose verdict decides whether a buy is signed — was blind to
+ * isBlocked(address), blocklist(address) and isFrozen(address), each of which is its own
+ * distinct mechanism for freezing this wallet's exit AFTER the buy has landed.
+ *
+ * THEY ARE OBSERVED, NOT ENFORCED, AND THE DISTINCTION IS THE POINT. Widening a bytecode
+ * scan by half with no population pass is exactly what the note at the top of this file
+ * forbids: a lint that cries wolf gets switched off, and a scan that starts refusing a
+ * chunk of the universe on day one is how a real hazard check gets disabled for the cases
+ * that mattered. These are reported on the verdict as `observedSelectors` and recorded as
+ * a gate observation; they earn their way into the refusal above only once
+ * observations-report.mjs shows their hit rate over at least GATE_PROMOTION_SAMPLE scans
+ * of coins the desk actually published.
+ *
+ * Selectors recomputed from the signatures at first write (keccak256(sig)[0:4]):
+ *   isBlocked(address)  -> 0xfbac3951
+ *   blocklist(address)  -> 0xe5c7160b
+ *   isFrozen(address)   -> 0xe5839836
+ * test-erc20-hazard-parity.mjs recomputes all nine, so a typo is a red test rather than a
+ * silently dead scan. */
+export const HAZARD_SELECTORS_OBSERVED = Object.freeze({
+  blocklist: Object.freeze({
+    "0xfbac3951": "isBlocked(address)",
+    "0xe5c7160b": "blocklist(address)",
+    "0xe5839836": "isFrozen(address)",
+  }),
+});
+
 /* THE HELPER, assembled at load. calldata = [token][to][amount][next?] (no selector).
  * It transfers `amount` of `token` from address(this) to `to`, reads balanceOf(to), and
  * when a fourth word is present, calls `to` (which must carry this same code) with
@@ -162,10 +193,17 @@ export function eip1167Target(code) {
  *  PUSH4 patterns Solidity's dispatcher emits (`63` + selector). */
 export function scanSelectors(code) {
   const body = String(code || "").toLowerCase().replace(/^0x/, "");
-  const hits = { pausable: [], blocklist: [] };
+  const hits = { pausable: [], blocklist: [], observed: [] };
   for (const [group, table] of Object.entries(HAZARD_SELECTORS)) {
     for (const [selector, signature] of Object.entries(table)) {
       if (body.includes("63" + selector.slice(2))) hits[group].push(signature);
+    }
+  }
+  /* Scanned by the same matcher, collected apart. A hit here is EVIDENCE, not a verdict:
+     nothing reads `observed` to refuse a trade until it has been promoted deliberately. */
+  for (const table of Object.values(HAZARD_SELECTORS_OBSERVED)) {
+    for (const [selector, signature] of Object.entries(table)) {
+      if (body.includes("63" + selector.slice(2))) hits.observed.push(signature);
     }
   }
   return hits;
@@ -192,10 +230,10 @@ export async function classifyErc20Hazards(rpc, { token, amount, holders = [], m
     return { tradeable: false, kind: "dangling_delegate", reason: `${token} delegates to ${logic}, which has no code` };
   const selectors = scanSelectors(logicCode);
   if (selectors.pausable.length)
-    return { tradeable: false, kind: "pausable", selectors, reason:
+    return { tradeable: false, kind: "pausable", selectors, observedSelectors: selectors.observed, reason:
       `${token} carries ${selectors.pausable.join(", ")} — whoever holds that role can freeze every exit` };
   if (selectors.blocklist.length)
-    return { tradeable: false, kind: "blocklist", selectors, reason:
+    return { tradeable: false, kind: "blocklist", selectors, observedSelectors: selectors.observed, reason:
       `${token} carries ${selectors.blocklist.join(", ")} — whoever holds that role can freeze THIS wallet's exit` };
 
   /* An upgradeable token behind a single key is a token whose transfer() can become
@@ -219,8 +257,11 @@ export async function classifyErc20Hazards(rpc, { token, amount, holders = [], m
   const tax = await measureTransferTax(rpc, { token, amount, holders, block: tag });
   const worst = Math.max(tax.buyTaxBps, tax.sellTaxBps);
   if (!(worst <= Number(maxTaxBps)))
-    return { tradeable: false, kind: "fee_on_transfer", tax, proxyAdmin, reason:
+    return { tradeable: false, kind: "fee_on_transfer", tax, proxyAdmin,
+      observedSelectors: selectors.observed, reason:
       `${token} keeps ${tax.buyTaxBps} bps on the way in and ${tax.sellTaxBps} bps on the way out (ceiling ${maxTaxBps}) — measured by executing a real transfer at block ${tag}` };
   return { tradeable: true, kind: clone ? "eip1167_clone" : implementation ? "erc1967_proxy" : "plain",
-    logic, proxyAdmin, tax, selectors };
+    logic, proxyAdmin, tax, selectors,
+    /* Evidence, not a verdict. The caller records it; nothing refuses on it yet. */
+    observedSelectors: selectors.observed };
 }

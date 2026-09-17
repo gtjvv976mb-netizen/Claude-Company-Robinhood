@@ -20,7 +20,8 @@ const num = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
    whether the desk's authored stop is one the bot can actually honour, so a second copy
    here is a divergence with a countdown on it. The registry carries the measurement and
    the date; this file carries the desk's use of it. */
-const { SLIPPAGE_BPS: REGISTERED_SLIPPAGE_BPS, MIN_STOP_DISTANCE_PCT: REGISTERED_MIN_STOP_PCT } =
+const { SLIPPAGE_BPS: REGISTERED_SLIPPAGE_BPS, MIN_STOP_DISTANCE_PCT: REGISTERED_MIN_STOP_PCT,
+  MAX_FEE_SHARE_OF_STOP: REGISTERED_MAX_FEE_SHARE, clampFeeShareOfStop } =
   await import("../executor/live-thresholds.mjs");
 
 export const CHARTER = fs.readFileSync(path.join(ROOT, "DESK.md"), "utf8");
@@ -136,7 +137,11 @@ minLiquidityUsd: num("DESK_MIN_LIQUIDITY_USD", 12000),   // overridden by DESK_O
    * calls on 2026-09-03. One definition, with provenance, imported. An env override is
    * kept for a deliberate local experiment and can only be a number someone typed. */
   executorSlippageBps: num("EXECUTOR_SLIPPAGE_BPS", REGISTERED_SLIPPAGE_BPS),
-  executorMaxFeeShareOfStop: Number(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP || 0.25),
+  /* THE REGISTRY IS THE HOME; THIS IMPORTS. The literal 0.25 used to live here beside an
+     uncapped env read, so EXECUTOR_MAX_FEE_SHARE_OF_STOP=1 quartered the fee floor this
+     number derives and =0 deleted it — a safety number configuration could switch off.
+     The clamp admits only a TIGHTER share and throws on anything else. */
+  executorMaxFeeShareOfStop: clampFeeShareOfStop(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP),
 
     /* THE STOP THAT COSTS ALONE WOULD TRIGGER.
      *

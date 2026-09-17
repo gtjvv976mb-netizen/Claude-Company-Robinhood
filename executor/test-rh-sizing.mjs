@@ -137,7 +137,13 @@ ok("the derivation reads the registry rather than a literal", () =>
    refuse. Both the poller and every copy of the caps now start from the registry's
    size.cheapestClipEth, so the default and the curve cannot drift apart. */
 ok("the live default clip IS the registry's measured cheapest clip", () => {
-  assert.match(poller, /maxEthPerTrade: CHEAPEST_CLIP_ETH,/);
+  /* The derivation moved into live-thresholds.mjs LIVE_CAPS so the simulator runs the
+     same rails the poller does. The assertion follows the number to its new home: the
+     registry reads the measured clip, and the poller spreads the registry. */
+  const registry = fs.readFileSync(new URL("./live-thresholds.mjs", import.meta.url), "utf8");
+  assert.match(registry, /maxEthPerTrade: CHEAPEST_CLIP_ETH,/);
+  assert.match(poller, /\.\.\.LIVE_CAPS,/);
+  assert.ok(!/maxEthPerTrade:\s*0\.0112/.test(poller), "no hardcoded clip in the poller");
   assert.ok(expectedRoundTripPct(CHEAPEST_CLIP_ETH) < expectedRoundTripPct(0.0004) / 5,
     "the default must sit near the minimum of the curve, not at its blown-up end");
 });

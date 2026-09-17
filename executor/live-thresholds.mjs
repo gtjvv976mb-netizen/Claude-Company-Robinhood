@@ -176,6 +176,75 @@ export const MIN_CLIP_ETH = defineThreshold("size.minClipEth", 0.004,
     "1.4% of 0.004 ETH; at the 2026-09-04 reading of 0.309 gwei it is 0.000204 ETH, 5.1%"),
     unit: "ETH", live: true });
 
+/* THE OPERATOR'S LIVE CAPS, IN ONE PLACE BECAUSE TWO READERS NEED THEM.
+   poller.mjs owned this arithmetic alone while it was the only reader. simulate.mjs is
+   the second: a simulation run at Solana's 0.05/0.5/0.15 against a 0.0112 ETH clip never
+   binds a portfolio brake, so it measured an engine whose rails were switched off — the
+   caps have to be the SAME numbers the live process uses, not a restatement of them.
+   Every one is derived from the measured cheapest clip above rather than chosen, so a
+   re-measurement of that one number moves the whole ladder. */
+/* HOW MANY OBSERVATIONS A NEW REFUSAL CLAUSE MUST ACCUMULATE BEFORE IT MAY KILL.
+   Deliberately ASSUMED and live:false, and both are the honest labels: this is not a
+   measurement of chain 4663, it is the desk's own claim floor (src/improvement-constants
+   CLAIM_SAMPLE_FLOOR, which src/perf.js edgeClaimable also reads) applied to the
+   executor's gates so one bar governs both halves of the company. Registering it as
+   measured would be a lie assertLiveReady() has no way to catch, and live:false is
+   correct because it decides no trade — it decides when a human is allowed to turn one
+   on. A lint that cries wolf gets switched off, so a gate that has not earned its
+   promotion does not get one. */
+export const GATE_PROMOTION_SAMPLE = defineThreshold("gates.promotionSampleFloor", 100,
+  { provenance: P.ASSUMED, live: false, unit: "observations",
+    note: "a new refusal clause records pass/would_refuse/unreadable until it clears this, " +
+      "then a human reads observations-report.mjs and promotes it deliberately" });
+
+/* THE SHARE OF THE RISKED DISTANCE THAT NETWORK FEES MAY EAT.
+ *
+ * ASSUMED and live:false, and both labels are the honest ones. Nobody has measured that
+ * a quarter is the right share on chain 4663 — it is the desk's policy constant, and
+ * src/agents/risk-rails.js stopFloorDetail() already solves the PUBLISHED stop floor from
+ * it. This is its home; src/config.js imports it, the same direction SLIPPAGE_BPS and
+ * MIN_STOP_DISTANCE_PCT already travel. Do not launder it to MEASURED to satisfy
+ * assertLiveReady(): it is not a gate, it is the constant a derived gate is solved from,
+ * and that gate must earn its own promotion. INHERITED would be the wrong label too, and
+ * not a kinder one: in this registry INHERITED means VOID UNTIL RE-MEASURED and BLOCKING
+ * (thresholds.mjs, and test-thresholds.mjs holds every inherited row to value === null,
+ * live === true). A null here would delete the floor this constant derives, which is the
+ * opposite of what marking it honestly is for. ASSUMED — "a starting guess nobody has
+ * checked" — is exactly what 0.25 is on this chain.
+ *
+ * IT WAS ENV-LOOSENABLE, WHICH IS THE BUG. src/config.js read
+ * `Number(process.env.EXECUTOR_MAX_FEE_SHARE_OF_STOP || 0.25)` with no clamp, so
+ * share=1 quartered the floor this constant derives and share=0 deleted it outright — a
+ * safety number an environment variable could switch off. Configuration may TIGHTEN a
+ * safety number and never loosen it, so the clamp below admits (0, 0.25] and throws on
+ * anything else rather than falling back to a default the operator did not ask for. */
+export const MAX_FEE_SHARE_OF_STOP = defineThreshold("exec.maxFeeShareOfStop", 0.25,
+  { provenance: P.ASSUMED, live: false, unit: "fraction",
+    note: "the share of the risked distance network fees may consume; risk-rails' " +
+      "stopFloorDetail() solves the published stop floor from it, and the executor's " +
+      "fee floor is solved from the same number so the two halves cannot disagree" });
+
+/** An override may only ever TIGHTEN. (0, 0.25]; anything else throws at boot. */
+export function clampFeeShareOfStop(raw) {
+  if (raw == null || raw === "") return MAX_FEE_SHARE_OF_STOP;
+  const v = Number(raw);
+  if (!Number.isFinite(v))
+    throw new Error(`EXECUTOR_MAX_FEE_SHARE_OF_STOP must be a number, got "${raw}"`);
+  if (!(v > 0))
+    throw new Error(`EXECUTOR_MAX_FEE_SHARE_OF_STOP must be above 0 — 0 deletes the fee floor entirely`);
+  if (v > MAX_FEE_SHARE_OF_STOP)
+    throw new Error(`EXECUTOR_MAX_FEE_SHARE_OF_STOP may only tighten: ${v} is above the ` +
+      `${MAX_FEE_SHARE_OF_STOP} the desk derives its published stop floor from`);
+  return v;
+}
+
+export const LIVE_CAPS = Object.freeze({
+  maxEthPerTrade: CHEAPEST_CLIP_ETH,
+  dailyEthCap: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
+  dailyLossLimitEth: Number((CHEAPEST_CLIP_ETH * 3).toFixed(6)),
+  maxOpenPositions: 4,
+});
+
 export const MIN_LIQUIDITY_USD = defineThreshold("screen.minLiquidityUsd", 2_000,
   { ...M("2026-09-07", "DexScreener sweep of the desk's own on-board RH universe: liquidity p10 $6.6k / " +
     "p50 $13.4k; the OPENNESS_LEVELS.open floor in src/config.js admits 59% of that sample where the " +

@@ -11,13 +11,14 @@ const site = target.replace(/\/$/, "");
    tooling. Must equal launchd-runner.mjs RUNTIME_FILES + install.sh RUNTIME_FILES, and
    scripts/build-viewer.mjs EXECUTOR_FILES must publish every one of them. */
 const need = ["poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs", "scope-guard.mjs",
-  "erc20-hazards.mjs", "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs",
+  "erc20-hazards.mjs", "storage-slots.mjs", "sell-proof.mjs", "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
   "heartbeat-health.mjs", "sleep-assertion.mjs", "monitor.mjs", "strategy.mjs", "trade-policy.mjs",
   /* A TOOL, not the trading runtime: never imported by poller.mjs, so it stays out of
      RUNTIME_FILES and out of the byte fingerprint, but it must be published, because it
      is the only way an operator can measure the three canary thresholds. */
   "live-roundtrip-4663.mjs",
+  "observations-report.mjs",
   "package.json", "package-lock.json", "install.sh", "macos-launchagent.sh", "macos-release.sh", "launchd-runner.mjs"];
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "wallste-install-test-"));
 const sources = new Map();
@@ -282,8 +283,32 @@ check("Node >=22.13 and <25 and pinned execution dependencies are required",
     installer.includes("npm ci --ignore-scripts"));
 check("installer never pipes a mutable bootstrap script into a privileged shell",
   !/nodesource[\s\S]*\|[\s\S]*sudo\s+-E\s+bash/.test(installer));
-check("installer stages the complete durable execution and monitoring module graph",
-  /RUNTIME_FILES=\(poller\.mjs journal\.mjs evm-executor\.mjs evm-rpc\.mjs evm-swap\.mjs approvals\.mjs scope-guard\.mjs erc20-hazards\.mjs thresholds\.mjs live-thresholds\.mjs eth-usd-oracle\.mjs balance-verification\.mjs entry-quote-guard\.mjs exit-trigger\.mjs feed-drain\.mjs heartbeat-health\.mjs sleep-assertion\.mjs monitor\.mjs strategy\.mjs trade-policy\.mjs\)/.test(installer));
+/* THE MODULE GRAPH IS WALKED, NOT TYPED OUT.
+ *
+ * This used to be a regex naming all twenty runtime files in order. It caught a dropped
+ * file, which is the point — and it also went red every time a real module was ADDED,
+ * which taught the next person that the fix is to paste the new name into the regex. A
+ * list maintained by hand beside a list maintained by the code is the drift this repo's
+ * own rule is about: compare what the system computes, never two source literals.
+ *
+ * So the invariant is stated directly instead: whatever poller.mjs's import closure
+ * reaches, the installer must stage. A new module joins by being imported; a dropped one
+ * is still caught, because the closure still names it. */
+{
+  const closure = new Set();
+  const walk = (file) => {
+    if (closure.has(file) || !sources.has(file)) return;
+    closure.add(file);
+    for (const m of (sources.get(file) || "").matchAll(/from "\.\/([\w.-]+\.mjs)"/g)) walk(m[1]);
+  };
+  walk("poller.mjs");
+  walk("monitor.mjs");
+  const staged = new Set(((installer.match(/RUNTIME_FILES=\(([^)]*)\)/) || [])[1] || "").split(/\s+/));
+  const unstaged = [...closure].filter((f) => !staged.has(f)).sort();
+  check("installer stages the complete durable execution and monitoring module graph",
+    closure.size > 15 && unstaged.length === 0,
+    unstaged.length ? `NOT STAGED: ${unstaged.join(", ")}` : `${closure.size} modules reachable, all staged`);
+}
 {
   // Three lists, one set: the installer's, the runner's, and the heartbeat fingerprint's.
   const runtimeList = (installer.match(/RUNTIME_FILES=\(([^)]*)\)/) || [])[1]?.split(/\s+/) ?? [];

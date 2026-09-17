@@ -255,6 +255,35 @@ const RISK_EVENTS_V2 = `(
   network_fee_wei TEXT,
   occurred_at INTEGER NOT NULL
 ) STRICT`;
+/* WHERE A REFUSAL THAT NEVER HAPPENED GETS WRITTEN DOWN.
+ *
+ * Every new gate in this executor is supposed to ship as a MEASUREMENT first — run it,
+ * record what it WOULD have refused, read the distribution back, and only then let it
+ * kill. There was nowhere to put that. The intent context only exists for calls that got
+ * as far as an intent, and the refused ones are exactly the sample that decides whether a
+ * gate is calibrated or is crying wolf.
+ *
+ * NOT IN `meta`. _validateDurableJson() parses every meta row at boot, so a growing blob
+ * there turns a measurement into a boot risk — the one thing an observation must never
+ * become. Its own table, pruned by age, and a writer that can never throw into a trade.
+ *
+ * `enforcing` is the honest half: a row written while the gate was observe-only and a row
+ * written once it could kill are different evidence, and a report that mixes them is
+ * measuring its own promotion. */
+const GATE_OBSERVATIONS = `(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  observed_at INTEGER NOT NULL,
+  call_id INTEGER,
+  mint TEXT,
+  symbol TEXT,
+  gate TEXT NOT NULL,
+  verdict TEXT NOT NULL CHECK(verdict IN ('pass','would_refuse','unreadable')),
+  value TEXT,
+  clip_wei TEXT,
+  enforcing INTEGER NOT NULL
+)`;
+export const GATE_VERDICTS = Object.freeze(["pass", "would_refuse", "unreadable"]);
+
 const ATTEMPT_FEE_EVENTS_V2 = `(
   intent_id TEXT NOT NULL REFERENCES intents(id) ON DELETE RESTRICT,
   attempt INTEGER NOT NULL,
@@ -326,6 +355,8 @@ export class ExecutionJournal {
       CREATE INDEX IF NOT EXISTS idx_risk_events_time ON risk_events(occurred_at);
       CREATE TABLE IF NOT EXISTS attempt_fee_events ${ATTEMPT_FEE_EVENTS_V2};
       CREATE INDEX IF NOT EXISTS idx_attempt_fee_events_time ON attempt_fee_events(occurred_at);
+      CREATE TABLE IF NOT EXISTS gate_observations ${GATE_OBSERVATIONS};
+      CREATE INDEX IF NOT EXISTS idx_gate_observations ON gate_observations(gate, observed_at);
     `);
     this.migrated = this._migrateSchema();
     ensurePrivateFile(this.file);
@@ -617,6 +648,53 @@ export class ExecutionJournal {
       riskWindowAsOf: end,
       riskWindowMs: window,
     };
+  }
+
+  /**
+   * RECORD WHAT A GATE WOULD HAVE DONE. THIS MAY NEVER REFUSE A TRADE.
+   *
+   * A measurement that can throw is a measurement that can stop the bot trading, which
+   * inverts the whole point of taking it. A full disk, a locked database, a schema that
+   * has not migrated yet — none of them is a reason to refuse a call, so every failure
+   * here is swallowed and reported, never raised. The ONE thing it validates loudly is
+   * the verdict enum, and it does that before touching the database: a typo'd verdict is
+   * a caller bug that would silently poison the distribution the report reads back, and
+   * it costs nothing to catch.
+   */
+  recordGateObservation({ gate, verdict, value = null, callId = null, mint = null,
+    symbol = null, clipWei = null, enforcing = false, now = this.now() } = {}) {
+    if (!gate || typeof gate !== "string") return { ok: false, error: "gate must be named" };
+    if (!GATE_VERDICTS.includes(verdict))
+      return { ok: false, error: `verdict must be one of ${GATE_VERDICTS.join(", ")}` };
+    try {
+      this.db.prepare(`INSERT INTO gate_observations
+        (observed_at, call_id, mint, symbol, gate, verdict, value, clip_wei, enforcing)
+        VALUES (?,?,?,?,?,?,?,?,?)`).run(
+        now, callId == null ? null : Number(callId), mint ?? null, symbol ?? null,
+        gate, verdict, value == null ? null : JSON.stringify(value),
+        clipWei == null ? null : String(clipWei), enforcing ? 1 : 0);
+      /* Pruning rides the writer rather than a timer, so an executor that is not running
+         is not accumulating either. Once every 500 rows is often enough for a table
+         nothing reads on the trading path. */
+      this._gateObservationWrites = (this._gateObservationWrites ?? 0) + 1;
+      if (this._gateObservationWrites % 500 === 0)
+        this.db.prepare("DELETE FROM gate_observations WHERE observed_at < ?")
+          .run(now - 30 * 24 * 60 * 60_000);
+      return { ok: true };
+    } catch (e) { return { ok: false, error: String(e?.message || e) }; }
+  }
+
+  /** The rows back out, for observations-report.mjs. Never called on the trading path. */
+  gateObservations({ gate = null, sinceMs = 0, limit = 5000 } = {}) {
+    try {
+      const rows = gate
+        ? this.db.prepare(`SELECT * FROM gate_observations WHERE gate=? AND observed_at >= ?
+                           ORDER BY observed_at DESC LIMIT ?`).all(gate, sinceMs, limit)
+        : this.db.prepare(`SELECT * FROM gate_observations WHERE observed_at >= ?
+                           ORDER BY observed_at DESC LIMIT ?`).all(sinceMs, limit);
+      return rows.map((r) => ({ ...r, enforcing: r.enforcing === 1,
+        value: r.value == null ? null : (() => { try { return JSON.parse(r.value); } catch { return r.value; } })() }));
+    } catch { return []; }
   }
 
   riskHistoryStatus(now = this.now()) {

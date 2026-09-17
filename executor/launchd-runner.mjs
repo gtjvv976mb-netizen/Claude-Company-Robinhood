@@ -26,6 +26,10 @@ const RUNTIME_FILES = Object.freeze([
   "approvals.mjs",
   "scope-guard.mjs",
   "erc20-hazards.mjs",
+  /* The exit proof: the slot finder and the sell simulation it drives. Runtime, because
+     poller.mjs imports recordExitProof and evm-executor.mjs imports proveExit. */
+  "storage-slots.mjs",
+  "sell-proof.mjs",
   "thresholds.mjs",
   "live-thresholds.mjs",
   "eth-usd-oracle.mjs",
@@ -56,6 +60,10 @@ const ALLOWED_ENV = new Set([
      retry re-enters through onEntry and faces all of them. The age ceiling is
      deliberately absent: it defers to MAX_CALL_AGE_MIN rather than owning a door. */
   "ENTRY_RETRY_BASE_MS", "ENTRY_RETRY_MAX_ATTEMPTS",
+  /* May only ever TIGHTEN the share of the risked distance gas may eat, which RAISES the
+     derived fee floor and can only refuse more. live-thresholds clampFeeShareOfStop
+     throws at boot on anything outside (0, 0.25], so this name cannot loosen a gate. */
+  "EXECUTOR_MAX_FEE_SHARE_OF_STOP",
   "FEE_RESERVE_ETH", "F_DEFAULT", "F_NAME_MAX", "HARD_STOP_FILE",
   "ENTRY_MODE", "ENTRY_MODE_ACK",
   "INIT_ONLY", "KEY_FILE", "LIVE_CAPS_ACK",

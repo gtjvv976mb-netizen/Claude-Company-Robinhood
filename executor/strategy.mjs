@@ -48,8 +48,55 @@ export { POLICY_VERSION };
  *                    typed sentence naming the wallet and the size (poller.mjs). */
 export const ENTRY_MODES = Object.freeze(["risk", "take-every-call"]);
 
+/**
+ * THE FEE FLOOR IS DERIVED, NEVER DIALED.
+ *
+ * Gas is FLAT on this chain, so two legs of it cost the same whatever the position is
+ * worth — which makes the fee share of the RISKED DISTANCE the thing that decides whether
+ * a bracket is worth opening at all. Solve it rather than pick it: the smallest clip at
+ * which two fee legs stay under `maxFeeShareOfStop` of what the stop puts at risk is
+ *
+ *     2 * feeReserve  <=  share * stopFrac * clip        =>   clip >= 2*fee / (share*stopFrac)
+ *
+ * so the floor moves on its own when gas moves or the stop tightens, and nobody has to
+ * remember to edit it. src/agents/risk-rails.js stopFloorDetail() solves the desk's
+ * PUBLISHED stop floor from the same share, so the two halves cannot disagree.
+ *
+ * ── IT FEEDS A REFUSAL AND NOTHING ELSE ─────────────────────────────────────────────
+ *
+ * This deliberately does NOT go into `minSolPerTrade`, and the reason is the whole care
+ * in this function. On the Solana desk the equivalent number has exactly one consumer,
+ * because that fork deleted conviction sizing. This fork KEPT it, and minSolPerTrade has
+ * a second job here: the conviction FLOOR (`want = Math.max(scaled, min(want, minSol))`).
+ * Routing a live gas reading into that key routes it into a SIZE-UP path — a median
+ * conviction call against a 14% stop would go 0.004 to 0.0058 ETH at 0.309 gwei and to
+ * the full clip at 0.7 gwei, which is 2.9x more capital at risk BECAUSE THE NETWORK GOT
+ * EXPENSIVE, with the reason string cheerfully reporting both. No rail may ever make a
+ * position larger. Its own key, read in exactly two places, both refusals.
+ *
+ * ── TWO CLAMPS THAT ARE LOAD-BEARING ────────────────────────────────────────────────
+ *
+ * A zero fee reserve returns 0, never 1: poller.mjs sets networkFeeReserveSol to 0 when
+ * EXECUTE is off, and a 1 would put the floor at the entry price on every paper position.
+ * And a stop of 95% or wider throws rather than returning a vast floor — at that width
+ * the arithmetic is no longer describing a trade, and a silent refusal of everything is
+ * the failure this repo keeps re-learning.
+ */
+export function feeFloorFor({ feeReserveSol, effectiveStopFrac, maxFeeShareOfStop }) {
+  const fee = Number(feeReserveSol), share = Number(maxFeeShareOfStop);
+  if (!(fee > 0) || !(share > 0)) return 0;
+  const stop = Number(effectiveStopFrac);
+  if (!(stop > 0) || stop >= 0.95)
+    throw new Error(`fee floor needs a stop distance in (0, 0.95), got ${effectiveStopFrac}`);
+  return (2 * fee) / (share * stop);
+}
+
 export const DEFAULTS = {
   entryMode: "risk",
+  /* Solved per call by feeFloorFor() and passed in; 0 means "not supplied", never
+     "no floor is needed". It is its OWN key because minSolPerTrade also floors
+     conviction sizing, and a gas reading must never reach a size-up path. */
+  feeFloorSolPerTrade: 0,
   maxSolPerTrade: 0.05,      // hard ceiling; Kelly may size well under it
   dailySolCap: 0.5,          // total SOL deployed per rolling day
   dailyLossLimitSol: 0.15,   // realized losses that stop new entries for the day
@@ -275,16 +322,29 @@ export function planEntry({ call, cfg = DEFAULTS, state }) {
      SOL-scale number (about a dollar); the Robinhood Chain executor sizes in ETH where
      the canary cap is 0.0004, and a floor above the cap made every entry "round to
      nothing" (measured 2026-09-05). Callers that pass nothing keep the old floor. */
-  const minSize = Number(c.minSolPerTrade) > 0 ? Number(c.minSolPerTrade) : 0.0005;
+  const staticFloor = Number(c.minSolPerTrade) > 0 ? Number(c.minSolPerTrade) : 0.0005;
+  /* THE DERIVED FLOOR ONLY EVER RAISES THE BAR TO ENTRY. It is solved from the gas
+     reading and the stop, so when the network is expensive or the stop is tight the
+     smallest worthwhile clip is larger — and the honest response to a clip under it is
+     to REFUSE, never to size up to meet it. */
+  const feeFloor = Number(c.feeFloorSolPerTrade) > 0 ? Number(c.feeFloorSolPerTrade) : 0;
+  const minSize = Math.max(staticFloor, feeFloor);
+  const gasIsWhy = feeFloor > staticFloor;
   if (!(want >= minSize))
     return { action: "skip",
       reason: boundBy
         ? `${boundBy} leaves ${Math.max(0, want).toFixed(4)} SOL, under the ${minSize} SOL minimum`
         /* NAME THE FLOOR AND THE NUMBER THAT MISSED IT. "Rounds to nothing" was true of a
            size that really was ~0, and misleading for one that is simply under the
-           measured minimum clip — the reader goes looking for a zero that is not there. */
-        : `the sized position is ${Math.max(0, want).toFixed(6)}, under the ${minSize} minimum clip — ` +
-          "below that the round trip is mostly the flat gas toll" };
+           measured minimum clip — the reader goes looking for a zero that is not there.
+           And when GAS is what raised the floor, say so: a floor that moved because the
+           network got expensive is otherwise a mysterious refusal rather than a
+           diagnosable one. */
+        : gasIsWhy
+          ? `the sized position is ${Math.max(0, want).toFixed(6)}, under the ${minSize.toFixed(6)} floor ` +
+            `two gas legs derive at this stop — the flat toll would eat more than its share of the risked distance`
+          : `the sized position is ${Math.max(0, want).toFixed(6)}, under the ${minSize} minimum clip — ` +
+            "below that the round trip is mostly the flat gas toll" };
 
   const actualF = (want * effectiveStopFrac + 2 * feeReserve) / Number(equity);
   if (!Number.isFinite(actualF) || actualF < 0)

@@ -1760,9 +1760,15 @@ export async function monitorCalls() {
       }
       if (shadows.length) {
         const card = shadow.scorecard({ sinceH: 168 });
-        if (card.graded >= 5)
-          emit("shadow:scorecard", { graded: card.graded, wouldHaveHit2x: card.wouldHaveHit2x,
-            died: card.died, medianPeakPct: card.medianPeakPct, verdict: card.verdict });
+        /* THE CLAIM FLOOR, NOT FIVE. This emitted a recommendation to loosen the desk's
+           refusal bar off five graded coins; the same repo wants a hundred settled
+           trades before it will claim an edge. Below the floor the shortfall is emitted
+           so the sample is visible, but never a verdict. */
+        if (card.graded > 0)
+          emit("shadow:scorecard", { graded: card.graded, floor: card.floor,
+            peakSeenAtPoll: card.peakSeenAtPoll, last: card.last,
+            wouldHavePaidUnderPolicy: card.wouldHavePaidUnderPolicy,
+            verdictClaimable: card.verdictClaimable, why: card.why });
       }
     } catch {}
 
