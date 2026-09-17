@@ -161,6 +161,10 @@ const EXECUTOR_FILES = [
      thresholds, since no read-only probe can watch what the sequencer does with a
      transaction. See executor/live-roundtrip-4663.mjs. */
   "live-roundtrip-4663.mjs",
+  /* Reads gate_observations back so a new refusal clause can be judged on its own
+     measured distribution before it is allowed to kill a trade. A TOOL: poller.mjs never
+     imports it, so it stays out of RUNTIME_FILES. See executor/observations-report.mjs. */
+  "observations-report.mjs",
   "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs", "scope-guard.mjs",
   "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs", "erc20-hazards.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",

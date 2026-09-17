@@ -18,6 +18,7 @@ const need = ["poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "e
      RUNTIME_FILES and out of the byte fingerprint, but it must be published, because it
      is the only way an operator can measure the three canary thresholds. */
   "live-roundtrip-4663.mjs",
+  "observations-report.mjs",
   "package.json", "package-lock.json", "install.sh", "macos-launchagent.sh", "macos-release.sh", "launchd-runner.mjs"];
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "wallste-install-test-"));
 const sources = new Map();

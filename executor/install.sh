@@ -436,7 +436,7 @@ RUNTIME_FILES=(poller.mjs journal.mjs evm-executor.mjs evm-rpc.mjs evm-swap.mjs 
 # launchd-runner.mjs and heartbeat-health.mjs's fingerprint all name the same trading
 # runtime, and a tool in that list would make the byte identity cover code that never
 # executes a trade. It is still downloaded, staged and syntax-checked.
-TOOL_FILES=(burner-backup.mjs live-roundtrip-4663.mjs)
+TOOL_FILES=(burner-backup.mjs live-roundtrip-4663.mjs observations-report.mjs)
 SOURCE_FILES=("${RUNTIME_FILES[@]}" "${TOOL_FILES[@]}" package.json package-lock.json)
 if [ "$MODE" = "live" ]; then
   echo "▶ staging immutable runtime blobs from commit $SOURCE_COMMIT"

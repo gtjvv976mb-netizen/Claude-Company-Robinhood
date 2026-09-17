@@ -183,6 +183,20 @@ export const MIN_CLIP_ETH = defineThreshold("size.minClipEth", 0.004,
    caps have to be the SAME numbers the live process uses, not a restatement of them.
    Every one is derived from the measured cheapest clip above rather than chosen, so a
    re-measurement of that one number moves the whole ladder. */
+/* HOW MANY OBSERVATIONS A NEW REFUSAL CLAUSE MUST ACCUMULATE BEFORE IT MAY KILL.
+   Deliberately ASSUMED and live:false, and both are the honest labels: this is not a
+   measurement of chain 4663, it is the desk's own claim floor (src/improvement-constants
+   CLAIM_SAMPLE_FLOOR, which src/perf.js edgeClaimable also reads) applied to the
+   executor's gates so one bar governs both halves of the company. Registering it as
+   measured would be a lie assertLiveReady() has no way to catch, and live:false is
+   correct because it decides no trade — it decides when a human is allowed to turn one
+   on. A lint that cries wolf gets switched off, so a gate that has not earned its
+   promotion does not get one. */
+export const GATE_PROMOTION_SAMPLE = defineThreshold("gates.promotionSampleFloor", 100,
+  { provenance: P.ASSUMED, live: false, unit: "observations",
+    note: "a new refusal clause records pass/would_refuse/unreadable until it clears this, " +
+      "then a human reads observations-report.mjs and promotes it deliberately" });
+
 export const LIVE_CAPS = Object.freeze({
   maxEthPerTrade: CHEAPEST_CLIP_ETH,
   dailyEthCap: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
