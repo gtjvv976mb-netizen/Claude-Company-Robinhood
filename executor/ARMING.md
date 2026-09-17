@@ -176,6 +176,50 @@ in the chronicle when it does.
 
 ---
 
+## 4b. The gates that are measuring rather than refusing
+
+Three clauses run on the entry path right now and refuse **nothing**. They record what
+they *would* have done into the journal's `gate_observations` table, and a human promotes
+them once the numbers say they have earned it. That order is deliberate: a lint that cries
+wolf gets switched off, and a gate that starts refusing a chunk of the universe on day one
+is how a real check gets disabled for the cases that mattered.
+
+| clause | what it measures | where |
+|---|---|---|
+| `exit_route_unproven` | the real sell calldata, executed against the real router with the position and allowance handed to your wallet by state override. Not a quote — the sell, run. | `sell-proof.mjs` |
+| `hazard_selector_observed` | three blocklist selectors the desk probes and the executor was blind to: `isBlocked`, `blocklist`, `isFrozen` | `erc20-hazards.mjs` |
+| `pool_manager_balance` | whether the token has left the curve into a pool that can actually be sold into | `erc20-hazards.mjs` |
+
+Read them back at any time. It costs nothing and touches no key:
+
+```bash
+node executor/observations-report.mjs --gate exit_route_unproven --since 7d
+```
+
+Each gate prints n, the pass / would_refuse / **unreadable** split, the deciles of what it
+measured, and the reasons behind unreadable. **Read the unreadable rate before anything
+else.** It is neither a pass nor a refusal — it is the gate failing to measure, and a
+clause that cannot read the chain a tenth of the time will fail *closed* a tenth of the
+time once promoted. That number decides readiness far more often than the refusal rate.
+
+The report prints `PROMOTABLE` once a gate clears `gates.promotionSampleFloor` (100,
+registered ASSUMED — it is the desk's own claim floor, not a measurement of this chain).
+That means **the sample is large enough to look at**, not that the clause is right. The
+report will never tell you to promote; that decision is yours, and a tool that made it for
+you would repeat the mistake the shadow scorecard made when it published a verdict off
+five coins.
+
+In the log, an observing gate looks like this, and the entry proceeds:
+
+```
+EXIT PROOF WIF: WOULD REFUSE — the sell REVERTED in simulation: execution reverted:
+TRANSFER_FROM_FAILED (observe-only; it does not stop this entry)
+```
+
+That line on a coin you then lost money on is the single most useful row in the journal.
+
+---
+
 ## 5. Order of operations
 
 0. **Top up the Anthropic account.** The desk halts at `desk:out_of_credit` — the API
@@ -192,5 +236,9 @@ in the chronicle when it does.
    rehearses the size the live bot will actually take.
 5. Decide the clip (§2) and the entry mode (§2b), and type the sentences.
 6. Optionally run the rehearsal (§3).
-7. `EXECUTE=1`. `assertLiveReady()` runs at boot; if it refuses, its message names the
+7. **Let the observing gates collect a sample** (§4b) before trusting them. They cost
+   nothing and refuse nothing; `observations-report.mjs` tells you when there is enough to
+   read. A `WOULD REFUSE` line on a coin that then lost money is the evidence that earns a
+   promotion.
+8. `EXECUTE=1`. `assertLiveReady()` runs at boot; if it refuses, its message names the
    number and why — that message is the specification, not this file.
