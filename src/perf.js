@@ -6,6 +6,7 @@ import { canonicalAddress, isEvmAddress, isEvmTxHash } from "./canonical.js";
 // fills references calls(id), so that table must exist before this module's DDL runs.
 // Importing for the side effect is the dependency, and stating it here keeps it honest.
 import "./calls.js";
+import { CLAIM_SAMPLE_FLOOR } from "./improvement-constants.js";
 
 /**
  * PERFORMANCE — did the tenant actually take the call, and what did it make them?
@@ -411,7 +412,7 @@ export function houseRecord() {
   const variance = returns.length > 1
     ? returns.reduce((s, x) => s + (x - mean) ** 2, 0) / (returns.length - 1) : null;
   const expectancyLow95 = variance != null ? mean - 1.96 * Math.sqrt(variance / returns.length) : null;
-  const enough = n >= 100;
+  const enough = n >= CLAIM_SAMPLE_FLOOR;   // one floor, one home
   const edgeClaimable = enough && w.low > 0.5 && expectancyLow95 > 0;
   return {
     settled: n, wins, losses: n - wins,

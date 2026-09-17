@@ -1,6 +1,9 @@
 import db from "./lib/store.js";
 import { emit } from "./lib/bus.js";
 import { canonicalAddress } from "./canonical.js";
+import { CLAIM_SAMPLE_FLOOR } from "./improvement-constants.js";
+import { pricePolicy, POLICY_DEFAULTS } from "../executor/trade-policy.mjs";
+import { expectedRoundTripPct, CHEAPEST_CLIP_ETH } from "../executor/live-thresholds.mjs";
 
 /**
  * THE SHADOW BOOK — grading the desk on what it REFUSED.
@@ -82,57 +85,137 @@ export function markChecked(id, priceNow) {
 /**
  * THE SCORECARD. What did the desk's refusals actually do?
  *
- * Reported by PEAK as well as by last price, because the two answer different
- * questions: peak is what a take-profit rule would have caught, last is what holding
- * would have returned. This desk sells into strength, so peak is the honest measure of
- * what a refusal cost — and quoting only the last price would flatter the desk by
- * pretending it would have round-tripped every winner.
+ * ── THREE THINGS THIS FUNCTION GOT WRONG, ALL IN THE SAME DIRECTION ─────────────────
+ *
+ * It is the only function in this repo capable of talking the desk into LOOSENING its
+ * refusal bar. On a chain where 66.8% of wallets lose, that is how a selection desk
+ * joins them, so its errors are not symmetric and none of them were caught by a test.
+ *
+ *   1. NO SAMPLE FLOOR. It returned "REFUSALS ARE RUNNING — the bar is costing more than
+ *      it saves" with no minimum n, and penthouse.js emitted that at graded >= FIVE, in
+ *      a repo that requires a hundred settled trades before it will claim an edge
+ *      (src/perf.js edgeClaimable). Five coins is not evidence; it is a coin flip with a
+ *      recommendation attached. It now reads CLAIM_SAMPLE_FLOOR — the same number — and
+ *      reports a SHORTFALL ("41 of 100 graded") rather than a projection.
+ *
+ *   2. IT COMPARED PEAK AGAINST LAST. `wouldHaveBanked` counted rows whose PEAK cleared
+ *      +50%; `died` counted rows whose LAST price was under -50%; and then the verdict
+ *      compared the two counts. A coin that spiked 60% and went to zero scored in BOTH,
+ *      and since a peak is far easier to clear than a terminal collapse, the comparison
+ *      leaned toward "refusals are running" by construction. Peak and last are now
+ *      reported SIDE BY SIDE and never differenced.
+ *
+ *   3. THE +50% BAR WAS MONEY THIS DESK CANNOT TAKE. It was justified as "half the
+ *      position comes off at the desk's target" — but this executor has NO partial exit:
+ *      trade-policy.mjs closes in full, and strategy.mjs sets scaleOutPct 0 with "never
+ *      emits sell_part". So the headline number counted profit from a scale-out that
+ *      does not exist. It is replaced by `wouldHavePaidUnderPolicy`, which runs the
+ *      recorded prices through pricePolicy — the SAME function the executor and the desk
+ *      record share byte-for-byte — and nets this chain's own round trip off the result.
+ *
+ * WHAT IS STILL WEAK, SAID RATHER THAN HIDDEN: the table stores three prices, not a
+ * series. `peak_price` is a SPARSE POLL MAXIMUM — markChecked only updates it when the
+ * monitor happens to look, at most a dozen rows a pass — so it is a lower bound on the
+ * true peak and the replay below sees a three-point path, not the path. It is named
+ * peakSeenAtPoll now so nothing reads it as the real high.
  */
-export function scorecard({ sinceH = 168 } = {}) {
+export function scorecard({ sinceH = 168, floor = CLAIM_SAMPLE_FLOOR } = {}) {
   const rows = db.prepare(
     "SELECT * FROM shadow WHERE checked_at IS NOT NULL AND refused_at > ?")
     .all(Date.now() - sinceH * 3600e3);
-  if (!rows.length) return { graded: 0, note: "no refusals have been priced again yet" };
+  if (!rows.length) return {
+    graded: 0, floor, floorsFrom: "src/improvement-constants.js CLAIM_SAMPLE_FLOOR",
+    verdictClaimable: false, why: `0 of ${floor} graded — no verdict`,
+    note: "no refusals have been priced again yet",
+  };
 
   const move = (r) => ((r.price_now - r.price_at) / r.price_at) * 100;
   const peak = (r) => ((r.peak_price - r.price_at) / r.price_at) * 100;
   const peaks = rows.map(peak);
-  /* TWO BARS, because this desk exits in two places and one bar would lie about it.
-   * Half the position comes off at the desk's target — call it +50% — long before the
-   * 2x rule closes the rest. Grading only on 2x scored ZCAT's +98.8% as a miss by 1.2
-   * points, when in truth half of it would have been banked and the remainder would
-   * have trailed out well above entry. A scorecard that cannot see the money the
-   * strategy actually takes is not measuring the strategy. */
-  const wouldHaveBanked = peaks.filter((p) => p >= 50).length;
-  const wouldHaveHit2x = peaks.filter((p) => p >= 100).length;
-  const died = rows.filter((r) => move(r) <= -50).length;
+
+  /* THE POLICY THAT ACTUALLY RUNS, REPLAYED. Three points is all the table has: the
+     price at refusal, the sparse poll peak, and the last price. Walking them through
+     pricePolicy in order gives the policy its chance to arm breakeven (1.35x), arm the
+     25% trail (1.5x) and take profit (2x) before the last price arrives — which is the
+     whole difference between "it peaked above a bar" and "this desk would have banked
+     it". Friction is charged once, from this chain's own curve. */
+  const FRICTION = expectedRoundTripPct(CHEAPEST_CLIP_ETH) / 100;
+  const replay = (r) => {
+    const entry = Number(r.price_at);
+    if (!(entry > 0)) return null;
+    const high = Number(r.peak_price) > 0 ? Number(r.peak_price) : entry;
+    const last = Number(r.price_now) > 0 ? Number(r.price_now) : entry;
+    let position = {
+      entry, high: 0, pendingHigh: 0, stop: entry * 0.75, target: null,
+      openedAtMs: null, holdMaxMs: null,
+    };
+    const cfg = { ...POLICY_DEFAULTS, honorDeskTarget: false };
+    /* The peak is offered TWICE because pricePolicy commits a new high only on a second
+       witness — a real run printed it more than once, and a sparse poll that saw it at
+       all is evidence of exactly that. Then the last price arrives. */
+    for (const mark of [high, high, last]) {
+      const d = pricePolicy({ position, mark, nowMs: 0, config: cfg });
+      position = d.position;
+      if (d.action === "sell") return (mark / entry) * (1 - FRICTION) - 1;
+    }
+    return (last / entry) * (1 - FRICTION) - 1;
+  };
+  const paid = rows.map(replay).filter((x) => x != null);
+  const wouldHavePaidUnderPolicy = paid.filter((x) => x > 0).length;
+  const medianPaidPct = paid.length
+    ? Number([...paid].sort((a, b) => a - b)[Math.floor(paid.length / 2)].toFixed(4)) * 100 : null;
+
+  /* PEAK AND LAST, SIDE BY SIDE, NEVER DIFFERENCED. */
+  const peakedOver2x = peaks.filter((p) => p >= 100).length;
+  const peakedOver50 = peaks.filter((p) => p >= 50).length;
+  const diedOnLast = rows.filter((r) => move(r) <= -50).length;
 
   const byStage = {};
   for (const r of rows) {
     const k = r.stage;
-    byStage[k] ??= { n: 0, banked: 0, hit2x: 0, died: 0 };
+    byStage[k] ??= { n: 0, peakedOver50: 0, peakedOver2x: 0, diedOnLast: 0 };
     byStage[k].n++;
-    if (peak(r) >= 50) byStage[k].banked++;
-    if (peak(r) >= 100) byStage[k].hit2x++;
-    if (move(r) <= -50) byStage[k].died++;
+    if (peak(r) >= 50) byStage[k].peakedOver50++;
+    if (peak(r) >= 100) byStage[k].peakedOver2x++;
+    if (move(r) <= -50) byStage[k].diedOnLast++;
   }
 
+  const graded = rows.length;
+  const claimable = graded >= floor;
+  const pct = (n) => Math.round((n / graded) * 100);
   return {
-    graded: rows.length,
-    wouldHaveBanked,
-    bankedPct: Math.round((wouldHaveBanked / rows.length) * 100),
-    wouldHaveHit2x,
-    hit2xPct: Math.round((wouldHaveHit2x / rows.length) * 100),
-    died,
-    diedPct: Math.round((died / rows.length) * 100),
-    medianPeakPct: Number(peaks.sort((a, b) => a - b)[Math.floor(peaks.length / 2)].toFixed(1)),
+    graded,
+    floor,
+    floorsFrom: "src/improvement-constants.js CLAIM_SAMPLE_FLOOR",
+    pollCount: rows.filter((r) => r.checked_at != null).length,
+
+    /* The headline: what this desk's own policy would have realised, net of friction. */
+    wouldHavePaidUnderPolicy,
+    paidPct: pct(wouldHavePaidUnderPolicy),
+    medianPaidPct,
+    frictionPct: Number((FRICTION * 100).toFixed(2)),
+
+    /* The two raw columns, reported but never compared. */
+    peakSeenAtPoll: { over50: peakedOver50, over2x: peakedOver2x,
+      over50Pct: pct(peakedOver50), over2xPct: pct(peakedOver2x),
+      medianPct: Number(peaks.slice().sort((a, b) => a - b)[Math.floor(peaks.length / 2)].toFixed(1)),
+      note: "a SPARSE POLL maximum — a lower bound on the true high, not the high" },
+    last: { died: diedOnLast, diedPct: pct(diedOnLast),
+      note: "terminal price at the last poll" },
+
     byStage,
-    /* The line that matters. A desk whose refusals mostly die is calibrated; one whose
-     * refusals mostly double is expensive, and now says so in its own numbers. */
-    verdict: wouldHaveBanked > died
-      ? "REFUSALS ARE RUNNING — the bar is costing more than it saves"
-      : died > wouldHaveBanked * 2
-        ? "refusals are dying as intended — the bar is earning its keep"
-        : "mixed — not enough separation to move the bar on",
+
+    /* THE VERDICT IS A CLAIM, SO IT OBEYS THE CLAIM FLOOR. Below it there is no verdict
+     * at all — not a weaker one — and the shortfall is reported rather than a
+     * projection of what the number might become. */
+    verdictClaimable: claimable,
+    why: claimable
+      ? (wouldHavePaidUnderPolicy > diedOnLast
+        ? "REFUSALS WOULD HAVE PAID under this desk's own policy — the bar is costing more than it saves"
+        : diedOnLast > wouldHavePaidUnderPolicy * 2
+          ? "refusals are dying as intended — the bar is earning its keep"
+          : "mixed — not enough separation to move the bar on")
+      : `${graded} of ${floor} graded — no verdict`,
   };
 }
+

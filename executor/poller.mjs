@@ -29,7 +29,7 @@ import {
 } from "./journal.mjs";
 import { EvmExecutor, EXECUTION_READINESS_ROUTE, walletFromKeyFile } from "./evm-executor.mjs";
 import { createRpc, erc20Balance, gasPriceConsensus, isAddress, fromHex, plainEthUnits } from "./evm-rpc.mjs";
-import { expectedRoundTripPct, CHEAPEST_CLIP_ETH, MIN_CLIP_ETH } from "./live-thresholds.mjs";
+import { expectedRoundTripPct, CHEAPEST_CLIP_ETH, MIN_CLIP_ETH, LIVE_CAPS } from "./live-thresholds.mjs";
 import { assertLiveReady, threshold } from "./thresholds.mjs";
 import {
   RpcBalanceUnavailableError, verifyTrackedBalanceWithFailover,
@@ -148,10 +148,11 @@ let lastDecisionSeen = Date.now() - 6 * 3600e3;
  * Raising past these is still the caps ceremony below — all three set explicitly plus a
  * typed sentence naming this wallet and these numbers — and env may only ever lower. */
 const LIVE_LIMITS = Object.freeze({
-  maxEthPerTrade: CHEAPEST_CLIP_ETH,
-  dailyEthCap: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
-  dailyLossLimitEth: Number((CHEAPEST_CLIP_ETH * 3).toFixed(6)),
-  maxOpenPositions: 4,
+  /* The four caps live in live-thresholds.mjs LIVE_CAPS, derived there from the measured
+     cheapest clip, because simulate.mjs has to run the rails at the SAME scale this
+     process does. Spread, never restated: a second copy is the drift the LESSONS file
+     warns about. */
+  ...LIVE_CAPS,
   maxExitPriceImpactPct: 50,
   /* THE ENTRY ROUND-TRIP CEILING, DERIVED FROM THE DESK'S OWN rather than inherited
      from Solana's 12. The guard measures a conservative loss of

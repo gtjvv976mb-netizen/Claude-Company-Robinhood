@@ -241,18 +241,32 @@ const pollerSource = fs.readFileSync(new URL("./executor/poller.mjs", import.met
  * is what is asserted: the same derivation, from the same registry entry. The source is
  * still read, for the one thing a value comparison cannot see — that the poller has not
  * quietly gone back to a hardcoded number. */
-const { CHEAPEST_CLIP_ETH } = await import("./executor/live-thresholds.mjs");
+const { CHEAPEST_CLIP_ETH, LIVE_CAPS } = await import("./executor/live-thresholds.mjs");
+/* THE DERIVATION MOVED INTO THE REGISTRY, so this compares against LIVE_CAPS rather than
+   re-deriving it here. A test that restates `CHEAPEST_CLIP_ETH * 10` is a third copy of
+   the arithmetic and would keep passing while the real one drifted. */
 for (const [key, value] of Object.entries({
-  maxEthPerTrade: CHEAPEST_CLIP_ETH,
-  rolling24hDeployEth: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
-  rolling24hRealizedLossBrakeEth: Number((CHEAPEST_CLIP_ETH * 3).toFixed(6)),
-  maxOpenPositions: 4,
+  maxEthPerTrade: LIVE_CAPS.maxEthPerTrade,
+  rolling24hDeployEth: LIVE_CAPS.dailyEthCap,
+  rolling24hRealizedLossBrakeEth: LIVE_CAPS.dailyLossLimitEth,
+  maxOpenPositions: LIVE_CAPS.maxOpenPositions,
 })) {
   assert.equal(EXECUTOR_CANARY_DEFAULTS[key], value,
     `dashboard default ${key} must equal the executor's, which is derived from the measured cheapest clip`);
 }
-assert.match(pollerSource, /maxEthPerTrade: CHEAPEST_CLIP_ETH,/,
-  "the executor's default must READ the registry, not restate a number beside it");
+assert.equal(LIVE_CAPS.maxEthPerTrade, CHEAPEST_CLIP_ETH,
+  "the live cap must BE the registry's measured cheapest clip, not a number beside it");
+/* The source check the value comparison cannot make: the poller must SPREAD the derived
+   caps, never restate one. It used to read the registry directly; the derivation moved to
+   live-thresholds.mjs so the simulator could run the same rails, so the assertion follows
+   it rather than being deleted. */
+assert.match(pollerSource, /\.\.\.LIVE_CAPS,/,
+  "the executor's caps must spread the registry's derived object, not restate a number");
+assert.ok(!/maxEthPerTrade:\s*0\.0112/.test(pollerSource),
+  "the poller must not carry a hardcoded default clip");
+const thresholdSource = fs.readFileSync(new URL("./executor/live-thresholds.mjs", import.meta.url), "utf8");
+assert.match(thresholdSource, /maxEthPerTrade: CHEAPEST_CLIP_ETH,/,
+  "and the registry's own caps must READ the measured clip, not restate it");
 assert.match(pollerSource, /OPERATOR_MAX[\s\S]{0,900}maxEthPerTrade: 0\.1, dailyEthCap: 1, dailyLossLimitEth: 0\.3/,
   "the hard maxima are a deliberate code constant and both copies must name the same three");
 for (const [key, value] of Object.entries({

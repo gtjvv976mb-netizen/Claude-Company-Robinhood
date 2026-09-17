@@ -176,6 +176,20 @@ export const MIN_CLIP_ETH = defineThreshold("size.minClipEth", 0.004,
     "1.4% of 0.004 ETH; at the 2026-09-04 reading of 0.309 gwei it is 0.000204 ETH, 5.1%"),
     unit: "ETH", live: true });
 
+/* THE OPERATOR'S LIVE CAPS, IN ONE PLACE BECAUSE TWO READERS NEED THEM.
+   poller.mjs owned this arithmetic alone while it was the only reader. simulate.mjs is
+   the second: a simulation run at Solana's 0.05/0.5/0.15 against a 0.0112 ETH clip never
+   binds a portfolio brake, so it measured an engine whose rails were switched off — the
+   caps have to be the SAME numbers the live process uses, not a restatement of them.
+   Every one is derived from the measured cheapest clip above rather than chosen, so a
+   re-measurement of that one number moves the whole ladder. */
+export const LIVE_CAPS = Object.freeze({
+  maxEthPerTrade: CHEAPEST_CLIP_ETH,
+  dailyEthCap: Number((CHEAPEST_CLIP_ETH * 10).toFixed(6)),
+  dailyLossLimitEth: Number((CHEAPEST_CLIP_ETH * 3).toFixed(6)),
+  maxOpenPositions: 4,
+});
+
 export const MIN_LIQUIDITY_USD = defineThreshold("screen.minLiquidityUsd", 2_000,
   { ...M("2026-09-07", "DexScreener sweep of the desk's own on-board RH universe: liquidity p10 $6.6k / " +
     "p50 $13.4k; the OPENNESS_LEVELS.open floor in src/config.js admits 59% of that sample where the " +
