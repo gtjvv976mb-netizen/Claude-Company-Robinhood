@@ -96,7 +96,7 @@ if [ ! -x "$GIT_BIN" ]; then fail "the system Git client is required"; fi
 
 RUNTIME_PATHS=(
   executor/poller.mjs executor/journal.mjs executor/evm-executor.mjs executor/evm-rpc.mjs
-  executor/evm-swap.mjs executor/approvals.mjs executor/scope-guard.mjs executor/erc20-hazards.mjs
+  executor/evm-swap.mjs executor/approvals.mjs executor/scope-guard.mjs executor/erc20-hazards.mjs executor/storage-slots.mjs executor/sell-proof.mjs
   executor/thresholds.mjs executor/live-thresholds.mjs executor/eth-usd-oracle.mjs
   executor/balance-verification.mjs executor/entry-quote-guard.mjs
   executor/exit-trigger.mjs executor/feed-drain.mjs

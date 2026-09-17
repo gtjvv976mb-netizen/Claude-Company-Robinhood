@@ -22,7 +22,7 @@ const outputFile = path.join(runtimeDir, "literal-output.txt");
 const marker = path.join(sandbox, "must-not-exist");
 const runtimeFiles = [
   "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs",
-  "scope-guard.mjs", "erc20-hazards.mjs", "thresholds.mjs", "live-thresholds.mjs",
+  "scope-guard.mjs", "erc20-hazards.mjs", "storage-slots.mjs", "sell-proof.mjs", "thresholds.mjs", "live-thresholds.mjs",
   "eth-usd-oracle.mjs", "balance-verification.mjs", "entry-quote-guard.mjs",
   "exit-trigger.mjs", "feed-drain.mjs", "heartbeat-health.mjs",
   "sleep-assertion.mjs", "strategy.mjs",

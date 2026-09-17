@@ -10,7 +10,7 @@ const POSITION_FLAGS = ["callIdentityIncomplete", "accountingIncomplete", "balan
    the same set; test-launchd holds them together. */
 const TRADING_RUNTIME_FILES = Object.freeze([
   "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs",
-  "scope-guard.mjs", "erc20-hazards.mjs", "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs",
+  "scope-guard.mjs", "erc20-hazards.mjs", "storage-slots.mjs", "sell-proof.mjs", "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
   "heartbeat-health.mjs", "sleep-assertion.mjs", "strategy.mjs", "trade-policy.mjs",
 ]);

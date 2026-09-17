@@ -166,7 +166,7 @@ const EXECUTOR_FILES = [
      imports it, so it stays out of RUNTIME_FILES. See executor/observations-report.mjs. */
   "observations-report.mjs",
   "poller.mjs", "journal.mjs", "evm-executor.mjs", "evm-rpc.mjs", "evm-swap.mjs", "approvals.mjs", "scope-guard.mjs",
-  "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs", "erc20-hazards.mjs",
+  "thresholds.mjs", "live-thresholds.mjs", "eth-usd-oracle.mjs", "erc20-hazards.mjs", "storage-slots.mjs", "sell-proof.mjs",
   "balance-verification.mjs", "entry-quote-guard.mjs", "exit-trigger.mjs", "feed-drain.mjs",
   "heartbeat-health.mjs", "sleep-assertion.mjs", "monitor.mjs", "install.sh", "macos-launchagent.sh",
   "macos-release.sh", "launchd-runner.mjs", "executor.mjs",

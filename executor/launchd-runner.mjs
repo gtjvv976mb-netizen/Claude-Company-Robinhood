@@ -26,6 +26,10 @@ const RUNTIME_FILES = Object.freeze([
   "approvals.mjs",
   "scope-guard.mjs",
   "erc20-hazards.mjs",
+  /* The exit proof: the slot finder and the sell simulation it drives. Runtime, because
+     poller.mjs imports recordExitProof and evm-executor.mjs imports proveExit. */
+  "storage-slots.mjs",
+  "sell-proof.mjs",
   "thresholds.mjs",
   "live-thresholds.mjs",
   "eth-usd-oracle.mjs",

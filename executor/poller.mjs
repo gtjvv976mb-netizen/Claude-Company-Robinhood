@@ -51,6 +51,7 @@ import {
   independentEthUsdPrice, ETH_USD_CACHE_SOURCE, ETH_USD_ORACLE_POLICY, usableEthUsdCache,
 } from "./eth-usd-oracle.mjs";
 import { DEFAULTS, ENTRY_MODES, planEntry, openPosition, stepPosition, freshState, feeFloorFor } from "./strategy.mjs";
+import { recordExitProof } from "./sell-proof.mjs";
 import { policyConfigForPosition, resolveTakeProfitRule, validateEntryReference } from "./trade-policy.mjs";
 
 process.umask(0o077);
@@ -1270,7 +1271,7 @@ async function onEntry(ev) {
    * never assumed from the larger one's proof. */
   const ladder = [1, 0.5, 0.25];
   let preflight = null, tokenDecimals = null, ethUsdOracle = null, preliminaryAmountWei = null;
-  let executableReturnRatio = 0, worstFeeRatio = 0, slippageHaircut = 1;
+  let executableReturnRatio = 0, worstFeeRatio = 0, slippageHaircut = 1, exitProof = null;
   let conservativeReturnRatio = 0, conservativeLossPct = 0;
   let lastRefusal = null;
   for (const fraction of ladder) {
@@ -1314,6 +1315,25 @@ async function onEntry(ev) {
         log(`ENTRY ${ev.symbol}: sized down to ${sized} ETH (${fraction}× the cap) — the round trip clears there`);
       plan = { ...plan, sol: sized, ladderFraction: fraction };
       lastRefusal = null;
+      /* PROVE THE EXIT, OBSERVE-ONLY. The rung is chosen; before the entry is built, run
+         the real sell calldata against the real router with the position and allowance
+         handed to this wallet by state override, and record what happens. It decides
+         NOTHING yet: the whole call is wrapped so that a bug here, an unreadable node or
+         a slow scan cannot refuse a trade the rest of the stack has cleared. It becomes a
+         kill only when observations-report.mjs shows it has earned one — which is what
+         gates.promotionSampleFloor is for. */
+      try {
+        exitProof = await executor.proveExitRoute(ev.mint, preflight.prepared.simulatedOut);
+        recordExitProof(journal, exitProof, { callId: ev.call_id ?? null, mint: ev.mint,
+          symbol: ev.symbol, clipWei: preliminaryAmountWei.toString(), enforcing: false });
+        if (exitProof.verdict === "refutable")
+          log(`EXIT PROOF ${ev.symbol}: WOULD REFUSE — ${exitProof.reason} ` +
+            `(observe-only; it does not stop this entry)`);
+        else if (exitProof.verdict === "unreadable")
+          log(`EXIT PROOF ${ev.symbol}: unreadable — ${exitProof.reason}`);
+      } catch (e) {
+        log(`EXIT PROOF ${ev.symbol}: skipped — ${String(e?.message || e).slice(0, 120)}`);
+      }
       break;
     }
     lastRefusal = conservativeReturnRatio <= entryReference.stopRatio

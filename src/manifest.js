@@ -22,6 +22,10 @@ export const DECISION_MANIFEST_FILES = Object.freeze([
   "package-lock.json",
   "executor/approvals.mjs",
   "executor/erc20-hazards.mjs",
+  /* The exit proof decides nothing yet, but it runs on the entry path and its verdict is
+     recorded against every call — so it belongs in the manifest that says what decided. */
+  "executor/storage-slots.mjs",
+  "executor/sell-proof.mjs",
   "executor/evm-executor.mjs",
   "executor/evm-swap.mjs",
   "executor/live-thresholds.mjs",

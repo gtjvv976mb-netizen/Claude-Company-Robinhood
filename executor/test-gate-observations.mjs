@@ -146,7 +146,12 @@ console.log("\nTHE SPAN PARSER, AND THE TOOL'S PLACE IN THE MANIFESTS");
   const health = fs.readFileSync(new URL("./heartbeat-health.mjs", import.meta.url), "utf8");
   ok("...nor in the trading runtime health check", !/observations-report/.test(health));
   const poller = fs.readFileSync(new URL("./poller.mjs", import.meta.url), "utf8");
-  ok("...and the poller never imports it", !/observations-report/.test(poller));
+  /* IMPORTS, not mentions. The poller's comments name this tool — correctly, because that
+     is where an operator is told how a gate earns its promotion — so a bare substring
+     test fails on the documentation it should be encouraging. What must stay true is that
+     nothing on the trading path LOADS it. */
+  ok("...and the poller never imports it",
+    !/from "\.\/observations-report\.mjs"/.test(poller) && !/import\(["']\.\/observations-report/.test(poller));
   const report = fs.readFileSync(new URL("./observations-report.mjs", import.meta.url), "utf8");
   ok("the report never recommends promoting, it only reports",
     /does not recommend promoting/.test(report));
